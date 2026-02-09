@@ -74,9 +74,7 @@ Point the server at **any local folder** containing a codebase. Index once, then
 
 ---
 
-## Demo (add a GIF here)
-
-![Quickstart demo](docs/demo.gif)
+## Demo
 
 Suggested demo flow:
 1. `index_repo(path=...)`
