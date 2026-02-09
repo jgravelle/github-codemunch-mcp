@@ -1,44 +1,63 @@
-
 # jCodeMunch MCP
-### Precision Code Intelligence for the Agent Era
+### Make AI agents cheaper and faster on real codebases
 
-![Build](https://img.shields.io/badge/build-passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![MCP](https://img.shields.io/badge/MCP-compatible-purple)
-![Python](https://img.shields.io/badge/python-3.10%2B-yellow)
+![Local-first](https://img.shields.io/badge/local--first-yes-brightgreen)
+![Polyglot](https://img.shields.io/badge/parsing-tree--sitter-9cf)
 
-**Stop loading files. Start navigating symbols.**
+**Stop dumping files into context windows. Start retrieving exactly what the agent needs.**
 
-jCodeMunch MCP converts any local repository into a semantic navigation engine that AI agents can query with surgical precision. Designed specifically for the MCP / OpenClaw / Claude Desktop ecosystem, it enables autonomous agents to explore large codebases efficiently, reducing token consumption and dramatically improving reasoning quality.
-
----
-
-## Why Agents Need This
-
-Modern AI agents waste tokens brute‑forcing file reads. jCodeMunch changes the paradigm:
-
-- Symbol‑first discovery instead of file scanning
-- Deterministic structural retrieval
-- Massive context cost reduction
-- Near‑instant semantic navigation
-- Local‑first indexing — no vendor lock‑in
-
-Agents don’t need more context.  
-They need **better context access**.
+jCodeMunch MCP indexes a local codebase once, then lets MCP-compatible agents (Claude Desktop, OpenClaw, etc.) **discover and retrieve code by symbol** instead of brute-reading files.
 
 ---
 
-## Architecture Overview
+## 🚀 Proof first: Token savings in the wild
 
-![Architecture Diagram](docs/architecture.png)
+**Repo:** `geekcomputers/Python`  
+**Size:** 338 files • 1422 symbols indexed  
+**Task:** Find calculator/math implementations
+
+| Approach | Tokens (this run) | What the agent had to do |
+|---|---:|---|
+| Raw file approach | ~7,500 | Open multiple files blindly and skim |
+| jCodeMunch MCP | ~1,449 | `search_symbols(...)` → `get_symbol(...)` |
+
+### Result: **80.7% fewer tokens** (≈5.2× more efficient)
+
+> Cost scales with tokens. Latency often scales with “how much junk the model must read”.  
+> jCodeMunch reduces both by turning *search* into *navigation*.
+
+![Token benchmark](docs/benchmark.png)
+
+---
+
+## Why agents need this (and humans benefit too)
+
+Agents waste money when they:
+- open entire files just to find one function
+- re-read the same code repeatedly
+- drown in imports, boilerplate, and unrelated helpers
+
+jCodeMunch gives agents **structured access**:
+- **Search symbols** by name/topic
+- **Outline files** without loading full contents
+- **Retrieve only the exact implementation** of a symbol
+
+Agents don’t need more context. They need **precision context access**.
+
+---
+
+## Architecture at a glance
+
+![Architecture](docs/architecture.png)
 
 **Pipeline**
-
-1. Parse source with structural parsers
-2. Extract symbols and metadata
-3. Build persistent local index
+1. Parse source structure (polyglot parsers)
+2. Extract symbols + metadata (names, signatures, byte offsets)
+3. Persist a lightweight local index
 4. Serve MCP tools for discovery
-5. Retrieve exact source fragments via byte‑offset precision
+5. Retrieve exact snippets via byte-offset precision
 
 ---
 
@@ -50,62 +69,40 @@ cd jcodemunch-mcp
 pip install -r requirements.txt
 ```
 
-Configure your MCP client to launch the server and point it to your local repository.
+### Configure your MCP client (Claude Desktop / OpenClaw)
+Point the server at **any local folder** containing a codebase. Index once, then query.
 
 ---
 
-## Quickstart Demo
+## Demo (add a GIF here)
 
-![Quickstart Demo](docs/demo.gif)
+![Quickstart demo](docs/demo.gif)
 
-See how an agent searches, discovers, and retrieves implementations in seconds using structured queries.
-
----
-
-## Benchmarks
-
-![Benchmark](docs/benchmark.png)
-
-| Workflow | Tokens |
-|----------|------|
-| Raw file loading | ~3600 |
-| jCodeMunch retrieval | ~689 |
-
-Typical discovery tasks show **~5× token efficiency improvement** and significantly lower latency.
+Suggested demo flow:
+1. `index_repo(path=...)`
+2. `search_symbols(query="calculate")`
+3. `get_symbol("...")`
 
 ---
 
-## Tool Suite
+## Tool suite
 
 | Tool | Purpose |
-|------|------|
-| `index_repo` | Index a repository |
-| `search_symbols` | Discover symbols |
-| `get_file_outline` | Retrieve file structure |
-| `get_symbol` | Fetch exact implementation |
+|---|---|
+| `index_repo` | Index any local codebase folder |
+| `search_symbols` | Find symbols by name/topic |
+| `get_file_outline` | View a file’s structural “API skeleton” |
+| `get_symbol` | Retrieve the exact implementation |
 
 ---
 
-## Ecosystem Integration
+## What it’s great for
 
-Designed for:
-
-- Claude Desktop MCP servers
-- OpenClaw agent orchestration
-- Autonomous engineering pipelines
-- Multi‑agent development systems
-
-jCodeMunch provides the **semantic navigation layer** agents need to operate reliably at scale.
-
----
-
-## Vision
-
-Parse once.  
-Retrieve precisely.  
-Reason structurally.
-
-jCodeMunch is building the foundational intelligence layer for the next generation of AI‑driven software engineering.
+- Large, messy repos where grepping is painful
+- Agentic refactors across many files
+- “Where is X implemented?” or “Who calls Y?” exploration
+- Fast onboarding and architecture discovery
+- Running cheaper agent swarms (OpenClaw-style)
 
 ---
 
