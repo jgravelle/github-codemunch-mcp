@@ -1,97 +1,113 @@
-# jcodemunch-mcp
 
-Token-efficient MCP server for GitHub source code exploration via tree-sitter AST parsing.
+# jCodeMunch MCP
+### Precision Code Intelligence for the Agent Era
 
-## Overview
+![Build](https://img.shields.io/badge/build-passing-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![MCP](https://img.shields.io/badge/MCP-compatible-purple)
+![Python](https://img.shields.io/badge/python-3.10%2B-yellow)
 
-**jcodemunch-mcp** pre-indexes repository source code using tree-sitter AST parsing, extracting a structured catalog of every symbol (function, class, method, constant, type). Each symbol stores only its **signature + one-line summary**, with the ability to retrieve full source on demand.
+**Stop loading files. Start navigating symbols.**
 
-### Token Savings
+jCodeMunch MCP converts any local repository into a semantic navigation engine that AI agents can query with surgical precision. Designed specifically for the MCP / OpenClaw / Claude Desktop ecosystem, it enables autonomous agents to explore large codebases efficiently, reducing token consumption and dramatically improving reasoning quality.
 
-| Scenario | Raw dump | codemunch | Savings |
-|----------|----------|-----------|---------|
-| Explore 500-file repo structure | ~200,000 tokens | ~2,000 tokens | **99%** |
-| Find a specific function | ~40,000 tokens | ~200 tokens | **99.5%** |
-| Read one function body | ~40,000 tokens | ~500 tokens | **98.7%** |
+---
 
-## Quick Start
+## Why Agents Need This
 
-### Installation
+Modern AI agents waste tokens brute‑forcing file reads. jCodeMunch changes the paradigm:
+
+- Symbol‑first discovery instead of file scanning
+- Deterministic structural retrieval
+- Massive context cost reduction
+- Near‑instant semantic navigation
+- Local‑first indexing — no vendor lock‑in
+
+Agents don’t need more context.  
+They need **better context access**.
+
+---
+
+## Architecture Overview
+
+![Architecture Diagram](docs/architecture.png)
+
+**Pipeline**
+
+1. Parse source with structural parsers
+2. Extract symbols and metadata
+3. Build persistent local index
+4. Serve MCP tools for discovery
+5. Retrieve exact source fragments via byte‑offset precision
+
+---
+
+## Quickstart
 
 ```bash
-pip install jcodemunch-mcp
+git clone https://github.com/jgravelle/jcodemunch-mcp
+cd jcodemunch-mcp
+pip install -r requirements.txt
 ```
 
-### Configure MCP
+Configure your MCP client to launch the server and point it to your local repository.
 
-Add to your `claude_desktop_config.json`:
+---
 
-```json
-{
-  "mcpServers": {
-    "github-codemunch": {
-      "command": "jcodemunch-mcp",
-      "env": {
-        "GITHUB_TOKEN": "your_github_token",
-        "ANTHROPIC_API_KEY": "your_anthropic_key"
-      }
-    }
-  }
-}
-```
+## Quickstart Demo
 
-### Usage
+![Quickstart Demo](docs/demo.gif)
 
-1. **Index a repository**:
-   ```
-   index_repo: { "url": "owner/repo" }
-   ```
+See how an agent searches, discovers, and retrieves implementations in seconds using structured queries.
 
-2. **Search for symbols**:
-   ```
-   search_symbols: { "repo": "owner/repo", "query": "authenticate" }
-   ```
+---
 
-3. **Get file outline**:
-   ```
-   get_file_outline: { "repo": "owner/repo", "file_path": "src/main.py" }
-   ```
+## Benchmarks
 
-4. **Read symbol source**:
-   ```
-   get_symbol: { "repo": "owner/repo", "symbol_id": "src-main-py::MyClass.login" }
-   ```
+![Benchmark](docs/benchmark.png)
 
-## Supported Languages
+| Workflow | Tokens |
+|----------|------|
+| Raw file loading | ~3600 |
+| jCodeMunch retrieval | ~689 |
 
-- Python (.py)
-- JavaScript (.js, .jsx)
-- TypeScript (.ts, .tsx)
-- Go (.go)
-- Rust (.rs)
-- Java (.java)
+Typical discovery tasks show **~5× token efficiency improvement** and significantly lower latency.
 
-## Tools
+---
+
+## Tool Suite
 
 | Tool | Purpose |
-|------|---------|
-| `index_repo` | Index a repository's source code |
-| `list_repos` | List indexed repositories |
-| `get_file_tree` | Get repository file structure |
-| `get_file_outline` | Get symbols in a file |
-| `get_symbol` | Get full source of a symbol |
-| `get_symbols` | Batch retrieve multiple symbols |
-| `search_symbols` | Search across all symbols |
+|------|------|
+| `index_repo` | Index a repository |
+| `search_symbols` | Discover symbols |
+| `get_file_outline` | Retrieve file structure |
+| `get_symbol` | Fetch exact implementation |
 
-## Environment Variables
+---
 
-| Variable | Purpose | Required |
-|----------|---------|----------|
-| `GITHUB_TOKEN` | GitHub API authentication | No |
-| `ANTHROPIC_API_KEY` | AI summarization | No |
-| `CODE_INDEX_PATH` | Custom storage path | No |
+## Ecosystem Integration
+
+Designed for:
+
+- Claude Desktop MCP servers
+- OpenClaw agent orchestration
+- Autonomous engineering pipelines
+- Multi‑agent development systems
+
+jCodeMunch provides the **semantic navigation layer** agents need to operate reliably at scale.
+
+---
+
+## Vision
+
+Parse once.  
+Retrieve precisely.  
+Reason structurally.
+
+jCodeMunch is building the foundational intelligence layer for the next generation of AI‑driven software engineering.
+
+---
 
 ## License
-
 MIT
-
