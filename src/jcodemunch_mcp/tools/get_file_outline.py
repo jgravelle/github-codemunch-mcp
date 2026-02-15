@@ -1,5 +1,6 @@
 """Get file outline - symbols in a specific file."""
 
+import time
 from typing import Optional
 
 from ..storage import IndexStore
@@ -21,6 +22,8 @@ def get_file_outline(
     Returns:
         Dict with symbols outline
     """
+    start = time.perf_counter()
+
     # Parse repo identifier
     if "/" in repo:
         owner, name = repo.split("/", 1)
@@ -61,11 +64,17 @@ def get_file_outline(
     # Get language
     language = file_symbols[0].get("language", "")
     
+    elapsed = (time.perf_counter() - start) * 1000
+
     return {
         "repo": f"{owner}/{name}",
         "file": file_path,
         "language": language,
-        "symbols": symbols_output
+        "symbols": symbols_output,
+        "_meta": {
+            "timing_ms": round(elapsed, 1),
+            "symbol_count": len(symbols_output),
+        },
     }
 
 
@@ -89,6 +98,7 @@ def _dict_to_symbol(d: dict) -> "Symbol":
         end_line=d["end_line"],
         byte_offset=d["byte_offset"],
         byte_length=d["byte_length"],
+        content_hash=d.get("content_hash", ""),
     )
 
 

@@ -15,6 +15,9 @@ from .tools.get_file_tree import get_file_tree
 from .tools.get_file_outline import get_file_outline
 from .tools.get_symbol import get_symbol, get_symbols
 from .tools.search_symbols import search_symbols
+from .tools.invalidate_cache import invalidate_cache
+from .tools.search_text import search_text
+from .tools.get_repo_outline import get_repo_outline
 
 
 # Create server
@@ -58,6 +61,16 @@ async def list_tools() -> list[Tool]:
                         "type": "boolean",
                         "description": "Use AI to generate symbol summaries (requires ANTHROPIC_API_KEY). When false, uses docstrings or signature fallback.",
                         "default": True
+                    },
+                    "extra_ignore_patterns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Additional gitignore-style patterns to exclude from indexing"
+                    },
+                    "follow_symlinks": {
+                        "type": "boolean",
+                        "description": "Whether to follow symlinks. Default false for security.",
+                        "default": False
                     }
                 },
                 "required": ["path"]
@@ -121,6 +134,16 @@ async def list_tools() -> list[Tool]:
                     "symbol_id": {
                         "type": "string",
                         "description": "Symbol ID from get_file_outline or search_symbols"
+                    },
+                    "verify": {
+                        "type": "boolean",
+                        "description": "Verify content hash matches stored hash (detects source drift)",
+                        "default": False
+                    },
+                    "context_lines": {
+                        "type": "integer",
+                        "description": "Number of lines before/after symbol to include for context",
+                        "default": 0
                     }
                 },
                 "required": ["repo", "symbol_id"]
@@ -168,6 +191,11 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Optional glob pattern to filter files (e.g., 'src/**/*.py')"
                     },
+                    "language": {
+                        "type": "string",
+                        "description": "Optional filter by language",
+                        "enum": ["python", "javascript", "typescript", "go", "rust", "java"]
+                    },
                     "max_results": {
                         "type": "integer",
                         "description": "Maximum number of results to return",
@@ -175,6 +203,61 @@ async def list_tools() -> list[Tool]:
                     }
                 },
                 "required": ["repo", "query"]
+            }
+        ),
+        Tool(
+            name="invalidate_cache",
+            description="Delete the index and cached files for a repository. Forces a full re-index on next index_repo or index_folder call.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Repository identifier (owner/repo or just repo name)"
+                    }
+                },
+                "required": ["repo"]
+            }
+        ),
+        Tool(
+            name="search_text",
+            description="Full-text search across indexed file contents. Useful when symbol search misses (e.g., string literals, comments, config values).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Repository identifier (owner/repo or just repo name)"
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Text to search for (case-insensitive substring match)"
+                    },
+                    "file_pattern": {
+                        "type": "string",
+                        "description": "Optional glob pattern to filter files (e.g., '*.py')"
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of matching lines to return",
+                        "default": 20
+                    }
+                },
+                "required": ["repo", "query"]
+            }
+        ),
+        Tool(
+            name="get_repo_outline",
+            description="Get a high-level overview of an indexed repository: directories, file counts, language breakdown, symbol counts. Lighter than get_file_tree.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Repository identifier (owner/repo or just repo name)"
+                    }
+                },
+                "required": ["repo"]
             }
         ),
     ]
@@ -196,7 +279,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = index_folder(
                 path=arguments["path"],
                 use_ai_summaries=arguments.get("use_ai_summaries", True),
-                storage_path=storage_path
+                storage_path=storage_path,
+                extra_ignore_patterns=arguments.get("extra_ignore_patterns"),
+                follow_symlinks=arguments.get("follow_symlinks", False),
             )
         elif name == "list_repos":
             result = list_repos(storage_path=storage_path)
@@ -216,6 +301,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = get_symbol(
                 repo=arguments["repo"],
                 symbol_id=arguments["symbol_id"],
+                verify=arguments.get("verify", False),
+                context_lines=arguments.get("context_lines", 0),
                 storage_path=storage_path
             )
         elif name == "get_symbols":
@@ -230,7 +317,26 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 query=arguments["query"],
                 kind=arguments.get("kind"),
                 file_pattern=arguments.get("file_pattern"),
+                language=arguments.get("language"),
                 max_results=arguments.get("max_results", 10),
+                storage_path=storage_path
+            )
+        elif name == "invalidate_cache":
+            result = invalidate_cache(
+                repo=arguments["repo"],
+                storage_path=storage_path
+            )
+        elif name == "search_text":
+            result = search_text(
+                repo=arguments["repo"],
+                query=arguments["query"],
+                file_pattern=arguments.get("file_pattern"),
+                max_results=arguments.get("max_results", 20),
+                storage_path=storage_path
+            )
+        elif name == "get_repo_outline":
+            result = get_repo_outline(
+                repo=arguments["repo"],
                 storage_path=storage_path
             )
         else:

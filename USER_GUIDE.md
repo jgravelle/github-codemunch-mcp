@@ -1,17 +1,14 @@
-# jcodemunch-mcp User Guide
+# User Guide
 
 ## Installation
-
-### From PyPI
 
 ```bash
 pip install jcodemunch-mcp
 ```
 
-### From Source
-
+Or from source:
 ```bash
-git clone https://github.com/yourusername/jcodemunch-mcp.git
+git clone https://github.com/jcodemunch/jcodemunch-mcp.git
 cd jcodemunch-mcp
 pip install -e .
 ```
@@ -20,12 +17,12 @@ pip install -e .
 
 ### Claude Desktop
 
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%/Claude/claude_desktop_config.json` (Windows):
+Add to your `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "github-codemunch": {
+    "jcodemunch": {
       "command": "jcodemunch-mcp",
       "env": {
         "GITHUB_TOKEN": "ghp_xxxxxxxx",
@@ -36,6 +33,8 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 }
 ```
 
+Both environment variables are optional — `GITHUB_TOKEN` enables private repos and higher rate limits, `ANTHROPIC_API_KEY` enables AI-generated summaries.
+
 ### VS Code
 
 Add to `.vscode/settings.json`:
@@ -43,7 +42,7 @@ Add to `.vscode/settings.json`:
 ```json
 {
   "mcp.servers": {
-    "github-codemunch": {
+    "jcodemunch": {
       "command": "jcodemunch-mcp",
       "env": {
         "GITHUB_TOKEN": "ghp_xxxxxxxx"
@@ -57,228 +56,127 @@ Add to `.vscode/settings.json`:
 
 ### Explore a New Repository
 
-1. **Index the repo**:
-   ```
-   index_repo: { "url": "fastapi/fastapi" }
-   ```
+```
+index_repo: { "url": "fastapi/fastapi" }
+get_repo_outline: { "repo": "fastapi/fastapi" }
+get_file_tree: { "repo": "fastapi/fastapi", "path_prefix": "fastapi" }
+get_file_outline: { "repo": "fastapi/fastapi", "file_path": "fastapi/main.py" }
+```
 
-2. **Get file tree**:
-   ```
-   get_file_tree: { "repo": "fastapi/fastapi", "path_prefix": "fastapi" }
-   ```
+### Explore a Local Project
 
-3. **Explore a file**:
-   ```
-   get_file_outline: { "repo": "fastapi/fastapi", "file_path": "fastapi/main.py" }
-   ```
+```
+index_folder: { "path": "/home/user/myproject" }
+get_repo_outline: { "repo": "local/myproject" }
+search_symbols: { "repo": "local/myproject", "query": "main" }
+```
 
-4. **Search for specific functionality**:
-   ```
-   search_symbols: { "repo": "fastapi/fastapi", "query": "dependency injection", "max_results": 5 }
-   ```
+### Find and Read a Function
 
-### Find and Understand a Function
+```
+search_symbols: { "repo": "owner/repo", "query": "authenticate", "kind": "function" }
+get_symbol: { "repo": "owner/repo", "symbol_id": "src/auth.py::authenticate#function" }
+```
 
-1. **Search for the function**:
-   ```
-   search_symbols: { "repo": "owner/repo", "query": "process_request" }
-   ```
+### Understand a Class
 
-2. **Get the file outline** to see context:
-   ```
-   get_file_outline: { "repo": "owner/repo", "file_path": "src/handlers.py" }
-   ```
+```
+get_file_outline: { "repo": "owner/repo", "file_path": "src/auth.py" }
+get_symbols: {
+  "repo": "owner/repo",
+  "symbol_ids": [
+    "src/auth.py::AuthHandler.login#method",
+    "src/auth.py::AuthHandler.logout#method"
+  ]
+}
+```
 
-3. **Read the full source**:
-   ```
-   get_symbol: { "repo": "owner/repo", "symbol_id": "src-handlers-py::process_request" }
-   ```
+### Verify Source Hasn't Changed
 
-### Understand a Class and Its Methods
+```
+get_symbol: {
+  "repo": "owner/repo",
+  "symbol_id": "src/main.py::process#function",
+  "verify": true
+}
+```
 
-1. **Get file outline** (shows class hierarchy):
-   ```
-   get_file_outline: { "repo": "owner/repo", "file_path": "src/auth.py" }
-   ```
+The response `_meta.content_verified` will be `true` if the source matches the stored hash, `false` if it has drifted.
 
-2. **Get all methods at once**:
-   ```
-   get_symbols: {
-     "repo": "owner/repo",
-     "symbol_ids": [
-       "src-auth-py::AuthHandler.__init__",
-       "src-auth-py::AuthHandler.login",
-       "src-auth-py::AuthHandler.logout"
-     ]
-   }
-   ```
+### Search for Non-Symbol Content
+
+```
+search_text: { "repo": "owner/repo", "query": "TODO", "file_pattern": "*.py" }
+```
+
+Use `search_text` for string literals, comments, config values, or anything that isn't a symbol name.
+
+### Force Re-index
+
+```
+invalidate_cache: { "repo": "owner/repo" }
+index_repo: { "url": "owner/repo" }
+```
 
 ## Tool Reference
 
-### index_repo
+| Tool | Purpose | Key Parameters |
+|------|---------|---------------|
+| `index_repo` | Index GitHub repo | `url`, `use_ai_summaries` |
+| `index_folder` | Index local folder | `path`, `extra_ignore_patterns`, `follow_symlinks` |
+| `list_repos` | List all indexed repos | — |
+| `get_file_tree` | Browse file structure | `repo`, `path_prefix` |
+| `get_file_outline` | Symbols in a file | `repo`, `file_path` |
+| `get_symbol` | Full source of one symbol | `repo`, `symbol_id`, `verify`, `context_lines` |
+| `get_symbols` | Batch retrieve symbols | `repo`, `symbol_ids` |
+| `search_symbols` | Search symbols | `repo`, `query`, `kind`, `language`, `file_pattern`, `max_results` |
+| `search_text` | Full-text search | `repo`, `query`, `file_pattern`, `max_results` |
+| `get_repo_outline` | High-level overview | `repo` |
+| `invalidate_cache` | Delete cached index | `repo` |
 
-Index a GitHub repository's source code.
+## Symbol IDs
 
-**Input**:
-```json
-{
-  "url": "owner/repo",
-  "use_ai_summaries": true
-}
+Symbol IDs follow the format `{file_path}::{qualified_name}#{kind}`:
+
+```
+src/main.py::UserService#class
+src/main.py::UserService.login#method
+src/utils.py::authenticate#function
+config.py::MAX_RETRIES#constant
 ```
 
-**Output**:
-```json
-{
-  "success": true,
-  "repo": "owner/repo",
-  "indexed_at": "2025-01-15T10:30:00",
-  "file_count": 42,
-  "symbol_count": 387,
-  "languages": {"python": 20, "typescript": 15}
-}
-```
-
-### list_repos
-
-List all indexed repositories.
-
-**Output**:
-```json
-{
-  "count": 3,
-  "repos": [
-    {
-      "repo": "owner/repo",
-      "indexed_at": "2025-01-15T10:30:00",
-      "symbol_count": 387,
-      "file_count": 42,
-      "languages": {"python": 20}
-    }
-  ]
-}
-```
-
-### get_file_tree
-
-Get repository file structure.
-
-**Input**:
-```json
-{
-  "repo": "owner/repo",
-  "path_prefix": "src"
-}
-```
-
-### get_file_outline
-
-Get symbols in a file.
-
-**Input**:
-```json
-{
-  "repo": "owner/repo",
-  "file_path": "src/main.py"
-}
-```
-
-**Output**:
-```json
-{
-  "repo": "owner/repo",
-  "file": "src/main.py",
-  "language": "python",
-  "symbols": [
-    {
-      "id": "src-main-py::MyClass",
-      "kind": "class",
-      "name": "MyClass",
-      "signature": "class MyClass(BaseClass):",
-      "summary": "Handles user authentication.",
-      "line": 15,
-      "children": [...]
-    }
-  ]
-}
-```
-
-### get_symbol
-
-Get full source of a symbol.
-
-**Input**:
-```json
-{
-  "repo": "owner/repo",
-  "symbol_id": "src-main-py::MyClass.login"
-}
-```
-
-### get_symbols
-
-Batch retrieve multiple symbols.
-
-**Input**:
-```json
-{
-  "repo": "owner/repo",
-  "symbol_ids": ["id1", "id2", "id3"]
-}
-```
-
-### search_symbols
-
-Search across all symbols.
-
-**Input**:
-```json
-{
-  "repo": "owner/repo",
-  "query": "authenticate",
-  "kind": "function",
-  "file_pattern": "src/**/*.py",
-  "max_results": 10
-}
-```
+IDs are returned by `get_file_outline`, `search_symbols`, and `search_text`. Pass them to `get_symbol` or `get_symbols` to retrieve source code.
 
 ## Troubleshooting
 
-### "Repository not found"
+**"Repository not found"** — Check the URL format (`owner/repo` or full GitHub URL). For private repos, set `GITHUB_TOKEN`.
 
-- Check that the repository exists and is public (or set GITHUB_TOKEN)
-- Verify the URL format: `owner/repo` or full GitHub URL
+**"No source files found"** — The repo may not contain supported language files (.py, .js, .ts, .go, .rs, .java), or files may be in skip patterns.
 
-### "No source files found"
+**Rate limiting** — Set `GITHUB_TOKEN` for 5,000 requests/hour (vs 60 without).
 
-- The repository may not contain supported language files
-- Check that files aren't in skip patterns (node_modules, vendor, etc.)
+**AI summaries not working** — Set `ANTHROPIC_API_KEY`. Without it, summaries fall back to docstrings or signatures.
 
-### Rate limiting
+**Stale index** — Use `invalidate_cache` followed by `index_repo` or `index_folder` to force a clean re-index.
 
-Set `GITHUB_TOKEN` for higher rate limits:
-- Public repos: 60 requests/hour (no token) → 5000 requests/hour (with token)
-- Private repos: token required
+**Encoding issues** — Files with invalid UTF-8 are handled gracefully with replacement characters.
 
-### AI summaries not working
+## Storage
 
-Set `ANTHROPIC_API_KEY` for AI-generated summaries. Without it, summaries fall back to docstrings or signatures.
+Indexes live at `~/.code-index/` (override with `CODE_INDEX_PATH` env var):
 
-## Storage Location
-
-Indexes are stored at:
-- macOS/Linux: `~/.code-index/`
-- Windows: `%USERPROFILE%\.code-index\`
-
-Each repository gets:
-- `{owner}-{repo}.json` - Index file
-- `{owner}-{repo}/` - Raw source files
+```
+~/.code-index/
+├── owner-repo.json       # Index metadata + symbols
+└── owner-repo/           # Raw source files
+    └── src/main.py
+```
 
 ## Tips
 
-1. **Start with file outline** - Understand a file's API before reading source
-2. **Use search** - Find symbols by name or concept
-3. **Batch retrieval** - Use `get_symbols` for related symbols
-4. **Filter by kind** - Search for just `class` or `function`
-5. **Re-index periodically** - Code changes; re-index to stay current
-
+1. **Start with `get_repo_outline`** for a quick lay of the land
+2. **Use `get_file_outline`** before reading source — understand the API first
+3. **Filter searches** with `kind`, `language`, and `file_pattern` to narrow results
+4. **Batch retrieve** related symbols with `get_symbols` instead of multiple `get_symbol` calls
+5. **Use `search_text`** when symbol search misses — it searches actual file content
+6. **Use `verify: true`** on `get_symbol` to detect source drift since indexing

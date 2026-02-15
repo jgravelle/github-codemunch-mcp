@@ -1,6 +1,7 @@
 """Get file tree for a repository."""
 
 import os
+import time
 from typing import Optional
 
 from ..storage import IndexStore
@@ -21,6 +22,8 @@ def get_file_tree(
     Returns:
         Dict with hierarchical tree structure
     """
+    start = time.perf_counter()
+
     # Parse repo identifier
     if "/" in repo:
         owner, name = repo.split("/", 1)
@@ -52,11 +55,17 @@ def get_file_tree(
     
     # Build tree structure
     tree = _build_tree(files, index, path_prefix)
-    
+
+    elapsed = (time.perf_counter() - start) * 1000
+
     return {
         "repo": f"{owner}/{name}",
         "path_prefix": path_prefix,
-        "tree": tree
+        "tree": tree,
+        "_meta": {
+            "timing_ms": round(elapsed, 1),
+            "file_count": len(files),
+        },
     }
 
 

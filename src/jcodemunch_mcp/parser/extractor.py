@@ -3,7 +3,7 @@
 from typing import Optional
 from tree_sitter_language_pack import get_language, get_parser
 
-from .symbols import Symbol, make_symbol_id
+from .symbols import Symbol, make_symbol_id, compute_content_hash
 from .languages import LanguageSpec, LANGUAGE_REGISTRY
 
 
@@ -30,7 +30,10 @@ def parse_file(content: str, filename: str, language: str) -> list[Symbol]:
     
     symbols = []
     _walk_tree(tree.root_node, spec, source_bytes, filename, language, symbols, None)
-    
+
+    # Disambiguate overloaded symbols (same ID)
+    symbols = _disambiguate_overloads(symbols)
+
     return symbols
 
 
@@ -100,9 +103,13 @@ def _extract_symbol(
     # Extract decorators
     decorators = _extract_decorators(node, spec, source_bytes)
     
+    # Compute content hash
+    symbol_bytes = source_bytes[node.start_byte:node.end_byte]
+    c_hash = compute_content_hash(symbol_bytes)
+
     # Create symbol
     symbol = Symbol(
-        id=make_symbol_id(filename, qualified_name),
+        id=make_symbol_id(filename, qualified_name, kind),
         file=filename,
         name=name,
         qualified_name=qualified_name,
@@ -116,6 +123,7 @@ def _extract_symbol(
         end_line=node.end_point[0] + 1,
         byte_offset=node.start_byte,
         byte_length=node.end_byte - node.start_byte,
+        content_hash=c_hash,
     )
     
     return symbol
@@ -298,9 +306,11 @@ def _extract_constant(
             if name.isupper() or (len(name) > 1 and name[0].isupper() and "_" in name):
                 # Get the full assignment text as signature
                 sig = source_bytes[node.start_byte:node.end_byte].decode("utf-8").strip()
-                
+                const_bytes = source_bytes[node.start_byte:node.end_byte]
+                c_hash = compute_content_hash(const_bytes)
+
                 return Symbol(
-                    id=make_symbol_id(filename, name),
+                    id=make_symbol_id(filename, name, "constant"),
                     file=filename,
                     name=name,
                     qualified_name=name,
@@ -311,6 +321,33 @@ def _extract_constant(
                     end_line=node.end_point[0] + 1,
                     byte_offset=node.start_byte,
                     byte_length=node.end_byte - node.start_byte,
+                    content_hash=c_hash,
                 )
-    
+
     return None
+
+
+def _disambiguate_overloads(symbols: list[Symbol]) -> list[Symbol]:
+    """Append ordinal suffix to symbols with duplicate IDs.
+
+    E.g., if two symbols have ID "file.py::foo#function", they become
+    "file.py::foo#function~1" and "file.py::foo#function~2".
+    """
+    from collections import Counter
+
+    id_counts = Counter(s.id for s in symbols)
+    # Only process IDs that appear more than once
+    duplicated = {sid for sid, count in id_counts.items() if count > 1}
+
+    if not duplicated:
+        return symbols
+
+    # Track ordinals per duplicate ID
+    ordinals: dict[str, int] = {}
+    result = []
+    for sym in symbols:
+        if sym.id in duplicated:
+            ordinals[sym.id] = ordinals.get(sym.id, 0) + 1
+            sym.id = f"{sym.id}~{ordinals[sym.id]}"
+        result.append(sym)
+    return result

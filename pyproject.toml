@@ -1,7 +1,7 @@
 [project]
 name = "jcodemunch-mcp"
-version = "0.1.0"
-description = "Token-efficient MCP server for GitHub source code exploration via tree-sitter AST parsing"
+version = "0.2.0"
+description = "Token-efficient MCP server for source code exploration via tree-sitter AST parsing"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

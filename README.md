@@ -8,31 +8,31 @@
 
 **Stop dumping files into context windows. Start retrieving exactly what the agent needs.**
 
-jCodeMunch MCP indexes a local codebase once, then lets MCP-compatible agents (Claude Desktop, OpenClaw, etc.) **discover and retrieve code by symbol** instead of brute-reading files.
+jCodeMunch indexes a codebase once using tree-sitter AST parsing, then lets MCP-compatible agents (Claude Desktop, VS Code, etc.) **discover and retrieve code by symbol** instead of brute-reading files. Every symbol stores its signature + one-line summary, with full source retrievable on demand via O(1) byte-offset seeking.
 
 ---
 
-## 🚀 Proof first: Token savings in the wild
+## Proof first: Token savings in the wild
 
-**Repo:** `geekcomputers/Python`  
-**Size:** 338 files • 1422 symbols indexed  
+**Repo:** `geekcomputers/Python`
+**Size:** 338 files, 1422 symbols indexed
 **Task:** Find calculator/math implementations
 
-| Approach | Tokens (this run) | What the agent had to do |
+| Approach | Tokens | What the agent had to do |
 |---|---:|---|
 | Raw file approach | ~7,500 | Open multiple files blindly and skim |
-| jCodeMunch MCP | ~1,449 | `search_symbols(...)` → `get_symbol(...)` |
+| jCodeMunch MCP | ~1,449 | `search_symbols(...)` -> `get_symbol(...)` |
 
-### Result: **80.7% fewer tokens** (≈5.2× more efficient)
+### Result: **80.7% fewer tokens** (5.2x more efficient)
 
-> Cost scales with tokens. Latency often scales with “how much junk the model must read”.  
+> Cost scales with tokens. Latency scales with "how much junk the model must read."
 > jCodeMunch reduces both by turning *search* into *navigation*.
 
 ![Token benchmark](benchmark.png)
 
 ---
 
-## Why agents need this (and humans benefit too)
+## Why agents need this
 
 Agents waste money when they:
 - open entire files just to find one function
@@ -40,69 +40,170 @@ Agents waste money when they:
 - drown in imports, boilerplate, and unrelated helpers
 
 jCodeMunch gives agents **structured access**:
-- **Search symbols** by name/topic
+- **Search symbols** by name, kind, or language
 - **Outline files** without loading full contents
 - **Retrieve only the exact implementation** of a symbol
+- **Full-text search** when symbol search misses (comments, TODOs, config)
 
-Agents don’t need more context. They need **precision context access**.
+Agents don't need more context. They need **precision context access**.
 
 ---
 
-## Architecture at a glance
+## How it works
 
-![Architecture](docs/architecture.png)
+1. **Discovery** -- files found via GitHub API or local directory walk
+2. **Security** -- path traversal, secret detection, binary filtering, .gitignore
+3. **Parsing** -- tree-sitter AST extraction across 6 languages
+4. **Storage** -- JSON index + raw files in `~/.code-index/` (atomic writes)
+5. **Retrieval** -- O(1) byte-offset seeking by stable symbol ID
 
-**Pipeline**
-1. Parse source structure (polyglot parsers)
-2. Extract symbols + metadata (names, signatures, byte offsets)
-3. Persist a lightweight local index
-4. Serve MCP tools for discovery
-5. Retrieve exact snippets via byte-offset precision
+### Stable Symbol IDs
+
+```
+{file_path}::{qualified_name}#{kind}
+```
+- `src/main.py::UserService.login#method`
+- `src/utils.py::authenticate#function`
+
+IDs are stable across re-indexing when file path, qualified name, and kind are unchanged.
 
 ---
 
 ## Quickstart
 
+### Install
+
 ```bash
-git clone https://github.com/jgravelle/jcodemunch-mcp
-cd jcodemunch-mcp
-pip install -r requirements.txt
+pip install jcodemunch-mcp
 ```
 
-### Configure your MCP client (Claude Desktop / OpenClaw)
-Point the server at **any local folder** containing a codebase. Index once, then query.
+### Configure MCP
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "jcodemunch": {
+      "command": "jcodemunch-mcp",
+      "env": {
+        "GITHUB_TOKEN": "your_github_token",
+        "ANTHROPIC_API_KEY": "your_anthropic_key"
+      }
+    }
+  }
+}
+```
+
+Both env vars are optional. `GITHUB_TOKEN` enables private repos + higher rate limits. `ANTHROPIC_API_KEY` enables AI-generated summaries.
+
+### Usage
+
+```
+index_folder: { "path": "/path/to/project" }
+index_repo:   { "url": "owner/repo" }
+
+get_repo_outline: { "repo": "owner/repo" }
+get_file_outline: { "repo": "owner/repo", "file_path": "src/main.py" }
+search_symbols:   { "repo": "owner/repo", "query": "authenticate" }
+get_symbol:       { "repo": "owner/repo", "symbol_id": "src/main.py::MyClass.login#method" }
+search_text:      { "repo": "owner/repo", "query": "TODO" }
+```
 
 ---
 
-## Demo
-
-Suggested demo flow:
-1. `index_repo(path=...)`
-2. `search_symbols(query="calculate")`
-3. `get_symbol("...")`
-
----
-
-## Tool suite
+## Tools (11)
 
 | Tool | Purpose |
-|---|---|
-| `index_repo` | Index any local codebase folder |
-| `search_symbols` | Find symbols by name/topic |
-| `get_file_outline` | View a file’s structural “API skeleton” |
-| `get_symbol` | Retrieve the exact implementation |
+|------|---------|
+| `index_repo` | Index a GitHub repository |
+| `index_folder` | Index a local folder (supports .gitignore, secret detection) |
+| `list_repos` | List all indexed repositories |
+| `get_file_tree` | Get repository file structure |
+| `get_file_outline` | Get symbols in a file with hierarchy |
+| `get_symbol` | Get full source of a symbol (with content verification) |
+| `get_symbols` | Batch retrieve multiple symbols |
+| `search_symbols` | Search symbols (filter by kind, language, file pattern) |
+| `search_text` | Full-text search across indexed file contents |
+| `get_repo_outline` | High-level repo overview (directories, languages, symbol counts) |
+| `invalidate_cache` | Delete index and cached files for a repository |
+
+All tool responses include a `_meta` envelope with timing and metadata.
 
 ---
 
-## What it’s great for
+## Supported Languages
+
+| Language | Extensions | Symbol Types |
+|----------|-----------|-------------|
+| Python | `.py` | function, class, method, constant, type |
+| JavaScript | `.js`, `.jsx` | function, class, method, constant |
+| TypeScript | `.ts`, `.tsx` | function, class, method, constant, type |
+| Go | `.go` | function, method, type, constant |
+| Rust | `.rs` | function, type, class (impl), constant |
+| Java | `.java` | method, class, type, constant |
+
+See [LANGUAGE_SUPPORT.md](LANGUAGE_SUPPORT.md) for detailed per-language semantics.
+
+---
+
+## Security
+
+Built-in security controls for indexing arbitrary codebases:
+
+- **Path traversal prevention** -- all paths validated against repo root
+- **Symlink escape protection** -- symlinks skipped by default
+- **Secret file exclusion** -- `.env`, `*.key`, `*.pem`, etc. excluded automatically
+- **Binary detection** -- extension + content sniffing to skip binary files
+- **File size limits** -- 500KB per file (configurable)
+
+See [SECURITY.md](SECURITY.md) for full details.
+
+---
+
+## What this is great for
 
 - Large, messy repos where grepping is painful
 - Agentic refactors across many files
-- “Where is X implemented?” or “Who calls Y?” exploration
+- "Where is X implemented?" exploration
 - Fast onboarding and architecture discovery
-- Running cheaper agent swarms (OpenClaw-style)
+- Running cheaper agent swarms
+
+## What this is not
+
+- **Not a Language Server (LSP)** -- no real-time diagnostics or completions
+- **Not a code editor** -- read-only indexing and retrieval
+- **Not a file watcher** -- re-index manually or via tools
+- **Not cross-repo search** -- each repository indexed independently
+- **Not semantic analysis** -- extraction is purely syntactic via tree-sitter AST
 
 ---
 
+## Environment Variables
+
+| Variable | Purpose | Required |
+|----------|---------|----------|
+| `GITHUB_TOKEN` | GitHub API auth (higher rate limits, private repos) | No |
+| `ANTHROPIC_API_KEY` | AI-powered symbol summarization via Claude Haiku | No |
+| `CODE_INDEX_PATH` | Custom storage path (default: `~/.code-index/`) | No |
+
+## Troubleshooting
+
+- **Rate limits:** Set `GITHUB_TOKEN` for higher GitHub API limits
+- **Large repos:** First 500 files indexed (priority: `src/`, `lib/`, `pkg/`)
+- **Encoding issues:** Invalid UTF-8 handled gracefully with replacement characters
+- **Stale index:** Use `invalidate_cache` to force a clean re-index
+
+## Documentation
+
+- [USER_GUIDE.md](USER_GUIDE.md) -- Detailed usage guide with workflows and examples
+- [ARCHITECTURE.md](ARCHITECTURE.md) -- Architecture, data flow, and design decisions
+- [SPEC.md](SPEC.md) -- Full technical specification (tools, data models, algorithms)
+- [SECURITY.md](SECURITY.md) -- Security controls and policies
+- [SYMBOL_SPEC.md](SYMBOL_SPEC.md) -- Symbol ID format, kinds, and per-language rules
+- [CACHE_SPEC.md](CACHE_SPEC.md) -- Cache storage, versioning, and invalidation
+- [LANGUAGE_SUPPORT.md](LANGUAGE_SUPPORT.md) -- Supported languages and extension guide
+
 ## License
+
 MIT

@@ -52,9 +52,11 @@ def test_parse_python():
 def test_symbol_id_format():
     """Test symbol ID generation."""
     from jcodemunch_mcp.parser import make_symbol_id
-    
-    assert make_symbol_id("src/main.py", "MyClass.method") == "src-main-py::MyClass.method"
-    assert make_symbol_id("test.py", "standalone") == "test-py::standalone"
+
+    assert make_symbol_id("src/main.py", "MyClass.method", "method") == "src/main.py::MyClass.method#method"
+    assert make_symbol_id("test.py", "standalone", "function") == "test.py::standalone#function"
+    # Without kind falls back to no suffix
+    assert make_symbol_id("test.py", "foo") == "test.py::foo"
 
 
 def test_unknown_language_returns_empty():

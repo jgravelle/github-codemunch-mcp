@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import httpx
 
 from ..parser import parse_file, LANGUAGE_EXTENSIONS
+from ..security import is_secret_file, is_binary_extension
 from ..storage import IndexStore
 from ..summarizer import summarize_symbols
 
@@ -105,7 +106,7 @@ def discover_source_files(
     if gitignore_content:
         try:
             gitignore_spec = pathspec.PathSpec.from_lines(
-                "gitwildmatch",
+                "gitignore",
                 gitignore_content.split("\n")
             )
         except Exception:
@@ -125,9 +126,17 @@ def discover_source_files(
         _, ext = os.path.splitext(path)
         if ext not in LANGUAGE_EXTENSIONS:
             continue
-        
+
         # Skip list
         if should_skip_file(path):
+            continue
+
+        # Secret detection
+        if is_secret_file(path):
+            continue
+
+        # Binary extension check
+        if is_binary_extension(path):
             continue
         
         # Size limit
