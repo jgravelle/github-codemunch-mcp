@@ -18,50 +18,52 @@ jcodemunch-mcp/
 │   │
 │   ├── parser/
 │   │   ├── __init__.py
-│   │   ├── symbols.py              # Symbol dataclass, make_symbol_id(), compute_content_hash()
-│   │   ├── extractor.py            # parse_file(): tree-sitter AST walking + symbol extraction
-│   │   ├── languages.py            # LanguageSpec registry for 6 languages
-│   │   └── hierarchy.py            # SymbolNode tree building for file outlines
+│   │   ├── symbols.py               # Symbol dataclass, ID generation, hashing
+│   │   ├── extractor.py             # tree-sitter AST walking + symbol extraction
+│   │   ├── languages.py             # LanguageSpec registry
+│   │   └── hierarchy.py             # SymbolNode tree building for file outlines
 │   │
 │   ├── storage/
 │   │   ├── __init__.py
-│   │   └── index_store.py          # CodeIndex, IndexStore: save/load, incremental, byte-offset reads
+│   │   └── index_store.py           # CodeIndex, IndexStore: save/load, incremental indexing
 │   │
 │   ├── summarizer/
 │   │   ├── __init__.py
-│   │   └── batch_summarize.py      # Three-tier: docstring > AI (Haiku) > signature fallback
+│   │   └── batch_summarize.py       # Docstring → AI → signature fallback
 │   │
 │   └── tools/
 │       ├── __init__.py
-│       ├── index_repo.py           # GitHub repo indexing (async, git/trees API)
-│       ├── index_folder.py         # Local folder indexing (sync, .gitignore, security)
+│       ├── index_repo.py            # GitHub repository indexing
+│       ├── index_folder.py          # Local folder indexing
 │       ├── list_repos.py
 │       ├── get_file_tree.py
 │       ├── get_file_outline.py
-│       ├── get_symbol.py           # get_symbol + get_symbols (verify, context_lines)
-│       ├── search_symbols.py       # Weighted scoring search (kind, language, file_pattern)
-│       ├── search_text.py          # Full-text search across file contents
-│       ├── get_repo_outline.py     # High-level repo overview
-│       └── invalidate_cache.py     # Delete index + cached files
+│       ├── get_symbol.py
+│       ├── search_symbols.py
+│       ├── search_text.py
+│       ├── get_repo_outline.py
+│       └── invalidate_cache.py
 │
 ├── tests/
-│   ├── fixtures/                   # Per-language test fixtures (Python, JS, TS, Go, Rust, Java)
+│   ├── fixtures/
 │   ├── test_parser.py
 │   ├── test_languages.py
 │   ├── test_storage.py
 │   ├── test_summarizer.py
 │   ├── test_tools.py
 │   ├── test_server.py
-│   ├── test_security.py            # 73 tests: path traversal, symlinks, secrets, binary, encoding
-│   └── test_hardening.py           # 51 tests: per-language extraction, determinism, incremental
+│   ├── test_security.py
+│   └── test_hardening.py
 │
 ├── benchmarks/
-│   └── run_benchmarks.py           # Index/search/retrieval benchmarks with Markdown+JSON output
+│   └── run_benchmarks.py
 │
 └── .github/workflows/
-    ├── test.yml                    # pytest on push/PR (Python 3.10/3.11/3.12)
-    └── benchmark.yml               # Benchmarks on demand/release
+    ├── test.yml
+    └── benchmark.yml
 ```
+
+---
 
 ## Data Flow
 
@@ -72,7 +74,7 @@ Source code (GitHub API or local folder)
 Security filters (path traversal, symlinks, secrets, binary, size)
     │
     ▼
-tree-sitter parse (language-specific grammar via LanguageSpec)
+tree-sitter parsing (language-specific grammars via LanguageSpec)
     │
     ▼
 Symbol extraction (functions, classes, methods, constants, types)
@@ -87,32 +89,39 @@ Summarization (docstring → AI batch → signature fallback)
 Storage (JSON index + raw files, atomic writes)
     │
     ▼
-MCP tools (11 tools for discovery, search, retrieval)
+MCP tools (discovery, search, retrieval)
 ```
+
+---
 
 ## Parser Design
 
-The parser uses a **language registry** pattern. Each language defines a `LanguageSpec` that tells the generic extractor which AST node types to look for and how to extract names, signatures, docstrings, and decorators.
+The parser follows a **language registry pattern**. Each supported language defines a `LanguageSpec` describing how symbols are extracted from its AST.
 
 ```python
 @dataclass
 class LanguageSpec:
-    ts_language: str                    # tree-sitter grammar name
-    symbol_node_types: dict[str, str]   # node_type → symbol kind
-    name_fields: dict[str, str]         # node_type → field name for symbol name
-    param_fields: dict[str, str]        # node_type → field name for parameters
-    return_type_fields: dict[str, str]  # node_type → field name for return type
-    docstring_strategy: str             # "next_sibling_string" or "preceding_comment"
-    decorator_node_type: str | None     # e.g., "decorator" for Python
-    container_node_types: list[str]     # nesting containers (classes for methods)
-    constant_patterns: list[str]        # node types for constants
-    type_patterns: list[str]            # node types for type definitions
+    ts_language: str
+    symbol_node_types: dict[str, str]
+    name_fields: dict[str, str]
+    param_fields: dict[str, str]
+    return_type_fields: dict[str, str]
+    docstring_strategy: str
+    decorator_node_type: str | None
+    container_node_types: list[str]
+    constant_patterns: list[str]
+    type_patterns: list[str]
 ```
 
-The generic extractor (`parse_file()`) walks the tree-sitter CST using the spec, then runs two post-processing passes:
+The generic extractor performs two post-processing passes:
 
-1. **Overload disambiguation** — duplicate IDs get `~1`, `~2` suffixes
-2. **Content hashing** — SHA-256 of each symbol's source bytes for drift detection
+1. **Overload disambiguation**
+   Duplicate symbol IDs receive numeric suffixes (`~1`, `~2`, etc.)
+
+2. **Content hashing**
+   SHA-256 hashes of symbol source content enable change detection.
+
+---
 
 ## Symbol ID Scheme
 
@@ -121,38 +130,43 @@ The generic extractor (`parse_file()`) walks the tree-sitter CST using the spec,
 ```
 
 Examples:
-- `src/main.py::UserService.login#method`
-- `src/utils.py::authenticate#function`
-- `config.py::MAX_RETRIES#constant`
 
-IDs are stable across re-indexing when file path, qualified name, and kind are unchanged. See [SYMBOL_SPEC.md](SYMBOL_SPEC.md) for full details.
+* `src/main.py::UserService.login#method`
+* `src/utils.py::authenticate#function`
+* `config.py::MAX_RETRIES#constant`
+
+IDs remain stable across re-indexing as long as the file path, qualified name, and symbol kind remain unchanged.
+
+---
 
 ## Storage
 
 Indexes are stored at `~/.code-index/` (configurable via `CODE_INDEX_PATH`):
 
-- **`{owner}-{name}.json`** — index metadata, file hashes, symbols (no source content)
-- **`{owner}-{name}/`** — raw source files preserving directory structure
+* `{owner}-{name}.json` — metadata, file hashes, symbol metadata
+* `{owner}-{name}/` — cached raw source files
 
-Content retrieval is O(1) via byte-offset seeking: each symbol stores `byte_offset` and `byte_length`, enabling a direct `seek() + read()` without re-parsing.
+Each symbol records byte offsets, allowing **O(1)** retrieval via `seek()` + `read()` without re-parsing.
 
-**Incremental indexing** compares SHA-256 file hashes to detect changed/new/deleted files, re-parsing only what changed. Writes are atomic (temp file + rename). See [CACHE_SPEC.md](CACHE_SPEC.md).
+Incremental indexing compares stored file hashes with current hashes, reprocessing only changed files. Writes are atomic (temporary file + rename).
+
+---
 
 ## Security
 
 All file operations pass through `security.py`:
 
-- **Path traversal prevention** — `validate_path()` ensures targets stay within repo root
-- **Symlink escape protection** — symlinks resolved and validated before reading
-- **Secret exclusion** — 25 patterns (`.env`, `*.pem`, `*.key`, etc.) blocked by default
-- **Binary detection** — extension-based + null-byte content sniffing
-- **Encoding safety** — `errors="replace"` on all file reads
+* Path traversal protection via validated resolved paths
+* Symlink target validation
+* Secret-file exclusion using predefined patterns
+* Binary file detection
+* Safe encoding reads using `errors="replace"`
 
-See [SECURITY.md](SECURITY.md).
+---
 
 ## Response Envelope
 
-All tool responses include a `_meta` object:
+All tool responses include metadata:
 
 ```json
 {
@@ -166,27 +180,31 @@ All tool responses include a `_meta` object:
 }
 ```
 
+---
+
 ## Search Algorithm
 
-`search_symbols` uses weighted scoring across 6 tiers:
+`search_symbols` uses weighted scoring:
 
-| Match type | Weight |
-|-----------|--------|
-| Exact name match | +20 |
-| Name substring | +10 |
-| Name word overlap | +5 per word |
-| Signature match | +8 (full) / +2 (word) |
-| Summary match | +5 (full) / +1 (word) |
-| Keyword/docstring match | +3 / +1 per word |
+| Match type              | Weight                |
+| ----------------------- | --------------------- |
+| Exact name match        | +20                   |
+| Name substring          | +10                   |
+| Name word overlap       | +5 per word           |
+| Signature match         | +8 (full) / +2 (word) |
+| Summary match           | +5 (full) / +1 (word) |
+| Docstring/keyword match | +3 / +1 per word      |
 
-Filters (kind, language, file_pattern) are applied before scoring. Results with score 0 are excluded.
+Filters (kind, language, file_pattern) are applied before scoring. Results scoring zero are excluded.
+
+---
 
 ## Dependencies
 
-| Package | Purpose |
-|---------|---------|
-| `mcp>=1.0.0` | MCP server framework |
-| `httpx>=0.27.0` | Async HTTP for GitHub API |
-| `anthropic>=0.40.0` | AI summarization (optional) |
-| `tree-sitter-language-pack>=0.7.0` | Pre-compiled grammars for 6 languages |
-| `pathspec>=0.12.0` | .gitignore pattern matching |
+| Package                            | Purpose                       |
+| ---------------------------------- | ----------------------------- |
+| `mcp>=1.0.0`                       | MCP server framework          |
+| `httpx>=0.27.0`                    | Async HTTP for GitHub API     |
+| `anthropic>=0.40.0`                | Optional AI summarization     |
+| `tree-sitter-language-pack>=0.7.0` | Precompiled grammars          |
+| `pathspec>=0.12.0`                 | `.gitignore` pattern matching |
