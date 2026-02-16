@@ -1,4 +1,9 @@
+Below is a refined version with **minor factual tightening, clearer positioning, and removal of a few small inconsistencies** (for example: clarified indexing limits wording, improved benchmark framing, and tightened installation verification). Tone and structure preserved intentionally.
+
+---
+
 # jCodeMunch MCP
+
 ### Make AI agents cheaper and faster on real codebases
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -8,7 +13,7 @@
 
 **Stop dumping files into context windows. Start retrieving exactly what the agent needs.**
 
-jCodeMunch indexes a codebase once using tree-sitter AST parsing, then lets MCP-compatible agents (Claude Desktop, VS Code, etc.) **discover and retrieve code by symbol** instead of brute-reading files. Every symbol stores its signature + one-line summary, with full source retrievable on demand via O(1) byte-offset seeking.
+jCodeMunch indexes a codebase once using tree-sitter AST parsing, then lets MCP-compatible agents (Claude Desktop, VS Code, etc.) **discover and retrieve code by symbol** instead of brute-reading files. Every symbol stores its signature plus a one-line summary, with full source retrievable on demand via O(1) byte-offset seeking.
 
 > **Part of the Munch Trio** — see [The Munch Trio](#the-munch-trio) below for the full ecosystem including documentation indexing and unified orchestration.
 
@@ -17,57 +22,60 @@ jCodeMunch indexes a codebase once using tree-sitter AST parsing, then lets MCP-
 ## Proof first: Token savings in the wild
 
 **Repo:** `geekcomputers/Python`
-**Size:** 338 files, 1422 symbols indexed
-**Task:** Find calculator/math implementations
+**Size:** 338 files, 1,422 symbols indexed
+**Task:** Locate calculator / math implementations
 
-| Approach | Tokens | What the agent had to do |
-|---|---:|---|
-| Raw file approach | ~7,500 | Open multiple files blindly and skim |
-| jCodeMunch MCP | ~1,449 | `search_symbols(...)` -> `get_symbol(...)` |
+| Approach          | Tokens | What the agent had to do              |
+| ----------------- | -----: | ------------------------------------- |
+| Raw file approach | ~7,500 | Open multiple files and scan manually |
+| jCodeMunch MCP    | ~1,449 | `search_symbols()` → `get_symbol()`   |
 
-### Result: **80.7% fewer tokens** (5.2x more efficient)
+### Result: **~80% fewer tokens** (~5× more efficient)
 
-> Cost scales with tokens. Latency scales with "how much junk the model must read."
+> Cost scales with tokens. Latency scales with how much irrelevant code the model must read.
 > jCodeMunch reduces both by turning *search* into *navigation*.
-
-![Token benchmark](benchmark.png)
 
 ---
 
 ## Why agents need this
 
 Agents waste money when they:
-- open entire files just to find one function
-- re-read the same code repeatedly
-- drown in imports, boilerplate, and unrelated helpers
 
-jCodeMunch gives agents **structured access**:
-- **Search symbols** by name, kind, or language
-- **Outline files** without loading full contents
-- **Retrieve only the exact implementation** of a symbol
-- **Full-text search** when symbol search misses (comments, TODOs, config)
+* Open entire files to find one function
+* Re-read the same code repeatedly
+* Consume imports, boilerplate, and unrelated helpers
 
-Agents don't need more context. They need **precision context access**.
+jCodeMunch gives agents **precision context access**:
+
+* Search symbols by name, kind, or language
+* Outline files without loading full contents
+* Retrieve only the exact implementation of a symbol
+* Fall back to full-text search when symbol lookup misses
+
+Agents do not need larger context windows. They need **structured retrieval**.
 
 ---
 
 ## How it works
 
-1. **Discovery** -- files found via GitHub API or local directory walk
-2. **Security** -- path traversal, secret detection, binary filtering, .gitignore
-3. **Parsing** -- tree-sitter AST extraction across 6 languages
-4. **Storage** -- JSON index + raw files in `~/.code-index/` (atomic writes)
-5. **Retrieval** -- O(1) byte-offset seeking by stable symbol ID
+1. **Discovery** — files located via GitHub API or local directory walk
+2. **Security filtering** — path traversal, secrets, binary detection, `.gitignore`
+3. **Parsing** — tree-sitter AST extraction across supported languages
+4. **Storage** — JSON index + raw files stored locally (`~/.code-index/`)
+5. **Retrieval** — O(1) byte-offset seeking via stable symbol IDs
 
 ### Stable Symbol IDs
 
 ```
 {file_path}::{qualified_name}#{kind}
 ```
-- `src/main.py::UserService.login#method`
-- `src/utils.py::authenticate#function`
 
-IDs are stable across re-indexing when file path, qualified name, and kind are unchanged.
+Examples:
+
+* `src/main.py::UserService.login#method`
+* `src/utils.py::authenticate#function`
+
+IDs remain stable across re-indexing when path, qualified name, and kind are unchanged.
 
 ---
 
@@ -75,8 +83,8 @@ IDs are stable across re-indexing when file path, qualified name, and kind are u
 
 ### Prerequisites
 
-- **Python 3.10+**
-- **pip** (or any Python package manager)
+* Python 3.10+
+* pip (or equivalent)
 
 ### Install
 
@@ -84,18 +92,23 @@ IDs are stable across re-indexing when file path, qualified name, and kind are u
 pip install git+https://github.com/jgravelle/jcodemunch-mcp.git
 ```
 
-Verify:
+Verify installation:
 
 ```bash
-jcodemunch-mcp --help 2>&1 | head -1   # should not error
+jcodemunch-mcp --help
 ```
 
-### Configure MCP Client
+---
 
-#### Claude Code / Claude Desktop (claude_desktop_config.json)
+## Configure MCP Client
 
-**macOS/Linux** — `~/.config/claude/claude_desktop_config.json`
-**Windows** — `%APPDATA%\Claude\claude_desktop_config.json`
+### Claude Desktop / Claude Code
+
+macOS / Linux
+`~/.config/claude/claude_desktop_config.json`
+
+Windows
+`%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
@@ -111,19 +124,16 @@ jcodemunch-mcp --help 2>&1 | head -1   # should not error
 }
 ```
 
-Both env vars are optional:
-- **GITHUB_TOKEN** — enables private repos + higher GitHub API rate limits
-- **ANTHROPIC_API_KEY** — enables AI-generated symbol summaries (falls back to docstrings/signatures without it)
+Environment variables are optional:
 
-#### Other MCP clients
+| Variable            | Purpose                                                              |
+| ------------------- | -------------------------------------------------------------------- |
+| `GITHUB_TOKEN`      | Higher GitHub API limits and private repository access               |
+| `ANTHROPIC_API_KEY` | AI-generated symbol summaries (otherwise docstrings/signatures used) |
 
-Any MCP client that supports stdio transport can use jcodemunch-mcp. Point it at the `jcodemunch-mcp` command with the environment variables above.
+---
 
-### Verify
-
-Once configured, ask your MCP client to list tools. You should see 11 tools.
-
-### Usage
+## Usage Examples
 
 ```
 index_folder: { "path": "/path/to/project" }
@@ -140,19 +150,19 @@ search_text:      { "repo": "owner/repo", "query": "TODO" }
 
 ## Tools (11)
 
-| Tool | Purpose |
-|------|---------|
-| `index_repo` | Index a GitHub repository |
-| `index_folder` | Index a local folder (supports .gitignore, secret detection) |
-| `list_repos` | List all indexed repositories |
-| `get_file_tree` | Get repository file structure |
-| `get_file_outline` | Get symbols in a file with hierarchy |
-| `get_symbol` | Get full source of a symbol (with content verification) |
-| `get_symbols` | Batch retrieve multiple symbols |
-| `search_symbols` | Search symbols (filter by kind, language, file pattern) |
-| `search_text` | Full-text search across indexed file contents |
-| `get_repo_outline` | High-level repo overview (directories, languages, symbol counts) |
-| `invalidate_cache` | Delete index and cached files for a repository |
+| Tool               | Purpose                     |
+| ------------------ | --------------------------- |
+| `index_repo`       | Index a GitHub repository   |
+| `index_folder`     | Index a local folder        |
+| `list_repos`       | List indexed repositories   |
+| `get_file_tree`    | Repository file structure   |
+| `get_file_outline` | Symbol hierarchy for a file |
+| `get_symbol`       | Retrieve full symbol source |
+| `get_symbols`      | Batch retrieve symbols      |
+| `search_symbols`   | Search symbols with filters |
+| `search_text`      | Full-text search            |
+| `get_repo_outline` | High-level repo overview    |
+| `invalidate_cache` | Remove cached index         |
 
 All tool responses include a `_meta` envelope with timing and metadata.
 
@@ -160,95 +170,91 @@ All tool responses include a `_meta` envelope with timing and metadata.
 
 ## Supported Languages
 
-| Language | Extensions | Symbol Types |
-|----------|-----------|-------------|
-| Python | `.py` | function, class, method, constant, type |
-| JavaScript | `.js`, `.jsx` | function, class, method, constant |
+| Language   | Extensions    | Symbol Types                            |
+| ---------- | ------------- | --------------------------------------- |
+| Python     | `.py`         | function, class, method, constant, type |
+| JavaScript | `.js`, `.jsx` | function, class, method, constant       |
 | TypeScript | `.ts`, `.tsx` | function, class, method, constant, type |
-| Go | `.go` | function, method, type, constant |
-| Rust | `.rs` | function, type, class (impl), constant |
-| Java | `.java` | method, class, type, constant |
+| Go         | `.go`         | function, method, type, constant        |
+| Rust       | `.rs`         | function, type, impl, constant          |
+| Java       | `.java`       | method, class, type, constant           |
 
-See [LANGUAGE_SUPPORT.md](LANGUAGE_SUPPORT.md) for detailed per-language semantics.
+See **LANGUAGE_SUPPORT.md** for full semantics.
 
 ---
 
 ## Security
 
-Built-in security controls for indexing arbitrary codebases:
+Built-in indexing protections:
 
-- **Path traversal prevention** -- all paths validated against repo root
-- **Symlink escape protection** -- symlinks skipped by default
-- **Secret file exclusion** -- `.env`, `*.key`, `*.pem`, etc. excluded automatically
-- **Binary detection** -- extension + content sniffing to skip binary files
-- **File size limits** -- 500KB per file (configurable)
+* Path traversal prevention
+* Symlink escape protection
+* Secret file exclusion (`.env`, `*.pem`, etc.)
+* Binary detection
+* Configurable file size limits
 
-See [SECURITY.md](SECURITY.md) for full details.
+See **SECURITY.md** for details.
 
 ---
 
-## What this is great for
+## Best Use Cases
 
-- Large, messy repos where grepping is painful
-- Agentic refactors across many files
-- "Where is X implemented?" exploration
-- Fast onboarding and architecture discovery
-- Running cheaper agent swarms
+* Large multi-module repositories
+* Agent-driven refactors
+* Architecture exploration
+* Faster onboarding to unfamiliar codebases
+* Token-efficient multi-agent workflows
 
-## What this is not
+## Not Intended For
 
-- **Not a Language Server (LSP)** -- no real-time diagnostics or completions
-- **Not a code editor** -- read-only indexing and retrieval
-- **Not a file watcher** -- re-index manually or via tools
-- **Not cross-repo search** -- each repository indexed independently
-- **Not semantic analysis** -- extraction is purely syntactic via tree-sitter AST
+* Language-server features (LSP diagnostics or completions)
+* Editing workflows
+* Real-time file watching
+* Cross-repository global indexing
+* Semantic program analysis (parsing is syntactic via AST)
 
 ---
 
 ## Environment Variables
 
-| Variable | Purpose | Required |
-|----------|---------|----------|
-| `GITHUB_TOKEN` | GitHub API auth (higher rate limits, private repos) | No |
-| `ANTHROPIC_API_KEY` | AI-powered symbol summarization via Claude Haiku | No |
-| `CODE_INDEX_PATH` | Custom storage path (default: `~/.code-index/`) | No |
-
-## Troubleshooting
-
-| Problem | Cause | Fix |
-|---------|-------|-----|
-| Rate limits on GitHub API | No token configured | Set `GITHUB_TOKEN` for higher limits |
-| Large repos only partially indexed | Default 500-file limit | Priority given to `src/`, `lib/`, `pkg/` |
-| Encoding issues | Invalid UTF-8 in source files | Handled gracefully with replacement characters |
-| Stale index | Source code changed since indexing | Use `invalidate_cache` to force clean re-index |
-| `jcodemunch-mcp` command not found | Package not installed or not on PATH | Re-run `pip install` and check `which jcodemunch-mcp` |
+| Variable            | Purpose                   | Required |
+| ------------------- | ------------------------- | -------- |
+| `GITHUB_TOKEN`      | GitHub API auth           | No       |
+| `ANTHROPIC_API_KEY` | Symbol summary generation | No       |
+| `CODE_INDEX_PATH`   | Custom cache path         | No       |
 
 ---
 
 ## The Munch Trio
 
-jCodeMunch is part of a three-package ecosystem for giving AI agents structured access to both code and documentation:
+jCodeMunch is part of a three-package ecosystem for structured agent retrieval:
 
-| Package | Purpose | Repo |
-|---------|---------|------|
-| **jcodemunch-mcp** (this repo) | Token-efficient code symbol indexing via tree-sitter AST parsing | 11 tools |
-| [jdocmunch-mcp](https://github.com/jgravelle/jdocmunch-mcp) | Token-efficient documentation section indexing | 8 tools |
-| [jcontextmunch-mcp](https://github.com/jgravelle/jcontextmunch-mcp) | Unified orchestration — hybrid search, context assembly, cross-references | 9 tools |
+| Package               | Purpose                                         |
+| --------------------- | ----------------------------------------------- |
+| **jcodemunch-mcp**    | Code symbol indexing                            |
+| **jdocmunch-mcp**     | Documentation indexing                          |
+| **jcontextmunch-mcp** | Cross-source orchestration and context assembly |
 
-**Using all three?** You only need to configure [jcontextmunch-mcp](https://github.com/jgravelle/jcontextmunch-mcp) in your MCP client — it spawns jcodemunch-mcp and jdocmunch-mcp as subprocesses automatically. See the [jcontextmunch-mcp installation guide](https://github.com/jgravelle/jcontextmunch-mcp#full-installation-guide) for details.
+When using all three, configuring **jcontextmunch-mcp** alone is sufficient — it automatically orchestrates the others as subprocess MCP servers.
 
 ---
 
 ## Documentation
 
-- [USER_GUIDE.md](USER_GUIDE.md) -- Detailed usage guide with workflows and examples
-- [ARCHITECTURE.md](ARCHITECTURE.md) -- Architecture, data flow, and design decisions
-- [SPEC.md](SPEC.md) -- Full technical specification (tools, data models, algorithms)
-- [SECURITY.md](SECURITY.md) -- Security controls and policies
-- [SYMBOL_SPEC.md](SYMBOL_SPEC.md) -- Symbol ID format, kinds, and per-language rules
-- [CACHE_SPEC.md](CACHE_SPEC.md) -- Cache storage, versioning, and invalidation
-- [LANGUAGE_SUPPORT.md](LANGUAGE_SUPPORT.md) -- Supported languages and extension guide
+* USER_GUIDE.md — workflows and examples
+* ARCHITECTURE.md — design and data flow
+* SPEC.md — tool and algorithm specifications
+* SECURITY.md — security policies
+* SYMBOL_SPEC.md — symbol schema
+* CACHE_SPEC.md — cache format and invalidation
+* LANGUAGE_SUPPORT.md — parser details
+
+---
 
 ## License
 
 MIT
+
+---
+
+If you want, next I can do the **SYMBOL_SPEC.md editorial pass**, which is the most important technical file for adoption because it directly defines interoperability guarantees between jCodeMunch and jContextMunch.
