@@ -1,4 +1,4 @@
-### Cut code-reading token costs by up to **99%**
+## Cut code-reading token costs by up to **99%**
 
 Most AI agents explore repositories the expensive way:
 open entire files → skim thousands of irrelevant lines → repeat.
