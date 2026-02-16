@@ -3,15 +3,18 @@
 ## Installation
 
 ```bash
-pip install jcodemunch-mcp
+pip install git+https://github.com/jgravelle/jcodemunch-mcp.git
 ```
 
 Or from source:
+
 ```bash
-git clone https://github.com/jcodemunch/jcodemunch-mcp.git
+git clone https://github.com/jgravelle/jcodemunch-mcp.git
 cd jcodemunch-mcp
 pip install -e .
 ```
+
+---
 
 ## Configuration
 
@@ -33,7 +36,10 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-Both environment variables are optional — `GITHUB_TOKEN` enables private repos and higher rate limits, `ANTHROPIC_API_KEY` enables AI-generated summaries.
+Both environment variables are optional:
+
+* `GITHUB_TOKEN` enables private repositories and higher GitHub API rate limits.
+* `ANTHROPIC_API_KEY` enables AI-generated summaries (otherwise docstrings or signatures are used).
 
 ### VS Code
 
@@ -52,6 +58,8 @@ Add to `.vscode/settings.json`:
 }
 ```
 
+---
+
 ## Workflows
 
 ### Explore a New Repository
@@ -67,8 +75,8 @@ get_file_outline: { "repo": "fastapi/fastapi", "file_path": "fastapi/main.py" }
 
 ```
 index_folder: { "path": "/home/user/myproject" }
-get_repo_outline: { "repo": "local/myproject" }
-search_symbols: { "repo": "local/myproject", "query": "main" }
+get_repo_outline: { "repo": "local-myproject" }
+search_symbols: { "repo": "local-myproject", "query": "main" }
 ```
 
 ### Find and Read a Function
@@ -101,7 +109,7 @@ get_symbol: {
 }
 ```
 
-The response `_meta.content_verified` will be `true` if the source matches the stored hash, `false` if it has drifted.
+The response `_meta.content_verified` will be `true` if the source matches the stored hash and `false` if it has drifted.
 
 ### Search for Non-Symbol Content
 
@@ -109,7 +117,7 @@ The response `_meta.content_verified` will be `true` if the source matches the s
 search_text: { "repo": "owner/repo", "query": "TODO", "file_pattern": "*.py" }
 ```
 
-Use `search_text` for string literals, comments, config values, or anything that isn't a symbol name.
+Use `search_text` for string literals, comments, configuration values, or anything that is not a symbol name.
 
 ### Force Re-index
 
@@ -118,25 +126,35 @@ invalidate_cache: { "repo": "owner/repo" }
 index_repo: { "url": "owner/repo" }
 ```
 
+---
+
 ## Tool Reference
 
-| Tool | Purpose | Key Parameters |
-|------|---------|---------------|
-| `index_repo` | Index GitHub repo | `url`, `use_ai_summaries` |
-| `index_folder` | Index local folder | `path`, `extra_ignore_patterns`, `follow_symlinks` |
-| `list_repos` | List all indexed repos | — |
-| `get_file_tree` | Browse file structure | `repo`, `path_prefix` |
-| `get_file_outline` | Symbols in a file | `repo`, `file_path` |
-| `get_symbol` | Full source of one symbol | `repo`, `symbol_id`, `verify`, `context_lines` |
-| `get_symbols` | Batch retrieve symbols | `repo`, `symbol_ids` |
-| `search_symbols` | Search symbols | `repo`, `query`, `kind`, `language`, `file_pattern`, `max_results` |
-| `search_text` | Full-text search | `repo`, `query`, `file_pattern`, `max_results` |
-| `get_repo_outline` | High-level overview | `repo` |
-| `invalidate_cache` | Delete cached index | `repo` |
+| Tool               | Purpose                       | Key Parameters                                                     |
+| ------------------ | ----------------------------- | ------------------------------------------------------------------ |
+| `index_repo`       | Index GitHub repository       | `url`, `use_ai_summaries`                                          |
+| `index_folder`     | Index local folder            | `path`, `extra_ignore_patterns`, `follow_symlinks`                 |
+| `list_repos`       | List all indexed repositories | —                                                                  |
+| `get_file_tree`    | Browse file structure         | `repo`, `path_prefix`                                              |
+| `get_file_outline` | Symbols in a file             | `repo`, `file_path`                                                |
+| `get_symbol`       | Full source of one symbol     | `repo`, `symbol_id`, `verify`, `context_lines`                     |
+| `get_symbols`      | Batch retrieve symbols        | `repo`, `symbol_ids`                                               |
+| `search_symbols`   | Search symbols                | `repo`, `query`, `kind`, `language`, `file_pattern`, `max_results` |
+| `search_text`      | Full-text search              | `repo`, `query`, `file_pattern`, `max_results`                     |
+| `get_repo_outline` | High-level overview           | `repo`                                                             |
+| `invalidate_cache` | Delete cached index           | `repo`                                                             |
+
+---
 
 ## Symbol IDs
 
-Symbol IDs follow the format `{file_path}::{qualified_name}#{kind}`:
+Symbol IDs follow the format:
+
+```
+{file_path}::{qualified_name}#{kind}
+```
+
+Examples:
 
 ```
 src/main.py::UserService#class
@@ -147,23 +165,33 @@ config.py::MAX_RETRIES#constant
 
 IDs are returned by `get_file_outline`, `search_symbols`, and `search_text`. Pass them to `get_symbol` or `get_symbols` to retrieve source code.
 
+---
+
 ## Troubleshooting
 
-**"Repository not found"** — Check the URL format (`owner/repo` or full GitHub URL). For private repos, set `GITHUB_TOKEN`.
+**"Repository not found"**
+Check the URL format (`owner/repo` or full GitHub URL). For private repositories, set `GITHUB_TOKEN`.
 
-**"No source files found"** — The repo may not contain supported language files (.py, .js, .ts, .go, .rs, .java), or files may be in skip patterns.
+**"No source files found"**
+The repository may not contain supported language files (`.py`, `.js`, `.ts`, `.go`, `.rs`, `.java`), or files may be excluded by skip patterns.
 
-**Rate limiting** — Set `GITHUB_TOKEN` for 5,000 requests/hour (vs 60 without).
+**Rate limiting**
+Set `GITHUB_TOKEN` to increase GitHub API limits (5,000 requests/hour vs 60 unauthenticated).
 
-**AI summaries not working** — Set `ANTHROPIC_API_KEY`. Without it, summaries fall back to docstrings or signatures.
+**AI summaries not working**
+Set `ANTHROPIC_API_KEY`. Without it, summaries fall back to docstrings or signatures.
 
-**Stale index** — Use `invalidate_cache` followed by `index_repo` or `index_folder` to force a clean re-index.
+**Stale index**
+Use `invalidate_cache` followed by `index_repo` or `index_folder` to force a clean re-index.
 
-**Encoding issues** — Files with invalid UTF-8 are handled gracefully with replacement characters.
+**Encoding issues**
+Files with invalid UTF-8 are handled safely using replacement characters.
+
+---
 
 ## Storage
 
-Indexes live at `~/.code-index/` (override with `CODE_INDEX_PATH` env var):
+Indexes are stored at `~/.code-index/` (override with the `CODE_INDEX_PATH` environment variable):
 
 ```
 ~/.code-index/
@@ -172,11 +200,13 @@ Indexes live at `~/.code-index/` (override with `CODE_INDEX_PATH` env var):
     └── src/main.py
 ```
 
+---
+
 ## Tips
 
-1. **Start with `get_repo_outline`** for a quick lay of the land
-2. **Use `get_file_outline`** before reading source — understand the API first
-3. **Filter searches** with `kind`, `language`, and `file_pattern` to narrow results
-4. **Batch retrieve** related symbols with `get_symbols` instead of multiple `get_symbol` calls
-5. **Use `search_text`** when symbol search misses — it searches actual file content
-6. **Use `verify: true`** on `get_symbol` to detect source drift since indexing
+1. Start with `get_repo_outline` to quickly understand the repository structure.
+2. Use `get_file_outline` before reading source to understand the API surface first.
+3. Narrow searches using `kind`, `language`, and `file_pattern`.
+4. Batch-retrieve related symbols with `get_symbols` instead of repeated `get_symbol` calls.
+5. Use `search_text` when symbol search does not locate the needed content.
+6. Use `verify: true` on `get_symbol` to detect source drift since indexing.
