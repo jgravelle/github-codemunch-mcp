@@ -6,12 +6,12 @@
 
 ### Token Savings
 
-| Scenario | Raw dump | codemunch | Savings |
-|----------|----------|-----------|---------|
-| Explore 500-file repo structure | ~200,000 tokens | ~2,000 tokens | **99%** |
-| Find a specific function | ~40,000 tokens | ~200 tokens | **99.5%** |
-| Read one function body | ~40,000 tokens | ~500 tokens | **98.7%** |
-| Understand module API | ~15,000 tokens | ~800 tokens | **94.7%** |
+| Scenario                        | Raw dump        | codemunch     | Savings   |
+| ------------------------------- | --------------- | ------------- | --------- |
+| Explore 500-file repo structure | ~200,000 tokens | ~2,000 tokens | **99%**   |
+| Find a specific function        | ~40,000 tokens  | ~200 tokens   | **99.5%** |
+| Read one function body          | ~40,000 tokens  | ~500 tokens   | **98.7%** |
+| Understand module API           | ~15,000 tokens  | ~800 tokens   | **94.7%** |
 
 ---
 
@@ -28,7 +28,7 @@
 }
 ```
 
-Fetches source via `git/trees?recursive=1` (single API call), filters through security pipeline, parses with tree-sitter, summarizes, saves index + raw files.
+Fetches source via `git/trees?recursive=1` (single API call), filters through the security pipeline, parses with tree-sitter, summarizes, and saves the index plus raw files.
 
 #### `index_folder` — Index a local folder
 
@@ -40,7 +40,7 @@ Fetches source via `git/trees?recursive=1` (single API call), filters through se
 }
 ```
 
-Walks local directory with full security controls: path traversal prevention, symlink escape protection, secret detection, binary filtering, .gitignore respect.
+Walks the local directory with full security controls: path traversal prevention, symlink escape protection, secret detection, binary filtering, and `.gitignore` respect.
 
 #### `invalidate_cache` — Delete index for a repository
 
@@ -52,11 +52,13 @@ Walks local directory with full security controls: path traversal prevention, sy
 
 Deletes both the index JSON and raw content directory.
 
+---
+
 ### Discovery Tools
 
 #### `list_repos` — List indexed repositories
 
-No input required. Returns all indexed repos with symbol counts, file counts, languages, and index version.
+No input required. Returns all indexed repositories with symbol counts, file counts, languages, and index version.
 
 #### `get_file_tree` — Get file structure
 
@@ -67,7 +69,7 @@ No input required. Returns all indexed repos with symbol counts, file counts, la
 }
 ```
 
-Returns nested directory tree with per-file language and symbol count annotations.
+Returns a nested directory tree with per-file language and symbol count annotations.
 
 #### `get_file_outline` — Get symbols in a file
 
@@ -78,9 +80,9 @@ Returns nested directory tree with per-file language and symbol count annotation
 }
 ```
 
-Returns hierarchical symbol tree (classes contain methods) with signatures and summaries. No source code — use `get_symbol` for that.
+Returns a hierarchical symbol tree (classes contain methods) with signatures and summaries. Source code is not included; use `get_symbol` for that.
 
-#### `get_repo_outline` — High-level repo overview
+#### `get_repo_outline` — High-level repository overview
 
 ```json
 {
@@ -89,6 +91,8 @@ Returns hierarchical symbol tree (classes contain methods) with signatures and s
 ```
 
 Returns directory file counts, language breakdown, and symbol kind distribution. Lighter than `get_file_tree`.
+
+---
 
 ### Retrieval Tools
 
@@ -103,7 +107,7 @@ Returns directory file counts, language breakdown, and symbol kind distribution.
 }
 ```
 
-Retrieves source via byte-offset seeking (O(1)). Optional `verify` re-hashes source and compares to stored `content_hash`. Optional `context_lines` includes surrounding lines.
+Retrieves source via byte-offset seeking (O(1)). Optional `verify` re-hashes the source and compares it to the stored `content_hash`. Optional `context_lines` includes surrounding lines.
 
 #### `get_symbols` — Batch retrieve multiple symbols
 
@@ -114,7 +118,9 @@ Retrieves source via byte-offset seeking (O(1)). Optional `verify` re-hashes sou
 }
 ```
 
-Returns symbols list + errors list for any IDs not found.
+Returns a list of symbols plus an error list for any IDs not found.
+
+---
 
 ### Search Tools
 
@@ -144,7 +150,7 @@ Weighted scoring search across name, signature, summary, keywords, and docstring
 }
 ```
 
-Case-insensitive substring search across indexed file contents. Returns matching lines with file, line number, and context. Use when symbol search misses (string literals, comments, config values).
+Case-insensitive substring search across indexed file contents. Returns matching lines with file, line number, and surrounding context. Use when symbol search misses (string literals, comments, config values).
 
 ---
 
@@ -188,30 +194,31 @@ class CodeIndex:
     languages: dict[str, int]        # language → file count
     symbols: list[dict]              # Serialized symbols (no source)
     file_hashes: dict[str, str]      # file_path → SHA-256 (for incremental)
-    git_head: str                    # HEAD commit hash (for git repos)
+    git_head: str                    # HEAD commit hash (for git repos, empty if unavailable)
 ```
 
 ---
 
 ## File Discovery
 
-### GitHub Repos
+### GitHub Repositories
 
-Single API call: `GET /repos/{owner}/{repo}/git/trees/HEAD?recursive=1`
+Single API call:
+`GET /repos/{owner}/{repo}/git/trees/HEAD?recursive=1`
 
 ### Local Folders
 
-Recursive directory walk with full security pipeline.
+Recursive directory walk with the full security pipeline.
 
-### Filtering Pipeline (both paths)
+### Filtering Pipeline (Both Paths)
 
 1. **Extension filter** — must be in `LANGUAGE_EXTENSIONS` (.py, .js, .jsx, .ts, .tsx, .go, .rs, .java)
 2. **Skip patterns** — `node_modules/`, `vendor/`, `.git/`, `build/`, `dist/`, lock files, minified files, etc.
-3. **.gitignore** — respected via `pathspec` library
-4. **Secret detection** — `.env`, `*.pem`, `*.key`, `*.p12`, credentials files blocked
+3. **`.gitignore`** — respected via the `pathspec` library
+4. **Secret detection** — `.env`, `*.pem`, `*.key`, `*.p12`, credentials files excluded
 5. **Binary detection** — extension-based + null-byte content sniffing
-6. **Size limit** — 500KB per file (configurable)
-7. **File count limit** — 500 files max, prioritized: `src/` > `lib/` > `pkg/` > `cmd/` > `internal/` > rest
+6. **Size limit** — 500 KB per file (configurable)
+7. **File count limit** — 500 files max, prioritized: `src/` → `lib/` → `pkg/` → `cmd/` → `internal/` → remainder
 
 ---
 
@@ -236,6 +243,7 @@ All tools return a `_meta` object with timing and context:
 ## Error Handling
 
 All errors return:
+
 ```json
 {
   "error": "Human-readable message",
@@ -243,24 +251,24 @@ All errors return:
 }
 ```
 
-| Scenario | Behavior |
-|----------|----------|
-| Repo not found (GitHub 404) | Error with message |
-| Rate limited (GitHub 403) | Error with reset time, suggest `GITHUB_TOKEN` |
-| File fetch fails | Skip file, continue indexing |
-| Parse fails (single file) | Skip file, continue |
-| No source files found | Error message |
-| Symbol ID not found | Error in response |
-| Repo not indexed | Error, suggest running index tool |
-| AI summarization fails | Fall back to docstring/signature |
-| Index version mismatch | Old index ignored, full reindex needed |
+| Scenario                          | Behavior                                              |
+| --------------------------------- | ----------------------------------------------------- |
+| Repository not found (GitHub 404) | Error with message                                    |
+| Rate limited (GitHub 403)         | Error with reset time; suggest setting `GITHUB_TOKEN` |
+| File fetch fails                  | File skipped; indexing continues                      |
+| Parse fails (single file)         | File skipped; indexing continues                      |
+| No source files found             | Error message returned                                |
+| Symbol ID not found               | Error in response                                     |
+| Repository not indexed            | Error suggesting indexing first                       |
+| AI summarization fails            | Falls back to docstring or signature                  |
+| Index version mismatch            | Old index ignored; full reindex required              |
 
 ---
 
 ## Environment Variables
 
-| Variable | Purpose | Required |
-|----------|---------|----------|
-| `GITHUB_TOKEN` | GitHub API auth (higher limits, private repos) | No |
-| `ANTHROPIC_API_KEY` | AI summarization via Claude Haiku | No |
-| `CODE_INDEX_PATH` | Custom storage path (default: `~/.code-index/`) | No |
+| Variable            | Purpose                                                  | Required |
+| ------------------- | -------------------------------------------------------- | -------- |
+| `GITHUB_TOKEN`      | GitHub API authentication (higher limits, private repos) | No       |
+| `ANTHROPIC_API_KEY` | AI summarization via Claude Haiku                        | No       |
+| `CODE_INDEX_PATH`   | Custom storage path (default: `~/.code-index/`)          | No       |
