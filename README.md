@@ -1,3 +1,21 @@
+### Cut code-reading token costs by up to **99%**
+
+Most AI agents explore repositories the expensive way:
+open entire files → skim thousands of irrelevant lines → repeat.
+
+**jCodeMunch indexes a codebase once and lets agents retrieve only the exact symbols they need** — functions, classes, methods, constants — with byte-level precision.
+
+| Task                   | Traditional approach | With jCodeMunch |
+| ---------------------- | -------------------- | --------------- |
+| Find a function        | ~40k tokens          | ~200 tokens     |
+| Understand module API  | ~15k tokens          | ~800 tokens     |
+| Explore repo structure | ~200k tokens         | ~2k tokens      |
+
+Index once. Query cheaply forever.
+Precision context beats brute-force context.
+
+---
+
 # jCodeMunch MCP
 
 ### Make AI agents cheaper and faster on real codebases
