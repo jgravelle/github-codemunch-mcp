@@ -29,8 +29,6 @@ Precision context beats brute-force context.
 
 jCodeMunch indexes a codebase once using tree-sitter AST parsing, then lets MCP-compatible agents (Claude Desktop, VS Code, etc.) **discover and retrieve code by symbol** instead of brute-reading files. Every symbol stores its signature plus a one-line summary, with full source retrievable on demand via O(1) byte-offset seeking.
 
-> **Part of the Munch Trio** — see [The Munch Trio](#the-munch-trio) below for the full ecosystem including documentation indexing and unified orchestration.
-
 ---
 
 ## Proof first: Token savings in the wild
@@ -219,6 +217,8 @@ See **SECURITY.md** for details.
 * Faster onboarding to unfamiliar codebases
 * Token-efficient multi-agent workflows
 
+---
+
 ## Not Intended For
 
 * Language-server features (LSP diagnostics or completions)
@@ -239,20 +239,6 @@ See **SECURITY.md** for details.
 
 ---
 
-## The Munch Trio
-
-jCodeMunch is part of a three-package ecosystem for structured agent retrieval:
-
-| Package               | Purpose                                         |
-| --------------------- | ----------------------------------------------- |
-| **jcodemunch-mcp**    | Code symbol indexing                            |
-| **jdocmunch-mcp**     | Documentation indexing                          |
-| **jcontextmunch-mcp** | Cross-source orchestration and context assembly |
-
-When using all three, configuring **jcontextmunch-mcp** alone is sufficient — it automatically orchestrates the others as subprocess MCP servers.
-
----
-
 ## Documentation
 
 * USER_GUIDE.md — workflows and examples
@@ -268,4 +254,3 @@ When using all three, configuring **jcontextmunch-mcp** alone is sufficient — 
 ## License
 
 MIT
-
