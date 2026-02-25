@@ -239,20 +239,6 @@ See **SECURITY.md** for details.
 
 ---
 
-## The Munch Trio
-
-jCodeMunch is part of a three-package ecosystem for structured agent retrieval:
-
-| Package               | Purpose                                         |
-| --------------------- | ----------------------------------------------- |
-| **jcodemunch-mcp**    | Code symbol indexing                            |
-| **jdocmunch-mcp**     | Documentation indexing                          |
-| **jcontextmunch-mcp** | Cross-source orchestration and context assembly |
-
-When using all three, configuring **jcontextmunch-mcp** alone is sufficient — it automatically orchestrates the others as subprocess MCP servers.
-
----
-
 ## Documentation
 
 * USER_GUIDE.md — workflows and examples
