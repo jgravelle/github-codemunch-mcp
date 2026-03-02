@@ -190,6 +190,7 @@ All tool responses include a `_meta` envelope with timing and metadata.
 | Go         | `.go`         | function, method, type, constant        |
 | Rust       | `.rs`         | function, type, impl, constant          |
 | Java       | `.java`       | method, class, type, constant           |
+| PHP        | `.php`        | function, class, method, type, constant |
 
 See **LANGUAGE_SUPPORT.md** for full semantics.
 

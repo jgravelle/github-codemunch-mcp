@@ -53,6 +53,7 @@ LANGUAGE_EXTENSIONS = {
     ".go": "go",
     ".rs": "rust",
     ".java": "java",
+    ".php": "php",
 }
 
 
@@ -241,6 +242,41 @@ JAVA_SPEC = LanguageSpec(
 )
 
 
+# PHP specification
+PHP_SPEC = LanguageSpec(
+    ts_language="php",
+    symbol_node_types={
+        "function_definition": "function",
+        "class_declaration": "class",
+        "method_declaration": "method",
+        "interface_declaration": "type",
+        "trait_declaration": "type",
+        "enum_declaration": "type",
+    },
+    name_fields={
+        "function_definition": "name",
+        "class_declaration": "name",
+        "method_declaration": "name",
+        "interface_declaration": "name",
+        "trait_declaration": "name",
+        "enum_declaration": "name",
+    },
+    param_fields={
+        "function_definition": "parameters",
+        "method_declaration": "parameters",
+    },
+    return_type_fields={
+        "function_definition": "return_type",
+        "method_declaration": "return_type",
+    },
+    docstring_strategy="preceding_comment",
+    decorator_node_type="attribute",  # PHP 8 #[Attribute] syntax
+    container_node_types=["class_declaration", "trait_declaration", "interface_declaration"],
+    constant_patterns=["const_declaration"],
+    type_patterns=["interface_declaration", "trait_declaration", "enum_declaration"],
+)
+
+
 # Language registry
 LANGUAGE_REGISTRY = {
     "python": PYTHON_SPEC,
@@ -249,4 +285,5 @@ LANGUAGE_REGISTRY = {
     "go": GO_SPEC,
     "rust": RUST_SPEC,
     "java": JAVA_SPEC,
+    "php": PHP_SPEC,
 }

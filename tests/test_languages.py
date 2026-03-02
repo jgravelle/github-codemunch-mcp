@@ -171,13 +171,91 @@ interface Operable {
 def test_parse_java():
     """Test Java parsing."""
     symbols = parse_file(JAVA_SOURCE, "Calculator.java", "java")
-    
+
     # Should have class, method, interface
     calc = next((s for s in symbols if s.name == "Calculator"), None)
     assert calc is not None
     assert calc.kind == "class"
-    
+
     add = next((s for s in symbols if s.name == "add"), None)
     assert add is not None
     assert add.kind == "method"
+
+
+PHP_SOURCE = '''<?php
+
+const MAX_RETRIES = 3;
+
+/**
+ * Authenticate a user token.
+ */
+function authenticate(string $token): bool
+{
+    return strlen($token) > 0;
+}
+
+/**
+ * Manages user operations.
+ */
+class UserService
+{
+    /**
+     * Get a user by ID.
+     */
+    public function getUser(int $userId): array
+    {
+        return ['id' => $userId];
+    }
+}
+
+interface Authenticatable
+{
+    public function authenticate(string $token): bool;
+}
+
+trait Timestampable
+{
+    public function getCreatedAt(): string
+    {
+        return date(\'Y-m-d\');
+    }
+}
+
+enum Status
+{
+    case Active;
+    case Inactive;
+}
+'''
+
+
+def test_parse_php():
+    """Test PHP parsing."""
+    symbols = parse_file(PHP_SOURCE, "service.php", "php")
+
+    func = next((s for s in symbols if s.name == "authenticate"), None)
+    assert func is not None
+    assert func.kind == "function"
+    assert "Authenticate a user token" in func.docstring
+
+    cls = next((s for s in symbols if s.name == "UserService"), None)
+    assert cls is not None
+    assert cls.kind == "class"
+
+    method = next((s for s in symbols if s.name == "getUser"), None)
+    assert method is not None
+    assert method.kind == "method"
+    assert "Get a user by ID" in method.docstring
+
+    interface = next((s for s in symbols if s.name == "Authenticatable"), None)
+    assert interface is not None
+    assert interface.kind == "type"
+
+    trait = next((s for s in symbols if s.name == "Timestampable"), None)
+    assert trait is not None
+    assert trait.kind == "type"
+
+    enum = next((s for s in symbols if s.name == "Status"), None)
+    assert enum is not None
+    assert enum.kind == "type"
 

@@ -166,7 +166,7 @@ class Symbol:
     name: str                # Symbol name
     qualified_name: str      # Dot-separated with parent context
     kind: str                # function | class | method | constant | type
-    language: str            # python | javascript | typescript | go | rust | java
+    language: str            # python | javascript | typescript | go | rust | java | php
     signature: str           # Full signature line(s)
     content_hash: str = ""   # SHA-256 of source bytes (drift detection)
     docstring: str = ""
@@ -212,7 +212,7 @@ Recursive directory walk with the full security pipeline.
 
 ### Filtering Pipeline (Both Paths)
 
-1. **Extension filter** — must be in `LANGUAGE_EXTENSIONS` (.py, .js, .jsx, .ts, .tsx, .go, .rs, .java)
+1. **Extension filter** — must be in `LANGUAGE_EXTENSIONS` (.py, .js, .jsx, .ts, .tsx, .go, .rs, .java, .php)
 2. **Skip patterns** — `node_modules/`, `vendor/`, `.git/`, `build/`, `dist/`, lock files, minified files, etc.
 3. **`.gitignore`** — respected via the `pathspec` library
 4. **Secret detection** — `.env`, `*.pem`, `*.key`, `*.p12`, credentials files excluded

@@ -10,6 +10,7 @@
 | Go         | `.go`         | tree-sitter-go         | function, method, type, constant                   | —             | `//` comments              | No class hierarchy (language limitation)                         |
 | Rust       | `.rs`         | tree-sitter-rust       | function, type (struct/enum/trait), impl, constant | `#[attr]`     | `///` and `//!` comments   | Macro-generated symbols are not visible to the parser            |
 | Java       | `.java`       | tree-sitter-java       | method, class, type (interface/enum), constant     | `@Annotation` | `/** */` Javadoc           | Deep inner-class nesting may be flattened                        |
+| PHP        | `.php`        | tree-sitter-php        | function, class, method, type (interface/trait/enum), constant | `#[Attribute]` | `/** */` PHPDoc | PHP 8+ attributes supported; language-file `<?php` tag required  |
 
 ---
 
