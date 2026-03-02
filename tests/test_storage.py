@@ -61,8 +61,8 @@ def test_byte_offset_retrieval(tmp_path):
             kind="function",
             language="python",
             signature="def foo():",
-            byte_offset=14,  # Start of "def foo()"
-            byte_length=14,  # Length of "def foo():\n    pass"
+            byte_offset=12,  # Start of "def foo():"
+            byte_length=19,  # Length of "def foo():\n    pass"
         )
     ]
     
