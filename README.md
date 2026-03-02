@@ -250,6 +250,10 @@ See **SECURITY.md** for details.
 * CACHE_SPEC.md — cache format and invalidation
 * LANGUAGE_SUPPORT.md — parser details
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=jgravelle/jcodemunch-mcp&type=date&legend=top-left)](https://www.star-history.com/#jgravelle/jcodemunch-mcp&type=date&legend=top-left)
+
 ---
 
 ## License
