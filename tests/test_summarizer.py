@@ -8,6 +8,7 @@ from jcodemunch_mcp.summarizer import (
     signature_fallback,
     summarize_symbols_simple,
     GeminiBatchSummarizer,
+    OpenAIBatchSummarizer,
 )
 
 
@@ -154,4 +155,77 @@ def test_gemini_summarizer_with_mock_client():
     ]
     summarizer.summarize_batch(symbols)
     assert symbols[0].summary == "Computes the sum of two integers."
+
+
+def test_openai_summarizer_no_api_base():
+    """OpenAIBatchSummarizer falls back to signature when no API base is set."""
+    with patch.dict("os.environ", {}, clear=True):
+        summarizer = OpenAIBatchSummarizer()
+        assert summarizer.client is None
+
+    symbols = [
+        Symbol(
+            id="test::bar",
+            file="test.py",
+            name="bar",
+            qualified_name="bar",
+            kind="function",
+            language="python",
+            signature="def bar():",
+        )
+    ]
+    summarizer.summarize_batch(symbols)
+    assert symbols[0].summary == "def bar():"
+
+
+def test_openai_summarizer_with_mock_client():
+    """OpenAIBatchSummarizer parses the response from OpenAI compatible endpoints."""
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "choices": [
+            {
+                "message": {"content": "1. Multiplies two integers together."}
+            }
+        ]
+    }
+
+    mock_client = MagicMock()
+    mock_client.post.return_value = mock_response
+
+    with patch.dict("os.environ", {"OPENAI_API_BASE": "http://localhost:11434/v1", "OPENAI_MODEL": "qwen3-coder"}, clear=True):
+        summarizer = OpenAIBatchSummarizer()
+        summarizer.client = mock_client
+
+    symbols = [
+        Symbol(
+            id="test::multiply",
+            file="test.py",
+            name="multiply",
+            qualified_name="multiply",
+            kind="function",
+            language="python",
+            signature="def multiply(a: int, b: int) -> int:",
+        )
+    ]
+    summarizer.summarize_batch(symbols)
+    
+    # Verify the endpoint URL used
+    mock_client.post.assert_called_once()
+    assert mock_client.post.call_args[0][0] == "http://localhost:11434/v1/chat/completions"
+    assert symbols[0].summary == "Multiplies two integers together."
+
+@pytest.mark.asyncio
+async def test_openai_summarizer_timeout_config():
+    """OpenAIBatchSummarizer configures custom timeouts via OPENAI_TIMEOUT."""
+    # Test valid float parsing
+    with patch.dict("os.environ", {"OPENAI_API_BASE": "http://test", "OPENAI_TIMEOUT": "120.5"}, clear=True):
+        summarizer = OpenAIBatchSummarizer()
+        assert summarizer.client is not None
+        assert summarizer.client.timeout.read == 120.5
+
+    # Test invalid string fallback
+    with patch.dict("os.environ", {"OPENAI_API_BASE": "http://test", "OPENAI_TIMEOUT": "invalid"}, clear=True):
+        summarizer = OpenAIBatchSummarizer()
+        assert summarizer.client is not None
+        assert summarizer.client.timeout.read == 60.0
 

@@ -290,6 +290,31 @@ See SECURITY.md for details.
 
 ---
 
+## Local LLMs (Ollama / LM Studio)
+
+You can use local, privacy-preserving AI models to generate summaries by providing an OpenAI-compatible endpoint.
+
+For **Ollama**, run a model locally, then configure the MCP server:
+```json
+"env": {
+  "OPENAI_API_BASE": "http://localhost:11434/v1",
+  "OPENAI_MODEL": "qwen3-coder"
+}
+```
+
+For **LM Studio**, ensure the Local Server is running (usually on port 1234):
+```json
+"env": {
+  "OPENAI_API_BASE": "http://127.0.0.1:1234/v1",
+  "OPENAI_MODEL": "openai/gpt-oss-20b"
+}
+```
+
+> [!TIP]
+> **Performance Note:** Local models can be slow to load into memory on their first request, potentially causing the MCP server to time out and fall back to generic signature summaries. It is highly recommended to **pre-load the model** in Ollama or LM Studio before starting the server, or increase the `OPENAI_TIMEOUT` environment variable (e.g., to `"120.0"`) to allow more time for generation.
+
+---
+
 ## Environment Variables
 
 | Variable                    | Purpose                   | Required |
@@ -297,6 +322,10 @@ See SECURITY.md for details.
 | `GITHUB_TOKEN`              | GitHub API auth           | No       |
 | `ANTHROPIC_API_KEY`         | Symbol summaries via Claude Haiku (takes priority) | No       |
 | `GOOGLE_API_KEY`            | Symbol summaries via Gemini Flash | No       |
+| `OPENAI_API_BASE`           | Base URL for local LLMs (e.g. `http://localhost:11434/v1`) | No |
+| `OPENAI_API_KEY`            | API key for local LLMs (default: `local-llm`) | No |
+| `OPENAI_MODEL`              | Model name for local LLMs (default: `qwen3-coder`) | No |
+| `OPENAI_TIMEOUT`            | Timeout in seconds for local requests (default: `60.0`) | No |
 | `CODE_INDEX_PATH`           | Custom cache path         | No       |
 | `JCODEMUNCH_SHARE_SAVINGS`  | Set to `0` to disable anonymous community token savings reporting | No       |
 

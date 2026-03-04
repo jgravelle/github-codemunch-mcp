@@ -270,10 +270,139 @@ class GeminiBatchSummarizer:
         return summaries
 
 
+@dataclass
+class OpenAIBatchSummarizer:
+    """AI-based batch summarization using OpenAI-compatible endpoints (Tier 2).
+    
+    Ideal for local LLMs like Ollama (http://localhost:11434/v1) or LM Studio.
+    """
+
+    model: str = "qwen3-coder"
+    max_tokens_per_batch: int = 500
+
+    def __post_init__(self):
+        self.client = None
+        self.api_base = os.environ.get("OPENAI_API_BASE")
+        if self.api_base:
+            # Strip trailing slash if present
+            self.api_base = self.api_base.rstrip("/")
+            self.model = os.environ.get("OPENAI_MODEL", self.model)
+            self._init_client()
+
+    def _init_client(self):
+        """Initialize HTTP client for OpenAI requests."""
+        try:
+            import httpx
+            
+            timeout_str = os.environ.get("OPENAI_TIMEOUT", "60.0")
+            try:
+                timeout = float(timeout_str)
+            except ValueError:
+                timeout = 60.0
+                
+            api_key = os.environ.get("OPENAI_API_KEY", "local-llm")
+            headers = {"Authorization": f"Bearer {api_key}"}
+            self.client = httpx.Client(timeout=timeout, headers=headers)
+        except ImportError:
+            self.client = None
+
+    def summarize_batch(self, symbols: list[Symbol], batch_size: int = 10) -> list[Symbol]:
+        """Summarize a batch of symbols using OpenAI compatible endpoint."""
+        if not self.client or not self.api_base:
+            for sym in symbols:
+                if not sym.summary:
+                    sym.summary = signature_fallback(sym)
+            return symbols
+
+        to_summarize = [s for s in symbols if not s.summary and not s.docstring]
+
+        if not to_summarize:
+            return symbols
+
+        for i in range(0, len(to_summarize), batch_size):
+            batch = to_summarize[i:i + batch_size]
+            self._summarize_one_batch(batch)
+
+        return symbols
+
+    def _summarize_one_batch(self, batch: list[Symbol]):
+        """Summarize one batch of symbols via HTTP POST."""
+        prompt = self._build_prompt(batch)
+
+        try:
+            payload = {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": self.max_tokens_per_batch,
+                "temperature": 0.0,
+            }
+            
+            response = self.client.post(f"{self.api_base}/chat/completions", json=payload)
+            response.raise_for_status()
+            
+            data = response.json()
+            # Extract content from the first choice
+            text = data["choices"][0]["message"]["content"]
+            summaries = self._parse_response(text, len(batch))
+
+            for sym, summary in zip(batch, summaries):
+                if summary:
+                    sym.summary = summary
+                else:
+                    sym.summary = signature_fallback(sym)
+
+        except Exception:
+            for sym in batch:
+                if not sym.summary:
+                    sym.summary = signature_fallback(sym)
+
+    def _build_prompt(self, symbols: list[Symbol]) -> str:
+        """Build summarization prompt for a batch."""
+        lines = [
+            "Summarize each code symbol in ONE short sentence (max 15 words).",
+            "Focus on what it does, not how.",
+            "",
+            "Input:",
+        ]
+
+        for i, sym in enumerate(symbols, 1):
+            lines.append(f"{i}. {sym.kind}: {sym.signature}")
+
+        lines.extend([
+            "",
+            "Output format: NUMBER. SUMMARY",
+            "Example: 1. Authenticates users with username and password.",
+            "",
+            "Summaries:",
+        ])
+
+        return "\n".join(lines)
+
+    def _parse_response(self, text: str, expected_count: int) -> list[str]:
+        """Parse numbered summaries from response."""
+        summaries = [""] * expected_count
+
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+
+            if "." in line:
+                parts = line.split(".", 1)
+                try:
+                    num = int(parts[0].strip())
+                    if 1 <= num <= expected_count:
+                        summaries[num - 1] = parts[1].strip()
+                except ValueError:
+                    continue
+
+        return summaries
+
+
 def _create_summarizer() -> Optional[BatchSummarizer]:
     """Return the appropriate summarizer based on available API keys.
 
-    Priority: Anthropic > Google Gemini.
+    Priority: Anthropic > Google Gemini > OpenAI/Local.
     Returns None if no API keys are configured.
     """
     if os.environ.get("ANTHROPIC_API_KEY"):
@@ -283,6 +412,11 @@ def _create_summarizer() -> Optional[BatchSummarizer]:
 
     if os.environ.get("GOOGLE_API_KEY"):
         s = GeminiBatchSummarizer()
+        if s.client:
+            return s
+            
+    if os.environ.get("OPENAI_API_BASE"):
+        s = OpenAIBatchSummarizer()
         if s.client:
             return s
 
@@ -313,14 +447,14 @@ def summarize_symbols(symbols: list[Symbol], use_ai: bool = True) -> list[Symbol
     """Full three-tier summarization.
 
     Tier 1: Docstring extraction (free)
-    Tier 2: AI batch summarization (Claude Haiku or Gemini Flash, auto-detected)
+    Tier 2: AI batch summarization (Claude Haiku, Gemini Flash, or Local LLM)
     Tier 3: Signature fallback (always works)
 
-    Provider selection (Tier 2):
-      - ANTHROPIC_API_KEY set → Claude Haiku
-      - GOOGLE_API_KEY set    → Gemini Flash
-      - Both set              → Anthropic takes priority
-      - Neither set           → skip to Tier 3
+    Provider selection (Tier 2 priority):
+      1. ANTHROPIC_API_KEY set → Claude Haiku
+      2. GOOGLE_API_KEY set    → Gemini Flash
+      3. OPENAI_API_BASE set   → Local LLM via OpenAI compatible endpoint
+      - None set               → skip to Tier 3
     """
     # Tier 1: Extract from docstrings
     for sym in symbols:
