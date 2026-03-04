@@ -128,6 +128,11 @@ jcodemunch-mcp --help
 
 ## Configure MCP Client
 
+> **Note on execution:** Because this is a Python package, the MCP client may not be able to find `jcodemunch-mcp` in its system `$PATH`. Using [`uvx`](https://github.com/astral-sh/uv) to run the server is recommended, or specifying the absolute path to the executable:
+> - **Linux:** `/home/<username>/.local/bin/jcodemunch-mcp`
+> - **macOS:** `/Users/<username>/.local/bin/jcodemunch-mcp`
+> - **Windows:** `C:\\Users\\<username>\\AppData\\Roaming\\Python\\Python311\\Scripts\\jcodemunch-mcp.exe` (or `C:\\Users\\<username>\\.local\\bin\\jcodemunch-mcp.exe` if using `pipx`)
+
 ### Claude Desktop / Claude Code
 
 macOS / Linux
@@ -140,7 +145,8 @@ Windows
 {
   "mcpServers": {
     "jcodemunch": {
-      "command": "jcodemunch-mcp",
+      "command": "uvx",
+      "args": ["jcodemunch-mcp"],
       "env": {
         "GITHUB_TOKEN": "ghp_...",
         "ANTHROPIC_API_KEY": "sk-ant-..."
@@ -160,7 +166,8 @@ Windows
 {
   "mcpServers": {
     "jcodemunch": {
-      "command": "jcodemunch-mcp",
+      "command": "uvx",
+      "args": ["jcodemunch-mcp"],
       "env": {
         "GITHUB_TOKEN": "ghp_...",
         "ANTHROPIC_API_KEY": "sk-ant-..."
