@@ -533,6 +533,88 @@ def test_parse_csharp():
     assert record.kind == "class"
 
 
+SWIFT_SOURCE = '''
+/// Greet a user by name.
+func greet(name: String) -> String {
+    return "Hello, \\(name)!"
+}
+
+/// A simple animal.
+class Animal {
+    /// Initialize with a name.
+    init(name: String) {}
+
+    /// Make the animal speak.
+    func speak() {}
+}
+
+/// A 2D point.
+struct Point {
+    var x: Double
+    var y: Double
+}
+
+/// Drawable objects.
+protocol Drawable {
+    func draw()
+}
+
+/// Cardinal directions.
+enum Direction {
+    case north, south, east, west
+}
+
+let MAX_SPEED = 100
+'''
+
+
+def test_parse_swift():
+    """Test Swift parsing."""
+    symbols = parse_file(SWIFT_SOURCE, "app.swift", "swift")
+
+    # Top-level function
+    func = next((s for s in symbols if s.name == "greet"), None)
+    assert func is not None
+    assert func.kind == "function"
+    assert "Greet a user by name" in func.docstring
+
+    # Class
+    cls = next((s for s in symbols if s.name == "Animal"), None)
+    assert cls is not None
+    assert cls.kind == "class"
+    assert "simple animal" in cls.docstring
+
+    # init inside class
+    init = next((s for s in symbols if s.name == "init"), None)
+    assert init is not None
+    assert init.kind == "method"
+
+    # Method inside class
+    speak = next((s for s in symbols if s.name == "speak"), None)
+    assert speak is not None
+    assert speak.kind in ("function", "method")
+
+    # Struct (maps to class)
+    point = next((s for s in symbols if s.name == "Point"), None)
+    assert point is not None
+    assert point.kind == "class"
+
+    # Protocol (maps to type)
+    drawable = next((s for s in symbols if s.name == "Drawable"), None)
+    assert drawable is not None
+    assert drawable.kind == "type"
+
+    # Enum (maps to class via class_declaration)
+    direction = next((s for s in symbols if s.name == "Direction"), None)
+    assert direction is not None
+    assert direction.kind == "class"
+
+    # Constant
+    speed = next((s for s in symbols if s.name == "MAX_SPEED"), None)
+    assert speed is not None
+    assert speed.kind == "constant"
+
+
 def test_parse_c():
     """Test C parsing."""
     symbols = parse_file(C_SOURCE, "sample.c", "c")

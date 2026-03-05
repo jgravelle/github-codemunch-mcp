@@ -402,6 +402,52 @@ def _extract_constant(
                     content_hash=c_hash,
                 )
 
+    # Swift: let MAX_SPEED = 100  (property_declaration with let binding)
+    if node.type == "property_declaration":
+        # Only extract immutable `let` bindings (not `var`)
+        binding = None
+        for child in node.children:
+            if child.type == "value_binding_pattern":
+                binding = child
+                break
+        if not binding:
+            return None
+        mutability = binding.child_by_field_name("mutability")
+        if not mutability or mutability.text != b"let":
+            return None
+        pattern = node.child_by_field_name("name")
+        if not pattern:
+            return None
+        name_node = pattern.child_by_field_name("bound_identifier")
+        if not name_node:
+            # fallback: first simple_identifier in pattern
+            for child in pattern.children:
+                if child.type == "simple_identifier":
+                    name_node = child
+                    break
+        if not name_node:
+            return None
+        name = source_bytes[name_node.start_byte:name_node.end_byte].decode("utf-8")
+        if not (name.isupper() or (len(name) > 1 and name[0].isupper() and "_" in name)):
+            return None
+        sig = source_bytes[node.start_byte:node.end_byte].decode("utf-8").strip()
+        const_bytes = source_bytes[node.start_byte:node.end_byte]
+        c_hash = compute_content_hash(const_bytes)
+        return Symbol(
+            id=make_symbol_id(filename, name, "constant"),
+            file=filename,
+            name=name,
+            qualified_name=name,
+            kind="constant",
+            language=language,
+            signature=sig[:100],
+            line=node.start_point[0] + 1,
+            end_line=node.end_point[0] + 1,
+            byte_offset=node.start_byte,
+            byte_length=node.end_byte - node.start_byte,
+            content_hash=c_hash,
+        )
+
     return None
 
 
