@@ -295,6 +295,7 @@ Every tool response includes a `_meta` envelope with timing, token savings, and 
 | PHP        | `.php`        | function, class, method, type, constant |
 | Dart       | `.dart`       | function, class, method, type           |
 | C#         | `.cs`         | class, method, type, record             |
+| C          | `.c`, `.h`    | function, type, constant                |
 
 See LANGUAGE_SUPPORT.md for full semantics.
 

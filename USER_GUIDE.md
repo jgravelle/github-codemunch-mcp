@@ -244,7 +244,7 @@ To disable, set `JCODEMUNCH_SHARE_SAVINGS=0` in your MCP server env:
 Check the URL format (`owner/repo` or full GitHub URL). For private repositories, set `GITHUB_TOKEN`.
 
 **"No source files found"**
-The repository may not contain supported language files (`.py`, `.js`, `.ts`, `.go`, `.rs`, `.java`), or files may be excluded by skip patterns.
+The repository may not contain supported language files (`.py`, `.js`, `.ts`, `.go`, `.rs`, `.java`, `.c`, `.h`), or files may be excluded by skip patterns.
 
 **Rate limiting**
 Set `GITHUB_TOKEN` to increase GitHub API limits (5,000 requests/hour vs 60 unauthenticated).

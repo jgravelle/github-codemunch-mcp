@@ -60,6 +60,8 @@ LANGUAGE_EXTENSIONS = {
     ".php": "php",
     ".dart": "dart",
     ".cs": "csharp",
+    ".c": "c",
+    ".h": "c",
 }
 
 
@@ -354,6 +356,37 @@ CSHARP_SPEC = LanguageSpec(
 )
 
 
+# C specification
+C_SPEC = LanguageSpec(
+    ts_language="c",
+    symbol_node_types={
+        "function_definition": "function",
+        "struct_specifier": "type",
+        "enum_specifier": "type",
+        "union_specifier": "type",
+        "type_definition": "type",
+    },
+    name_fields={
+        "function_definition": "declarator",
+        "struct_specifier": "name",
+        "enum_specifier": "name",
+        "union_specifier": "name",
+        "type_definition": "declarator",
+    },
+    param_fields={
+        "function_definition": "declarator",
+    },
+    return_type_fields={
+        "function_definition": "type",
+    },
+    docstring_strategy="preceding_comment",
+    decorator_node_type=None,
+    container_node_types=[],
+    constant_patterns=["preproc_def"],
+    type_patterns=["type_definition", "enum_specifier", "struct_specifier", "union_specifier"],
+)
+
+
 # Language registry
 LANGUAGE_REGISTRY = {
     "python": PYTHON_SPEC,
@@ -365,4 +398,5 @@ LANGUAGE_REGISTRY = {
     "php": PHP_SPEC,
     "dart": DART_SPEC,
     "csharp": CSHARP_SPEC,
+    "c": C_SPEC,
 }

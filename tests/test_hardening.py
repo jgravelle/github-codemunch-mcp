@@ -272,6 +272,39 @@ class TestPerLanguageExtraction:
         symbols = parse_file(content, fname, "csharp")
         record = _by_name(symbols, "Person")
         assert record.kind == "class"
+    # -- C ---------------------------------------------------------------
+
+    def test_c_functions(self):
+        content, fname = _fixture("c", "sample.c")
+        symbols = parse_file(content, fname, "c")
+        grouped = _kinds(symbols)
+        func_names = {f.name for f in grouped.get("function", [])}
+        assert "get_user" in func_names
+        assert "authenticate" in func_names
+
+    def test_c_struct(self):
+        content, fname = _fixture("c", "sample.c")
+        symbols = parse_file(content, fname, "c")
+        user = _by_name(symbols, "User")
+        assert user.kind == "type"
+
+    def test_c_enum(self):
+        content, fname = _fixture("c", "sample.c")
+        symbols = parse_file(content, fname, "c")
+        status = _by_name(symbols, "Status")
+        assert status.kind == "type"
+
+    def test_c_constant(self):
+        content, fname = _fixture("c", "sample.c")
+        symbols = parse_file(content, fname, "c")
+        const = _by_name(symbols, "MAX_USERS")
+        assert const.kind == "constant"
+
+    def test_c_function_kind(self):
+        content, fname = _fixture("c", "sample.c")
+        symbols = parse_file(content, fname, "c")
+        auth = _by_name(symbols, "authenticate")
+        assert auth.kind == "function"
 
 
 # ===========================================================================
@@ -357,6 +390,7 @@ class TestDeterminism:
         ("java", "Sample.java"),
         ("dart", "sample.dart"),
         ("csharp", "sample.cs"),
+        ("c", "sample.c"),
     ])
     def test_deterministic_ids_and_hashes(self, language, filename):
         content, fname = _fixture(language, filename)

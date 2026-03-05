@@ -306,6 +306,34 @@ abstract class Repository {
 '''
 
 
+C_SOURCE = '''
+#define MAX_USERS 100
+
+/* Represents a user in the system. */
+struct User {
+    char *name;
+    int age;
+};
+
+/* Status codes for operations. */
+enum Status {
+    STATUS_OK,
+    STATUS_ERROR,
+    STATUS_PENDING
+};
+
+/* Get user by ID. */
+struct User *get_user(int id) {
+    return NULL;
+}
+
+/* Authenticate a token string. */
+int authenticate(const char *token) {
+    return token != NULL;
+}
+'''
+
+
 def test_parse_dart():
     """Test Dart parsing."""
     symbols = parse_file(DART_SOURCE, "app.dart", "dart")
@@ -459,3 +487,35 @@ def test_parse_csharp():
     record = next((s for s in symbols if s.name == "Person"), None)
     assert record is not None
     assert record.kind == "class"
+
+
+def test_parse_c():
+    """Test C parsing."""
+    symbols = parse_file(C_SOURCE, "sample.c", "c")
+
+    # Should have functions
+    func = next((s for s in symbols if s.name == "authenticate"), None)
+    assert func is not None
+    assert func.kind == "function"
+    assert "Authenticate a token string" in func.docstring
+
+    get_user = next((s for s in symbols if s.name == "get_user"), None)
+    assert get_user is not None
+    assert get_user.kind == "function"
+
+    # Should have struct
+    user = next((s for s in symbols if s.name == "User"), None)
+    assert user is not None
+    assert user.kind == "type"
+
+    # Should have enum
+    status = next((s for s in symbols if s.name == "Status"), None)
+    assert status is not None
+    assert status.kind == "type"
+
+    # Should have constant
+    const = next((s for s in symbols if s.name == "MAX_USERS"), None)
+    assert const is not None
+    assert const.kind == "constant"
+
+

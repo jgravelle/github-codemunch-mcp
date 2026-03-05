@@ -188,6 +188,14 @@ def _extract_name(node, spec: LanguageSpec, source_bytes: bytes) -> Optional[str
     name_node = node.child_by_field_name(field_name)
     
     if name_node:
+        # C function_definition: declarator is a function_declarator,
+        # which wraps the actual identifier. Unwrap recursively.
+        while name_node.type in ("function_declarator", "pointer_declarator"):
+            inner = name_node.child_by_field_name("declarator")
+            if inner:
+                name_node = inner
+            else:
+                break
         return source_bytes[name_node.start_byte:name_node.end_byte].decode("utf-8")
     
     return None
@@ -362,6 +370,31 @@ def _extract_constant(
                     kind="constant",
                     language=language,
                     signature=sig[:100],  # Truncate long assignments
+                    line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    byte_offset=node.start_byte,
+                    byte_length=node.end_byte - node.start_byte,
+                    content_hash=c_hash,
+                )
+
+    # C preprocessor #define macros
+    if node.type == "preproc_def":
+        name_node = node.child_by_field_name("name")
+        if name_node:
+            name = source_bytes[name_node.start_byte:name_node.end_byte].decode("utf-8")
+            if name.isupper() or (len(name) > 1 and name[0].isupper() and "_" in name):
+                sig = source_bytes[node.start_byte:node.end_byte].decode("utf-8").strip()
+                const_bytes = source_bytes[node.start_byte:node.end_byte]
+                c_hash = compute_content_hash(const_bytes)
+
+                return Symbol(
+                    id=make_symbol_id(filename, name, "constant"),
+                    file=filename,
+                    name=name,
+                    qualified_name=name,
+                    kind="constant",
+                    language=language,
+                    signature=sig[:100],
                     line=node.start_point[0] + 1,
                     end_line=node.end_point[0] + 1,
                     byte_offset=node.start_byte,
