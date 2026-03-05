@@ -4,6 +4,20 @@ import pytest
 from jcodemunch_mcp.parser import parse_file
 
 
+def _vb_parser_available() -> bool:
+    try:
+        parse_file(
+            "Public Class Probe\nEnd Class\n",
+            "probe.vb",
+            "vb",
+        )
+        return True
+    except RuntimeError as exc:
+        if "VB parser unavailable" in str(exc):
+            return False
+        raise
+
+
 JAVASCRIPT_SOURCE = '''
 /** Greet a user. */
 function greet(name) {
@@ -258,4 +272,134 @@ def test_parse_php():
     enum = next((s for s in symbols if s.name == "Status"), None)
     assert enum is not None
     assert enum.kind == "type"
+
+
+CSHARP_SOURCE = '''
+namespace SampleApp;
+
+/// User service.
+public class UserService
+{
+    public const int MAX_RETRIES = 3;
+
+    public string Name { get; set; } = "";
+
+    public UserService()
+    {
+    }
+
+    public string GetUser(int userId)
+    {
+        return userId.ToString();
+    }
+}
+
+public interface IAuthenticator
+{
+    bool Authenticate(string token);
+}
+
+public record UserRecord(int Id, string Name);
+'''
+
+
+def test_parse_csharp():
+    """Test C# parsing."""
+    symbols = parse_file(CSHARP_SOURCE, "service.cs", "csharp")
+
+    cls = next((s for s in symbols if s.name == "UserService"), None)
+    assert cls is not None
+    assert cls.kind == "class"
+    assert "User service" in cls.docstring
+
+    method = next((s for s in symbols if s.name == "GetUser"), None)
+    assert method is not None
+    assert method.kind == "method"
+    assert method.parent is not None
+
+    const = next((s for s in symbols if s.name == "MAX_RETRIES"), None)
+    assert const is not None
+    assert const.kind == "constant"
+
+    iface = next((s for s in symbols if s.name == "IAuthenticator"), None)
+    assert iface is not None
+    assert iface.kind == "type"
+
+    record = next((s for s in symbols if s.name == "UserRecord"), None)
+    assert record is not None
+    assert record.kind == "type"
+
+
+RAZOR_SOURCE = '''
+@page "/users"
+
+@code {
+    public void Increment()
+    {
+    }
+}
+
+@functions {
+    public string FormatUser(int id)
+    {
+        return $"user-{id}";
+    }
+}
+'''
+
+
+def test_parse_razor():
+    """Test Razor parsing using @code and @functions blocks."""
+    symbols = parse_file(RAZOR_SOURCE, "component.razor", "csharp")
+
+    inc = next((s for s in symbols if s.name == "Increment"), None)
+    assert inc is not None
+    assert inc.kind == "method"
+    assert inc.line > 0
+    assert inc.byte_offset >= 0
+
+    fmt = next((s for s in symbols if s.name == "FormatUser"), None)
+    assert fmt is not None
+    assert fmt.kind == "method"
+    assert fmt.line > inc.line
+    assert fmt.byte_offset > inc.byte_offset
+
+
+VB_SOURCE = '''
+Namespace SampleApp
+
+Public Class UserService
+    Public Const MAX_RETRIES As Integer = 3
+
+    Public Property Name As String
+
+    Public Function GetUser(userId As Integer) As String
+        Return userId.ToString()
+    End Function
+End Class
+
+Public Interface IAuthenticator
+    Function Authenticate(token As String) As Boolean
+End Interface
+
+End Namespace
+'''
+
+
+@pytest.mark.skipif(not _vb_parser_available(), reason="Optional VB parser is not installed")
+def test_parse_vb():
+    """Test VB.NET parsing when optional parser is available."""
+    symbols = parse_file(VB_SOURCE, "service.vb", "vb")
+
+    cls = next((s for s in symbols if s.name == "UserService"), None)
+    assert cls is not None
+    assert cls.kind == "class"
+
+    method = next((s for s in symbols if s.name == "GetUser"), None)
+    assert method is not None
+    assert method.kind == "method"
+
+    const = next((s for s in symbols if s.name == "MAX_RETRIES"), None)
+    assert const is not None
+    assert const.kind == "constant"
 

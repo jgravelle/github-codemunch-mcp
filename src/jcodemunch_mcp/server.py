@@ -9,6 +9,7 @@ from typing import Any, Optional
 from mcp.server import Server
 from mcp.types import Tool, TextContent
 
+from .parser import supported_language_filters
 from .tools.index_repo import index_repo
 from .tools.index_folder import index_folder
 from .tools.list_repos import list_repos
@@ -28,6 +29,7 @@ server = Server("jcodemunch-mcp")
 @server.list_tools()
 async def list_tools() -> list[Tool]:
     """List all available tools."""
+    language_filter_enum = supported_language_filters()
     return [
         Tool(
             name="index_repo",
@@ -210,7 +212,7 @@ async def list_tools() -> list[Tool]:
                     "language": {
                         "type": "string",
                         "description": "Optional filter by language",
-                        "enum": ["python", "javascript", "typescript", "go", "rust", "java"]
+                        "enum": language_filter_enum,
                     },
                     "max_results": {
                         "type": "integer",

@@ -118,6 +118,14 @@ IDs remain stable across re-indexing when path, qualified name, and kind are unc
 pip install jcodemunch-mcp
 ```
 
+Optional: install VB.NET parser support (C#/.NET support is included by default):
+
+```bash
+pip install "jcodemunch-mcp[dotnet]"
+```
+
+`[dotnet]` installs `tree-sitter-vb-dotnet` from GitHub. If a prebuilt wheel is unavailable for your platform, install C build tools first.
+
 Verify:
 
 ```bash
@@ -264,17 +272,21 @@ Every tool response includes a `_meta` envelope with timing, token savings, and 
 
 ## Supported Languages
 
-| Language   | Extensions    | Symbol Types                            |
-| ---------- | ------------- | --------------------------------------- |
-| Python     | `.py`         | function, class, method, constant, type |
-| JavaScript | `.js`, `.jsx` | function, class, method, constant       |
-| TypeScript | `.ts`, `.tsx` | function, class, method, constant, type |
-| Go         | `.go`         | function, method, type, constant        |
-| Rust       | `.rs`         | function, type, impl, constant          |
-| Java       | `.java`       | method, class, type, constant           |
-| PHP        | `.php`        | function, class, method, type, constant |
+| Language            | Extensions                      | Symbol Types                                            |
+| ------------------- | ------------------------------- | ------------------------------------------------------- |
+| Python              | `.py`                           | function, class, method, constant, type                 |
+| JavaScript          | `.js`, `.jsx`                   | function, class, method, constant                       |
+| TypeScript          | `.ts`, `.tsx`                   | function, class, method, constant, type                 |
+| Go                  | `.go`                           | function, method, type, constant                        |
+| Rust                | `.rs`                           | function, type, impl, constant                          |
+| Java                | `.java`                         | method, class, type, constant                           |
+| PHP                 | `.php`                          | function, class, method, type, constant                 |
+| C# / .NET / ASP.NET | `.cs`, `.csx`, `.razor`, `.cshtml` | class, method, type, constant, property              |
+| VB.NET              | `.vb`                           | class/module, method, type, constant, property, event   |
 
 See LANGUAGE_SUPPORT.md for full semantics.
+
+`search_symbols.language` accepts canonical languages and aliases such as `c#`, `vbnet`, `dotnet`, and `aspnetframework`.
 
 ---
 

@@ -6,6 +6,7 @@ from typing import Optional
 
 from ..storage import IndexStore, CodeIndex, record_savings, estimate_savings, cost_avoided
 from ._utils import resolve_repo
+from ..parser import resolve_language_filter
 
 
 def search_symbols(
@@ -51,7 +52,10 @@ def search_symbols(
 
     # Apply language filter (post-search since CodeIndex.search doesn't support it)
     if language:
-        results = [s for s in results if s.get("language") == language]
+        resolved_languages = resolve_language_filter(language)
+        if not resolved_languages:
+            return {"error": f"Unknown language filter: {language}"}
+        results = [s for s in results if s.get("language") in resolved_languages]
 
     # Score and sort (search already does this, but we need to add score to output)
     query_lower = query.lower()

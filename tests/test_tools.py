@@ -27,6 +27,8 @@ def test_should_skip_file():
     """Test skip patterns."""
     assert should_skip_file("node_modules/foo.js") is True
     assert should_skip_file("vendor/github.com/foo.go") is True
+    assert should_skip_file("TestResults/report.trx") is True
+    assert should_skip_file(".vs/config.json") is True
     assert should_skip_file("src/main.py") is False
 
 
@@ -45,6 +47,26 @@ def test_discover_source_files():
     assert "src/utils.py" in files
     assert "node_modules/foo.js" not in files
     assert "README.md" not in files  # Not a source file
+
+
+def test_discover_source_files_dotnet_extensions_and_case():
+    """Test .NET extension discovery including uppercase variants."""
+    tree_entries = [
+        {"path": "src/Service.CS", "type": "blob", "size": 1000},
+        {"path": "src/Page.aspx.cs", "type": "blob", "size": 1000},
+        {"path": "src/Legacy.VB", "type": "blob", "size": 1000},
+        {"path": "src/Component.razor", "type": "blob", "size": 1000},
+        {"path": "src/View.CSHTML", "type": "blob", "size": 1000},
+        {"path": "src/View.vbhtml", "type": "blob", "size": 1000},
+    ]
+
+    files = discover_source_files(tree_entries)
+    assert "src/Service.CS" in files
+    assert "src/Page.aspx.cs" in files
+    assert "src/Legacy.VB" in files
+    assert "src/Component.razor" in files
+    assert "src/View.CSHTML" in files
+    assert "src/View.vbhtml" not in files
 
 
 def test_discover_source_files_respects_max():

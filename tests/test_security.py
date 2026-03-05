@@ -128,7 +128,7 @@ class TestBinaryDetection:
         assert is_binary_extension(f"file{ext}") is True
 
     @pytest.mark.parametrize("ext", [
-        ".py", ".js", ".ts", ".go", ".rs", ".java", ".md", ".txt",
+        ".py", ".js", ".ts", ".go", ".rs", ".java", ".cs", ".vb", ".razor", ".cshtml", ".md", ".txt",
     ])
     def test_source_extensions_not_binary(self, ext):
         assert is_binary_extension(f"file{ext}") is False

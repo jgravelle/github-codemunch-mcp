@@ -54,6 +54,11 @@ LANGUAGE_EXTENSIONS = {
     ".rs": "rust",
     ".java": "java",
     ".php": "php",
+    ".cs": "csharp",
+    ".csx": "csharp",
+    ".razor": "csharp",
+    ".cshtml": "csharp",
+    ".vb": "vb",
 }
 
 
@@ -277,6 +282,115 @@ PHP_SPEC = LanguageSpec(
 )
 
 
+# C# specification
+CSHARP_SPEC = LanguageSpec(
+    ts_language="csharp",
+    symbol_node_types={
+        "class_declaration": "class",
+        "struct_declaration": "type",
+        "interface_declaration": "type",
+        "enum_declaration": "type",
+        "record_declaration": "type",
+        "delegate_declaration": "type",
+        "method_declaration": "method",
+        "constructor_declaration": "method",
+        "property_declaration": "method",
+    },
+    name_fields={
+        "class_declaration": "name",
+        "struct_declaration": "name",
+        "interface_declaration": "name",
+        "enum_declaration": "name",
+        "record_declaration": "name",
+        "delegate_declaration": "name",
+        "method_declaration": "name",
+        "constructor_declaration": "name",
+        "property_declaration": "name",
+    },
+    param_fields={
+        "method_declaration": "parameters",
+        "constructor_declaration": "parameters",
+    },
+    return_type_fields={
+        "method_declaration": "returns",
+        "delegate_declaration": "type",
+        "property_declaration": "type",
+    },
+    docstring_strategy="preceding_comment",
+    decorator_node_type="attribute_list",
+    container_node_types=[
+        "class_declaration",
+        "struct_declaration",
+        "interface_declaration",
+        "record_declaration",
+    ],
+    constant_patterns=["field_declaration"],
+    type_patterns=[
+        "struct_declaration",
+        "interface_declaration",
+        "enum_declaration",
+        "record_declaration",
+        "delegate_declaration",
+    ],
+)
+
+
+# Visual Basic .NET specification
+VB_SPEC = LanguageSpec(
+    ts_language="vb",
+    symbol_node_types={
+        "class_block": "class",
+        "module_block": "class",
+        "structure_block": "type",
+        "interface_block": "type",
+        "enum_block": "type",
+        "method_declaration": "method",
+        "constructor_declaration": "method",
+        "property_declaration": "method",
+        "delegate_declaration": "type",
+        "event_declaration": "method",
+    },
+    name_fields={
+        "class_block": "name",
+        "module_block": "name",
+        "structure_block": "name",
+        "interface_block": "name",
+        "enum_block": "name",
+        "method_declaration": "name",
+        "constructor_declaration": "name",
+        "property_declaration": "name",
+        "delegate_declaration": "name",
+        "event_declaration": "name",
+        "const_declaration": "name",
+    },
+    param_fields={
+        "method_declaration": "parameters",
+        "constructor_declaration": "parameters",
+        "property_declaration": "parameters",
+        "delegate_declaration": "parameters",
+    },
+    return_type_fields={
+        "method_declaration": "return_type",
+        "delegate_declaration": "return_type",
+    },
+    docstring_strategy="preceding_comment",
+    decorator_node_type="attribute_block",
+    container_node_types=[
+        "class_block",
+        "module_block",
+        "structure_block",
+        "interface_block",
+    ],
+    constant_patterns=["const_declaration"],
+    type_patterns=[
+        "structure_block",
+        "interface_block",
+        "enum_block",
+        "delegate_declaration",
+    ],
+)
+
+
 # Language registry
 LANGUAGE_REGISTRY = {
     "python": PYTHON_SPEC,
@@ -286,4 +400,75 @@ LANGUAGE_REGISTRY = {
     "rust": RUST_SPEC,
     "java": JAVA_SPEC,
     "php": PHP_SPEC,
+    "csharp": CSHARP_SPEC,
+    "vb": VB_SPEC,
 }
+
+
+CANONICAL_LANGUAGES = tuple(LANGUAGE_REGISTRY.keys())
+
+
+# Aliases that map to one canonical language
+LANGUAGE_ALIASES = {
+    "c#": "csharp",
+    "cs": "csharp",
+    "csharp": "csharp",
+    "vb": "vb",
+    "vbnet": "vb",
+    "visualbasicnet": "vb",
+    "visualbasic": "vb",
+}
+
+
+# Aliases that map to a language family
+LANGUAGE_FAMILY_ALIASES = {
+    "dotnet": {"csharp", "vb"},
+    ".net": {"csharp", "vb"},
+    "netframework": {"csharp", "vb"},
+    ".netframework": {"csharp", "vb"},
+    "aspnet": {"csharp", "vb"},
+    "asp.net": {"csharp", "vb"},
+    "aspnetframework": {"csharp", "vb"},
+    "asp.netframework": {"csharp", "vb"},
+}
+
+
+def normalize_language_name(language: str) -> str:
+    """Normalize a language or alias for lookup."""
+    return language.strip().lower().replace(" ", "").replace("_", "").replace("-", "")
+
+
+def resolve_language_alias(language: str) -> Optional[str]:
+    """Resolve a direct alias to one canonical language."""
+    normalized = normalize_language_name(language)
+
+    if normalized in LANGUAGE_REGISTRY:
+        return normalized
+    if normalized in LANGUAGE_ALIASES:
+        return LANGUAGE_ALIASES[normalized]
+    return None
+
+
+def resolve_language_filter(language: Optional[str]) -> Optional[set[str]]:
+    """Resolve a language filter into canonical languages."""
+    if language is None:
+        return None
+
+    normalized = normalize_language_name(language)
+
+    direct = resolve_language_alias(normalized)
+    if direct:
+        return {direct}
+
+    if normalized in LANGUAGE_FAMILY_ALIASES:
+        return set(LANGUAGE_FAMILY_ALIASES[normalized])
+
+    return None
+
+
+def supported_language_filters() -> list[str]:
+    """Return all accepted language filter values."""
+    values = set(CANONICAL_LANGUAGES)
+    values.update(LANGUAGE_ALIASES.keys())
+    values.update(LANGUAGE_FAMILY_ALIASES.keys())
+    return sorted(values)

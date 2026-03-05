@@ -103,6 +103,7 @@ def _build_tree(files: list[str], index, path_prefix: str, include_summaries: bo
                 # Get language
                 lang = ""
                 _, ext = os.path.splitext(file_path)
+                ext = ext.lower()
                 from ..parser import LANGUAGE_EXTENSIONS
                 lang = LANGUAGE_EXTENSIONS.get(ext, "")
                 

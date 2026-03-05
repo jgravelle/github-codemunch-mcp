@@ -24,6 +24,11 @@ SKIP_PATTERNS = [
     "node_modules/", "vendor/", "venv/", ".venv/", "__pycache__/",
     "dist/", "build/", ".git/", ".tox/", ".mypy_cache/",
     "target/",
+    "bin/",
+    "obj/",
+    ".vs/",
+    "testresults/",
+    "packages/",
     ".gradle/",
     "test_data/", "testdata/", "fixtures/", "snapshots/",
     "migrations/",
@@ -36,7 +41,7 @@ SKIP_PATTERNS = [
 def should_skip_file(path: str) -> bool:
     """Check if file should be skipped based on path patterns."""
     # Normalize path separators for matching
-    normalized = path.replace("\\", "/")
+    normalized = path.replace("\\", "/").lower()
     for pattern in SKIP_PATTERNS:
         if pattern in normalized:
             return True
@@ -130,7 +135,7 @@ def discover_local_files(
             continue
 
         # Extension filter
-        ext = file_path.suffix
+        ext = file_path.suffix.lower()
         if ext not in LANGUAGE_EXTENSIONS:
             continue
 
@@ -235,7 +240,7 @@ def index_folder(
                 rel_path = file_path.relative_to(folder_path).as_posix()
             except ValueError:
                 continue
-            ext = file_path.suffix
+            ext = file_path.suffix.lower()
             if ext not in LANGUAGE_EXTENSIONS:
                 continue
             current_files[rel_path] = content
@@ -261,7 +266,7 @@ def index_folder(
 
             for rel_path in files_to_parse:
                 content = current_files[rel_path]
-                ext = os.path.splitext(rel_path)[1]
+                ext = os.path.splitext(rel_path)[1].lower()
                 language = LANGUAGE_EXTENSIONS.get(ext)
                 if not language:
                     continue
@@ -277,7 +282,7 @@ def index_folder(
 
             # Compute updated language counts from all current files
             for rel_path in current_files:
-                ext = os.path.splitext(rel_path)[1]
+                ext = os.path.splitext(rel_path)[1].lower()
                 lang = LANGUAGE_EXTENSIONS.get(ext)
                 if lang:
                     languages[lang] = languages.get(lang, 0) + 1
@@ -312,7 +317,7 @@ def index_folder(
         parsed_files = []
 
         for rel_path, content in current_files.items():
-            ext = os.path.splitext(rel_path)[1]
+            ext = os.path.splitext(rel_path)[1].lower()
             language = LANGUAGE_EXTENSIONS.get(ext)
             if not language:
                 continue

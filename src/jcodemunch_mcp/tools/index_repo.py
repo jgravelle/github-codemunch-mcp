@@ -18,6 +18,11 @@ SKIP_PATTERNS = [
     "node_modules/", "vendor/", "venv/", ".venv/", "__pycache__/",
     "dist/", "build/", ".git/", ".tox/", ".mypy_cache/",
     "target/",
+    "bin/",
+    "obj/",
+    ".vs/",
+    "testresults/",
+    "packages/",
     ".gradle/",
     "test_data/", "testdata/", "fixtures/", "snapshots/",
     "migrations/",
@@ -77,8 +82,9 @@ async def fetch_repo_tree(owner: str, repo: str, token: Optional[str] = None) ->
 
 def should_skip_file(path: str) -> bool:
     """Check if file should be skipped based on path patterns."""
+    normalized = path.lower()
     for pattern in SKIP_PATTERNS:
-        if pattern in path:
+        if pattern in normalized:
             return True
     return False
 
@@ -124,6 +130,7 @@ def discover_source_files(
         
         # Extension filter
         _, ext = os.path.splitext(path)
+        ext = ext.lower()
         if ext not in LANGUAGE_EXTENSIONS:
             continue
 
@@ -291,6 +298,7 @@ async def index_repo(
             for path in files_to_parse:
                 content = current_files[path]
                 _, ext = os.path.splitext(path)
+                ext = ext.lower()
                 language = LANGUAGE_EXTENSIONS.get(ext)
                 if not language:
                     continue
@@ -299,14 +307,15 @@ async def index_repo(
                     if symbols:
                         new_symbols.extend(symbols)
                         raw_files_subset[path] = content
-                except Exception:
-                    warnings.append(f"Failed to parse {path}")
+                except Exception as e:
+                    warnings.append(f"Failed to parse {path}: {e}")
 
             new_symbols = summarize_symbols(new_symbols, use_ai=use_ai_summaries)
 
             # Compute language counts from all current files
             for path in current_files:
                 _, ext = os.path.splitext(path)
+                ext = ext.lower()
                 lang = LANGUAGE_EXTENSIONS.get(ext)
                 if lang:
                     languages[lang] = languages.get(lang, 0) + 1
@@ -338,6 +347,7 @@ async def index_repo(
 
         for path, content in current_files.items():
             _, ext = os.path.splitext(path)
+            ext = ext.lower()
             language = LANGUAGE_EXTENSIONS.get(ext)
             if not language:
                 continue
@@ -348,8 +358,8 @@ async def index_repo(
                     languages[language] = languages.get(language, 0) + 1
                     raw_files[path] = content
                     parsed_files.append(path)
-            except Exception:
-                warnings.append(f"Failed to parse {path}")
+            except Exception as e:
+                warnings.append(f"Failed to parse {path}: {e}")
                 continue
 
         if not all_symbols:

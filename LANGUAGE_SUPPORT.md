@@ -11,18 +11,35 @@
 | Rust       | `.rs`         | tree-sitter-rust       | function, type (struct/enum/trait), impl, constant | `#[attr]`     | `///` and `//!` comments   | Macro-generated symbols are not visible to the parser            |
 | Java       | `.java`       | tree-sitter-java       | method, class, type (interface/enum), constant     | `@Annotation` | `/** */` Javadoc           | Deep inner-class nesting may be flattened                        |
 | PHP        | `.php`        | tree-sitter-php        | function, class, method, type (interface/trait/enum), constant | `#[Attribute]` | `/** */` PHPDoc | PHP 8+ attributes supported; language-file `<?php` tag required  |
+| C# / .NET / ASP.NET | `.cs`, `.csx`, `.razor`, `.cshtml` | tree-sitter-c-sharp | class, method, type (interface/enum/record/delegate), constant, property | `[Attribute]` | `///` and `//` comments | Razor supports `@code`/`@functions` C# blocks; ASP.NET code-behind files (`*.aspx.cs`, etc.) are parsed via `.cs` |
+| VB.NET / ASP.NET | `.vb` | tree-sitter-vb-dotnet (optional extra) | class/module, method, type (interface/enum/delegate), property, constant, event | `<Attribute>` blocks | `'` comments | Optional parser dependency; install with `pip install jcodemunch-mcp[dotnet]` |
 
 ---
 
 ## Parser Engine
 
-All language parsing is powered by **tree-sitter** via the `tree-sitter-language-pack` Python package, providing:
+Most language parsing is powered by **tree-sitter** via the `tree-sitter-language-pack` Python package, providing:
 
 * Incremental, error-tolerant parsing
 * Uniform AST representation across languages
 * Pre-compiled grammars for supported languages
 
-**Dependency:** `tree-sitter-language-pack>=0.7.0` (pinned in `pyproject.toml`)
+**Core dependency:** `tree-sitter-language-pack>=0.7.0` (pinned in `pyproject.toml`)
+
+For VB.NET, jCodeMunch uses an optional external grammar package:
+
+* `tree-sitter-vb-dotnet` (installed via `pip install jcodemunch-mcp[dotnet]`)
+* On systems without a prebuilt wheel, C build tools are required.
+
+---
+
+## Language Filter Aliases
+
+`search_symbols.language` accepts canonical languages and aliases:
+
+* C#: `csharp`, `c#`, `cs`
+* VB: `vb`, `vbnet`, `visualbasic`
+* Framework families (map to both C# and VB): `dotnet`, `.net`, `netframework`, `aspnet`, `aspnetframework`
 
 ---
 

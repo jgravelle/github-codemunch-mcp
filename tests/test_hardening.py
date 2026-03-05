@@ -44,6 +44,16 @@ def _by_name(symbols: list[Symbol], name: str) -> Symbol:
     raise AssertionError(f"No symbol named '{name}' found. Available: {_names(symbols)}")
 
 
+def _vb_parser_available() -> bool:
+    try:
+        parse_file("Public Class Probe\nEnd Class\n", "probe.vb", "vb")
+        return True
+    except RuntimeError as exc:
+        if "VB parser unavailable" in str(exc):
+            return False
+        raise
+
+
 # ===========================================================================
 # 1. Per-Language Extraction
 # ===========================================================================
@@ -240,6 +250,58 @@ class TestPerLanguageExtraction:
         get_user = _by_name(symbols, "getUser")
         assert "Sample" in get_user.qualified_name
 
+    # -- C# --------------------------------------------------------------
+
+    def test_csharp_class(self):
+        content, fname = _fixture("csharp", "sample.cs")
+        symbols = parse_file(content, fname, "csharp")
+        cls = _by_name(symbols, "UserService")
+        assert cls.kind == "class"
+        assert cls.language == "csharp"
+
+    def test_csharp_methods(self):
+        content, fname = _fixture("csharp", "sample.cs")
+        symbols = parse_file(content, fname, "csharp")
+        grouped = _kinds(symbols)
+        methods = grouped.get("method", [])
+        method_names = {m.name for m in methods}
+        assert "GetUser" in method_names
+        assert "UserService" in {m.qualified_name.split(".")[0] for m in methods if "." in m.qualified_name}
+
+    def test_csharp_constant(self):
+        content, fname = _fixture("csharp", "sample.cs")
+        symbols = parse_file(content, fname, "csharp")
+        const = _by_name(symbols, "MAX_RETRIES")
+        assert const.kind == "constant"
+
+    def test_razor_methods(self):
+        content, fname = _fixture("csharp", "sample.razor")
+        symbols = parse_file(content, fname, "csharp")
+        inc = _by_name(symbols, "Increment")
+        fmt = _by_name(symbols, "FormatUser")
+        assert inc.kind == "method"
+        assert fmt.kind == "method"
+        assert fmt.byte_offset > inc.byte_offset
+
+
+@pytest.mark.skipif(not _vb_parser_available(), reason="Optional VB parser is not installed")
+class TestVBPerLanguageExtraction:
+    """VB-specific extraction checks, enabled only with optional parser."""
+
+    def test_vb_class_and_method(self):
+        content, fname = _fixture("vb", "sample.vb")
+        symbols = parse_file(content, fname, "vb")
+        cls = _by_name(symbols, "UserService")
+        method = _by_name(symbols, "GetUser")
+        assert cls.kind == "class"
+        assert method.kind == "method"
+
+    def test_vb_constant(self):
+        content, fname = _fixture("vb", "sample.vb")
+        symbols = parse_file(content, fname, "vb")
+        const = _by_name(symbols, "MAX_RETRIES")
+        assert const.kind == "constant"
+
 
 # ===========================================================================
 # 2. Overload Disambiguation
@@ -322,6 +384,7 @@ class TestDeterminism:
         ("go", "sample.go"),
         ("rust", "sample.rs"),
         ("java", "Sample.java"),
+        ("csharp", "sample.cs"),
     ])
     def test_deterministic_ids_and_hashes(self, language, filename):
         content, fname = _fixture(language, filename)
@@ -337,6 +400,18 @@ class TestDeterminism:
             )
             assert s1.kind == s2.kind
             assert s1.qualified_name == s2.qualified_name
+
+
+@pytest.mark.skipif(not _vb_parser_available(), reason="Optional VB parser is not installed")
+class TestVBDeterminism:
+    def test_vb_deterministic_ids_and_hashes(self):
+        content, fname = _fixture("vb", "sample.vb")
+        run1 = parse_file(content, fname, "vb")
+        run2 = parse_file(content, fname, "vb")
+        assert len(run1) == len(run2)
+        for s1, s2 in zip(run1, run2):
+            assert s1.id == s2.id
+            assert s1.content_hash == s2.content_hash
 
 
 # ===========================================================================
@@ -636,3 +711,137 @@ class TestNewTools:
             storage_path=storage,
         )
         assert result["success"] is False
+
+
+class TestLanguageFilterAliases:
+    """Validate canonical and framework aliases in search_symbols.language."""
+
+    def _seed_index(self, tmp_path: Path) -> str:
+        storage = str(tmp_path / "store")
+        store = IndexStore(base_path=storage)
+
+        cs = Symbol(
+            id="a.cs::AuthService.Login#method",
+            file="a.cs",
+            name="Login",
+            qualified_name="AuthService.Login",
+            kind="method",
+            language="csharp",
+            signature="public string Login(string token)",
+            line=1,
+            end_line=1,
+            byte_offset=0,
+            byte_length=10,
+        )
+        vb = Symbol(
+            id="b.vb::AuthService.Login#method",
+            file="b.vb",
+            name="Login",
+            qualified_name="AuthService.Login",
+            kind="method",
+            language="vb",
+            signature="Public Function Login(token As String) As String",
+            line=1,
+            end_line=1,
+            byte_offset=0,
+            byte_length=10,
+        )
+
+        store.save_index(
+            owner="alias",
+            name="demo",
+            source_files=["a.cs", "b.vb"],
+            symbols=[cs, vb],
+            raw_files={"a.cs": "class AuthService {}", "b.vb": "Class AuthService\nEnd Class\n"},
+            languages={"csharp": 1, "vb": 1},
+        )
+        return storage
+
+    def test_dotnet_alias_returns_csharp_and_vb(self, tmp_path):
+        from jcodemunch_mcp.tools.search_symbols import search_symbols
+
+        storage = self._seed_index(tmp_path)
+        result = search_symbols(
+            repo="alias/demo",
+            query="Login",
+            language="dotnet",
+            storage_path=storage,
+        )
+        assert "error" not in result
+        files = {r["file"] for r in result["results"]}
+        assert "a.cs" in files
+        assert "b.vb" in files
+
+    def test_aspnetframework_alias_returns_csharp_and_vb(self, tmp_path):
+        from jcodemunch_mcp.tools.search_symbols import search_symbols
+
+        storage = self._seed_index(tmp_path)
+        result = search_symbols(
+            repo="alias/demo",
+            query="Login",
+            language="aspnetframework",
+            storage_path=storage,
+        )
+        assert "error" not in result
+        assert result["result_count"] == 2
+
+    def test_csharp_alias_is_single_language(self, tmp_path):
+        from jcodemunch_mcp.tools.search_symbols import search_symbols
+
+        storage = self._seed_index(tmp_path)
+        result = search_symbols(
+            repo="alias/demo",
+            query="Login",
+            language="c#",
+            storage_path=storage,
+        )
+        assert "error" not in result
+        assert result["result_count"] == 1
+        assert result["results"][0]["file"] == "a.cs"
+
+
+class TestRazorOffsets:
+    """Validate Razor symbol byte offsets with persisted storage retrieval."""
+
+    def test_get_symbol_content_for_razor_symbol(self, tmp_path):
+        content, fname = _fixture("csharp", "sample.razor")
+        symbols = parse_file(content, fname, "csharp")
+        format_user = _by_name(symbols, "FormatUser")
+
+        store = IndexStore(base_path=str(tmp_path / "store"))
+        store.save_index(
+            owner="razor",
+            name="demo",
+            source_files=[fname],
+            symbols=symbols,
+            raw_files={fname: content},
+            languages={"csharp": 1},
+        )
+
+        symbol_content = store.get_symbol_content("razor", "demo", format_user.id)
+        assert symbol_content is not None
+        assert "FormatUser" in symbol_content
+        assert "return $\"user-{id}\";" in symbol_content
+
+
+@pytest.mark.skipif(_vb_parser_available(), reason="Optional VB parser is installed")
+class TestVBMissingParserWarning:
+    """VB files should produce explicit warnings when parser is unavailable."""
+
+    def test_index_folder_warns_when_vb_parser_missing(self, tmp_path):
+        from jcodemunch_mcp.tools.index_folder import index_folder
+
+        (tmp_path / "main.py").write_text("def ok():\n    return 1\n", encoding="utf-8")
+        (tmp_path / "legacy.vb").write_text(
+            "Public Class Legacy\nEnd Class\n",
+            encoding="utf-8",
+        )
+
+        result = index_folder(
+            path=str(tmp_path),
+            use_ai_summaries=False,
+            storage_path=str(tmp_path / "store"),
+        )
+        assert result["success"] is True
+        warnings = result.get("warnings", [])
+        assert any("VB parser unavailable" in warning for warning in warnings)

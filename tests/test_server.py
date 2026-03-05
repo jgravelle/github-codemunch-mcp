@@ -51,3 +51,12 @@ async def test_search_symbols_tool_schema():
     # kind should have enum
     assert "enum" in props["kind"]
     assert set(props["kind"]["enum"]) == {"function", "class", "method", "constant", "type"}
+
+    assert "enum" in props["language"]
+    language_enum = set(props["language"]["enum"])
+    # Canonical
+    assert {"python", "javascript", "typescript", "go", "rust", "java", "php", "csharp", "vb"} <= language_enum
+    # Direct aliases
+    assert {"c#", "cs", "vbnet", "visualbasic"} <= language_enum
+    # Family aliases
+    assert {"dotnet", ".net", "aspnet", "aspnetframework", "netframework"} <= language_enum

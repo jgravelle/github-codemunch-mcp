@@ -139,6 +139,10 @@ Returns a list of symbols plus an error list for any IDs not found.
 
 Weighted scoring search across name, signature, summary, keywords, and docstring. All filters are optional.
 
+`language` accepts canonical values (`python`, `javascript`, `typescript`, `go`, `rust`, `java`, `php`, `csharp`, `vb`) and aliases:
+- Direct aliases: `c#`, `cs`, `vbnet`, `visualbasic`
+- Family aliases: `dotnet`, `.net`, `netframework`, `aspnet`, `aspnetframework` (map to both `csharp` and `vb`)
+
 #### `search_text` — Full-text search across file contents
 
 ```json
@@ -166,7 +170,7 @@ class Symbol:
     name: str                # Symbol name
     qualified_name: str      # Dot-separated with parent context
     kind: str                # function | class | method | constant | type
-    language: str            # python | javascript | typescript | go | rust | java | php
+    language: str            # canonical key: python | javascript | typescript | go | rust | java | php | csharp | vb
     signature: str           # Full signature line(s)
     content_hash: str = ""   # SHA-256 of source bytes (drift detection)
     docstring: str = ""
@@ -212,7 +216,7 @@ Recursive directory walk with the full security pipeline.
 
 ### Filtering Pipeline (Both Paths)
 
-1. **Extension filter** — must be in `LANGUAGE_EXTENSIONS` (.py, .js, .jsx, .ts, .tsx, .go, .rs, .java, .php)
+1. **Extension filter** — must be in `LANGUAGE_EXTENSIONS` (.py, .js, .jsx, .ts, .tsx, .go, .rs, .java, .php, .cs, .csx, .razor, .cshtml, .vb)
 2. **Skip patterns** — `node_modules/`, `vendor/`, `.git/`, `build/`, `dist/`, lock files, minified files, etc.
 3. **`.gitignore`** — respected via the `pathspec` library
 4. **Secret detection** — `.env`, `*.pem`, `*.key`, `*.p12`, credentials files excluded

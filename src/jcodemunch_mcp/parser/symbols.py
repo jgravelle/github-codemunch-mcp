@@ -13,7 +13,7 @@ class Symbol:
     name: str                       # Symbol name (e.g., "login")
     qualified_name: str             # Fully qualified (e.g., "MyClass.login")
     kind: str                       # "function" | "class" | "method" | "constant" | "type"
-    language: str                   # "python" | "javascript" | "typescript" | "go" | "rust" | "java"
+    language: str                   # Canonical language key (python, javascript, typescript, go, rust, java, php, csharp, vb)
     signature: str                  # Full signature line(s)
     docstring: str = ""             # Extracted docstring (language-specific)
     summary: str = ""               # One-line summary

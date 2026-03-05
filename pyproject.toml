@@ -15,6 +15,7 @@ dependencies = [
 anthropic = ["anthropic>=0.40.0"]
 gemini = ["google-generativeai>=0.8.0"]
 all = ["anthropic>=0.40.0", "google-generativeai>=0.8.0"]
+dotnet = ["tree-sitter-vb-dotnet @ git+https://github.com/CodeAnt-AI/tree-sitter-vb-dotnet.git@cfca210ce8fdcb5245bd9cd5c47ce0a21a8488d5", "tree-sitter>=0.24,<0.26"]
 test = ["pytest", "pytest-asyncio", "pytest-cov"]
 
 [project.scripts]
@@ -29,6 +30,9 @@ packages = ["src/jcodemunch_mcp"]
 
 [tool.hatch.build.targets.sdist]
 exclude = [".claude/"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

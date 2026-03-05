@@ -249,7 +249,7 @@ class IndexStore:
             if not file_dest:
                 raise ValueError(f"Unsafe file path in raw_files: {file_path}")
             file_dest.parent.mkdir(parents=True, exist_ok=True)
-            with open(file_dest, "w", encoding="utf-8") as f:
+            with open(file_dest, "w", encoding="utf-8", newline="") as f:
                 f.write(content)
 
         return index
@@ -441,7 +441,7 @@ class IndexStore:
             if not dest:
                 raise ValueError(f"Unsafe file path in raw_files: {fp}")
             dest.parent.mkdir(parents=True, exist_ok=True)
-            with open(dest, "w", encoding="utf-8") as f:
+            with open(dest, "w", encoding="utf-8", newline="") as f:
                 f.write(content)
 
         return updated

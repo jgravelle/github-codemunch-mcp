@@ -1,0 +1,19 @@
+@page "/users"
+
+<h3>Users</h3>
+
+@code {
+    private int _count = 0;
+
+    public void Increment()
+    {
+        _count++;
+    }
+}
+
+@functions {
+    public string FormatUser(int id)
+    {
+        return $"user-{id}";
+    }
+}

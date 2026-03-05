@@ -6,6 +6,14 @@
 pip install git+https://github.com/jgravelle/jcodemunch-mcp.git
 ```
 
+Optional VB.NET parser support:
+
+```bash
+pip install "jcodemunch-mcp[dotnet]"
+```
+
+The optional extra installs `tree-sitter-vb-dotnet` from GitHub and may require local C build tools if no wheel is available.
+
 Or from source:
 
 ```bash
@@ -192,6 +200,9 @@ index_repo: { "url": "owner/repo" }
 | `get_repo_outline` | High-level overview           | `repo`                                                             |
 | `invalidate_cache` | Delete cached index           | `repo`                                                             |
 
+`search_symbols.language` supports canonical names and aliases.
+Examples: `csharp`, `c#`, `vb`, `vbnet`, `dotnet`, `aspnetframework`.
+
 ---
 
 ## Symbol IDs
@@ -244,7 +255,11 @@ To disable, set `JCODEMUNCH_SHARE_SAVINGS=0` in your MCP server env:
 Check the URL format (`owner/repo` or full GitHub URL). For private repositories, set `GITHUB_TOKEN`.
 
 **"No source files found"**
-The repository may not contain supported language files (`.py`, `.js`, `.ts`, `.go`, `.rs`, `.java`), or files may be excluded by skip patterns.
+The repository may not contain supported language files (`.py`, `.js`, `.ts`, `.go`, `.rs`, `.java`, `.php`, `.cs`, `.csx`, `.razor`, `.cshtml`, `.vb`), or files may be excluded by skip patterns.
+
+**"VB parser unavailable" warning**
+VB files were discovered but optional VB parsing support is not installed. Install:
+`pip install "jcodemunch-mcp[dotnet]"`.
 
 **Rate limiting**
 Set `GITHUB_TOKEN` to increase GitHub API limits (5,000 requests/hour vs 60 unauthenticated).
