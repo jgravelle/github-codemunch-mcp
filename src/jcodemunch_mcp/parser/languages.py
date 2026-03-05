@@ -54,6 +54,7 @@ LANGUAGE_EXTENSIONS = {
     ".rs": "rust",
     ".java": "java",
     ".php": "php",
+    ".dart": "dart",
 }
 
 
@@ -277,6 +278,37 @@ PHP_SPEC = LanguageSpec(
 )
 
 
+# Dart specification
+DART_SPEC = LanguageSpec(
+    ts_language="dart",
+    symbol_node_types={
+        "function_signature": "function",
+        "class_definition": "class",
+        "mixin_declaration": "class",
+        "enum_declaration": "type",
+        "extension_declaration": "class",
+        "method_signature": "method",
+        "type_alias": "type",
+    },
+    name_fields={
+        "function_signature": "name",
+        "class_definition": "name",
+        "enum_declaration": "name",
+        "extension_declaration": "name",
+        # mixin_declaration, method_signature, type_alias: special-cased in extractor
+    },
+    param_fields={
+        "function_signature": "parameters",
+    },
+    return_type_fields={},
+    docstring_strategy="preceding_comment",
+    decorator_node_type="annotation",
+    container_node_types=["class_definition", "mixin_declaration", "extension_declaration"],
+    constant_patterns=[],
+    type_patterns=["type_alias", "enum_declaration"],
+)
+
+
 # Language registry
 LANGUAGE_REGISTRY = {
     "python": PYTHON_SPEC,
@@ -286,4 +318,5 @@ LANGUAGE_REGISTRY = {
     "rust": RUST_SPEC,
     "java": JAVA_SPEC,
     "php": PHP_SPEC,
+    "dart": DART_SPEC,
 }

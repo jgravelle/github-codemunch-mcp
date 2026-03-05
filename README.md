@@ -273,6 +273,7 @@ Every tool response includes a `_meta` envelope with timing, token savings, and 
 | Rust       | `.rs`         | function, type, impl, constant          |
 | Java       | `.java`       | method, class, type, constant           |
 | PHP        | `.php`        | function, class, method, type, constant |
+| Dart       | `.dart`       | function, class, method, type           |
 
 See LANGUAGE_SUPPORT.md for full semantics.
 

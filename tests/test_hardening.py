@@ -322,6 +322,7 @@ class TestDeterminism:
         ("go", "sample.go"),
         ("rust", "sample.rs"),
         ("java", "Sample.java"),
+        ("dart", "sample.dart"),
     ])
     def test_deterministic_ids_and_hashes(self, language, filename):
         content, fname = _fixture(language, filename)

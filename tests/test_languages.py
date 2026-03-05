@@ -259,3 +259,110 @@ def test_parse_php():
     assert enum is not None
     assert enum.kind == "type"
 
+
+DART_SOURCE = '''
+/// Greet a user by name.
+String greet(String name) {
+  return 'Hello, $name!';
+}
+
+/// A simple calculator.
+class Calculator {
+  /// Add two numbers.
+  int add(int a, int b) {
+    return a + b;
+  }
+
+  /// Whether the result is positive.
+  bool get isPositive => true;
+}
+
+/// Scrollable behavior for widgets.
+mixin Scrollable on Calculator {
+  /// Scroll to offset.
+  void scrollTo(double offset) {}
+}
+
+/// Status of a task.
+enum Status { pending, active, done }
+
+/// Helpers for String manipulation.
+extension StringExt on String {
+  /// Whether the string is blank.
+  bool get isBlank => trim().isEmpty;
+}
+
+/// A JSON map alias.
+typedef JsonMap = Map<String, dynamic>;
+
+/// An abstract repository.
+abstract class Repository {
+  /// Get all items.
+  @override
+  Future<List<String>> getAll() {
+    return Future.value([]);
+  }
+}
+'''
+
+
+def test_parse_dart():
+    """Test Dart parsing."""
+    symbols = parse_file(DART_SOURCE, "app.dart", "dart")
+
+    # Top-level function
+    func = next((s for s in symbols if s.name == "greet"), None)
+    assert func is not None
+    assert func.kind == "function"
+    assert "Greet a user by name" in func.docstring
+
+    # Class
+    cls = next((s for s in symbols if s.name == "Calculator"), None)
+    assert cls is not None
+    assert cls.kind == "class"
+    assert "simple calculator" in cls.docstring
+
+    # Method
+    method = next((s for s in symbols if s.name == "add"), None)
+    assert method is not None
+    assert method.kind == "method"
+    assert "Add two numbers" in method.docstring
+
+    # Getter
+    getter = next((s for s in symbols if s.name == "isPositive"), None)
+    assert getter is not None
+    assert getter.kind == "method"
+
+    # Mixin
+    mixin = next((s for s in symbols if s.name == "Scrollable"), None)
+    assert mixin is not None
+    assert mixin.kind == "class"
+
+    # Enum
+    enum = next((s for s in symbols if s.name == "Status"), None)
+    assert enum is not None
+    assert enum.kind == "type"
+
+    # Extension
+    ext = next((s for s in symbols if s.name == "StringExt"), None)
+    assert ext is not None
+    assert ext.kind == "class"
+
+    # Typedef
+    typedef = next((s for s in symbols if s.name == "JsonMap"), None)
+    assert typedef is not None
+    assert typedef.kind == "type"
+
+    # Abstract class with @override decorator
+    repo = next((s for s in symbols if s.name == "Repository"), None)
+    assert repo is not None
+    assert repo.kind == "class"
+    repo_method = next((s for s in symbols if s.name == "getAll"), None)
+    assert repo_method is not None
+    assert repo_method.kind == "method"
+    assert "@override" in repo_method.decorators
+
+    # Qualified names
+    assert method.qualified_name == "Calculator.add"
+    assert getter.qualified_name == "Calculator.isPositive"
+

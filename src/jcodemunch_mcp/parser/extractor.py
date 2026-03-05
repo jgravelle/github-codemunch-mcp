@@ -47,6 +47,10 @@ def _walk_tree(
     parent_symbol: Optional[Symbol] = None
 ):
     """Recursively walk the AST and extract symbols."""
+    # Dart: function_signature inside method_signature is handled by method_signature
+    if node.type == "function_signature" and node.parent and node.parent.type == "method_signature":
+        return
+
     # Check if this node is a symbol
     if node.type in spec.symbol_node_types:
         symbol = _extract_symbol(
@@ -103,8 +107,15 @@ def _extract_symbol(
     # Extract decorators
     decorators = _extract_decorators(node, spec, source_bytes)
     
+    # Dart: function_signature/method_signature have their body as a next sibling
+    end_byte = node.end_byte
+    if node.type in ("function_signature", "method_signature"):
+        next_sib = node.next_named_sibling
+        if next_sib and next_sib.type == "function_body":
+            end_byte = next_sib.end_byte
+
     # Compute content hash
-    symbol_bytes = source_bytes[node.start_byte:node.end_byte]
+    symbol_bytes = source_bytes[node.start_byte:end_byte]
     c_hash = compute_content_hash(symbol_bytes)
 
     # Create symbol
@@ -122,7 +133,7 @@ def _extract_symbol(
         line=node.start_point[0] + 1,
         end_line=node.end_point[0] + 1,
         byte_offset=node.start_byte,
-        byte_length=node.end_byte - node.start_byte,
+        byte_length=end_byte - node.start_byte,
         content_hash=c_hash,
     )
     
@@ -144,7 +155,30 @@ def _extract_name(node, spec: LanguageSpec, source_bytes: bytes) -> Optional[str
                 if name_node:
                     return source_bytes[name_node.start_byte:name_node.end_byte].decode("utf-8")
         return None
-    
+
+    # Dart: mixin_declaration has identifier as direct child (no field name)
+    if node.type == "mixin_declaration":
+        for child in node.children:
+            if child.type == "identifier":
+                return source_bytes[child.start_byte:child.end_byte].decode("utf-8")
+        return None
+
+    # Dart: method_signature wraps function_signature or getter_signature
+    if node.type == "method_signature":
+        for child in node.children:
+            if child.type in ("function_signature", "getter_signature"):
+                name_node = child.child_by_field_name("name")
+                if name_node:
+                    return source_bytes[name_node.start_byte:name_node.end_byte].decode("utf-8")
+        return None
+
+    # Dart: type_alias name is the first type_identifier child
+    if node.type == "type_alias":
+        for child in node.children:
+            if child.type == "type_identifier":
+                return source_bytes[child.start_byte:child.end_byte].decode("utf-8")
+        return None
+
     if node.type not in spec.name_fields:
         return None
     
@@ -231,10 +265,12 @@ def _strip_quotes(text: str) -> str:
 def _extract_preceding_comments(node, source_bytes: bytes) -> str:
     """Extract comments that immediately precede a node."""
     comments = []
-    
-    # Walk backwards through siblings
+
+    # Walk backwards through siblings, skipping past annotations/decorators
     prev = node.prev_named_sibling
-    while prev and prev.type in ("comment", "line_comment", "block_comment"):
+    while prev and prev.type in ("annotation", "marker_annotation"):
+        prev = prev.prev_named_sibling
+    while prev and prev.type in ("comment", "line_comment", "block_comment", "documentation_comment"):
         comment_text = source_bytes[prev.start_byte:prev.end_byte].decode("utf-8")
         comments.insert(0, comment_text)
         prev = prev.prev_named_sibling
