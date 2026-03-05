@@ -296,6 +296,7 @@ Every tool response includes a `_meta` envelope with timing, token savings, and 
 | Dart       | `.dart`       | function, class, method, type           |
 | C#         | `.cs`         | class, method, type, record             |
 | C          | `.c`, `.h`    | function, type, constant                |
+| C++        | `.cpp`, `.hpp`, `.cc`, `.hh`, `.cxx`, `.hxx` | function, class, method, type, constant |
 
 See LANGUAGE_SUPPORT.md for full semantics.
 

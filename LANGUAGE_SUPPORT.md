@@ -14,6 +14,7 @@
 | Dart       | `.dart`       | tree-sitter-dart       | function, class (class/mixin/extension), method, type (enum/typedef) | `@annotation` | `///` doc comments | Constructors and top-level constants are not indexed               |
 | C#         | `.cs`         | tree-sitter-csharp     | class (class/record), method (method/constructor), type (interface/enum/struct/delegate) | `[Attribute]` | `/// <summary>` XML doc comments | Properties and `const` fields not indexed                          |
 | C          | `.c`, `.h`    | tree-sitter-c          | function, type (struct/enum/union), constant | —             | `/* */` and `//` comments | `#define` macros extracted as constants; no class/method hierarchy |
+| C++        | `.cpp`, `.hpp`, `.cc`, `.hh`, `.cxx`, `.hxx` | tree-sitter-cpp | function, class, method, type (struct/enum/union), constant | — | `/* */` and `//` comments | Templates unwrapped to inner declaration; namespace contents extracted as top-level |
 
 ---
 

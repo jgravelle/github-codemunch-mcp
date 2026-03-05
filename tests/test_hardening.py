@@ -306,6 +306,47 @@ class TestPerLanguageExtraction:
         auth = _by_name(symbols, "authenticate")
         assert auth.kind == "function"
 
+    # -- C++ --------------------------------------------------------------
+
+    def test_cpp_functions(self):
+        content, fname = _fixture("cpp", "sample.cpp")
+        symbols = parse_file(content, fname, "cpp")
+        grouped = _kinds(symbols)
+        func_names = {f.name for f in grouped.get("function", [])}
+        assert "authenticate" in func_names
+        assert "add" in func_names
+
+    def test_cpp_class(self):
+        content, fname = _fixture("cpp", "sample.cpp")
+        symbols = parse_file(content, fname, "cpp")
+        cls = _by_name(symbols, "UserService")
+        assert cls.kind == "class"
+
+    def test_cpp_struct(self):
+        content, fname = _fixture("cpp", "sample.cpp")
+        symbols = parse_file(content, fname, "cpp")
+        point = _by_name(symbols, "Point")
+        assert point.kind == "type"
+
+    def test_cpp_enum(self):
+        content, fname = _fixture("cpp", "sample.cpp")
+        symbols = parse_file(content, fname, "cpp")
+        status = _by_name(symbols, "Status")
+        assert status.kind == "type"
+
+    def test_cpp_constant(self):
+        content, fname = _fixture("cpp", "sample.cpp")
+        symbols = parse_file(content, fname, "cpp")
+        const = _by_name(symbols, "MAX_BUFFER_SIZE")
+        assert const.kind == "constant"
+
+    def test_cpp_method_qualified_name(self):
+        content, fname = _fixture("cpp", "sample.cpp")
+        symbols = parse_file(content, fname, "cpp")
+        method = _by_name(symbols, "getUser")
+        assert method.kind == "method"
+        assert "UserService" in method.qualified_name
+
 
 # ===========================================================================
 # 2. Overload Disambiguation
@@ -391,6 +432,7 @@ class TestDeterminism:
         ("dart", "sample.dart"),
         ("csharp", "sample.cs"),
         ("c", "sample.c"),
+        ("cpp", "sample.cpp"),
     ])
     def test_deterministic_ids_and_hashes(self, language, filename):
         content, fname = _fixture(language, filename)

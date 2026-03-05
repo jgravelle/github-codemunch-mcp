@@ -190,7 +190,7 @@ def _extract_name(node, spec: LanguageSpec, source_bytes: bytes) -> Optional[str
     if name_node:
         # C function_definition: declarator is a function_declarator,
         # which wraps the actual identifier. Unwrap recursively.
-        while name_node.type in ("function_declarator", "pointer_declarator"):
+        while name_node.type in ("function_declarator", "pointer_declarator", "reference_declarator"):
             inner = name_node.child_by_field_name("declarator")
             if inner:
                 name_node = inner

@@ -306,6 +306,50 @@ abstract class Repository {
 '''
 
 
+CPP_SOURCE = '''
+#define MAX_BUFFER_SIZE 1024
+
+/* Manages user data and operations. */
+class UserService {
+public:
+    /* Create a new service instance. */
+    UserService(int capacity) : capacity_(capacity) {}
+
+    /* Get a user by their identifier. */
+    std::string getUser(int userId) const {
+        return "user-" + std::to_string(userId);
+    }
+
+private:
+    int capacity_;
+};
+
+/* A 2D coordinate point. */
+struct Point {
+    double x;
+    double y;
+};
+
+/* Status codes for operations. */
+enum Status {
+    STATUS_OK,
+    STATUS_ERROR,
+    STATUS_PENDING
+};
+
+/* Authenticate a token string. */
+int authenticate(const char *token) {
+    return token != nullptr;
+}
+
+// A template function for maximum.
+template <typename T>
+T maximum(T a, T b) {
+    return (a > b) ? a : b;
+}
+'''
+
+
 C_SOURCE = '''
 #define MAX_USERS 100
 
@@ -515,6 +559,54 @@ def test_parse_c():
 
     # Should have constant
     const = next((s for s in symbols if s.name == "MAX_USERS"), None)
+    assert const is not None
+    assert const.kind == "constant"
+
+
+def test_parse_cpp():
+    """Test C++ parsing."""
+    symbols = parse_file(CPP_SOURCE, "sample.cpp", "cpp")
+
+    # Class
+    cls = next((s for s in symbols if s.name == "UserService" and s.kind == "class"), None)
+    assert cls is not None
+    assert "Manages user data" in cls.docstring
+
+    # Methods inside class
+    get_user = next((s for s in symbols if s.name == "getUser"), None)
+    assert get_user is not None
+    assert get_user.kind == "method"
+    assert get_user.qualified_name == "UserService.getUser"
+    assert "Get a user by their identifier" in get_user.docstring
+
+    # Constructor (method inside class)
+    ctor = next((s for s in symbols if s.name == "UserService" and s.kind == "method"), None)
+    assert ctor is not None
+    assert ctor.qualified_name == "UserService.UserService"
+
+    # Struct
+    point = next((s for s in symbols if s.name == "Point"), None)
+    assert point is not None
+    assert point.kind == "type"
+
+    # Enum
+    status = next((s for s in symbols if s.name == "Status"), None)
+    assert status is not None
+    assert status.kind == "type"
+
+    # Free function
+    auth = next((s for s in symbols if s.name == "authenticate"), None)
+    assert auth is not None
+    assert auth.kind == "function"
+    assert "Authenticate a token string" in auth.docstring
+
+    # Template function
+    maximum = next((s for s in symbols if s.name == "maximum"), None)
+    assert maximum is not None
+    assert maximum.kind == "function"
+
+    # Constant
+    const = next((s for s in symbols if s.name == "MAX_BUFFER_SIZE"), None)
     assert const is not None
     assert const.kind == "constant"
 
