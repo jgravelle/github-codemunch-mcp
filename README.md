@@ -197,8 +197,9 @@ Environment variables are optional:
 | Variable            | Purpose                                      |
 | ------------------- | -------------------------------------------- |
 | `GITHUB_TOKEN`      | Higher GitHub API limits / private access    |
-| `ANTHROPIC_API_KEY` | AI-generated summaries via Claude Haiku (takes priority) |
-| `GOOGLE_API_KEY`    | AI-generated summaries via Gemini Flash      |
+| `ANTHROPIC_API_KEY`  | AI-generated summaries via Claude Haiku (takes priority) |
+| `ANTHROPIC_BASE_URL` | Third-party Anthropic-compatible endpoints (e.g. z.ai) |
+| `GOOGLE_API_KEY`     | AI-generated summaries via Gemini Flash      |
 
 ---
 
@@ -343,6 +344,7 @@ For **LM Studio**, ensure the Local Server is running (usually on port 1234):
 | --------------------------- | ------------------------- | -------- |
 | `GITHUB_TOKEN`              | GitHub API auth           | No       |
 | `ANTHROPIC_API_KEY`         | Symbol summaries via Claude Haiku (takes priority) | No       |
+| `ANTHROPIC_BASE_URL`        | Third-party Anthropic-compatible endpoints (e.g. z.ai) | No       |
 | `GOOGLE_API_KEY`            | Symbol summaries via Gemini Flash | No       |
 | `OPENAI_API_BASE`           | Base URL for local LLMs (e.g. `http://localhost:11434/v1`) | No |
 | `OPENAI_API_KEY`            | API key for local LLMs (default: `local-llm`) | No |

@@ -110,6 +110,46 @@ def test_simple_summarize_fallback_to_signature():
     assert "def foo" in result[0].summary
 
 
+def test_anthropic_summarizer_base_url():
+    """BatchSummarizer passes ANTHROPIC_BASE_URL to Anthropic client when set."""
+    import sys
+
+    mock_anthropic_module = MagicMock()
+    mock_client = MagicMock()
+    mock_anthropic_module.Anthropic.return_value = mock_client
+
+    with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
+        with patch.dict("os.environ", {
+            "ANTHROPIC_API_KEY": "sk-test-key",
+            "ANTHROPIC_BASE_URL": "https://proxy.example.com/v1",
+        }, clear=True):
+            from jcodemunch_mcp.summarizer.batch_summarize import BatchSummarizer
+            summarizer = BatchSummarizer()
+
+    mock_anthropic_module.Anthropic.assert_called_once_with(
+        api_key="sk-test-key",
+        base_url="https://proxy.example.com/v1",
+    )
+    assert summarizer.client is mock_client
+
+
+def test_anthropic_summarizer_no_base_url():
+    """BatchSummarizer omits base_url when ANTHROPIC_BASE_URL is not set."""
+    import sys
+
+    mock_anthropic_module = MagicMock()
+    mock_client = MagicMock()
+    mock_anthropic_module.Anthropic.return_value = mock_client
+
+    with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"}, clear=True):
+            from jcodemunch_mcp.summarizer.batch_summarize import BatchSummarizer
+            summarizer = BatchSummarizer()
+
+    mock_anthropic_module.Anthropic.assert_called_once_with(api_key="sk-test-key")
+    assert summarizer.client is mock_client
+
+
 def test_gemini_summarizer_no_api_key():
     """GeminiBatchSummarizer falls back to signature when no API key is set."""
     with patch.dict("os.environ", {}, clear=True):

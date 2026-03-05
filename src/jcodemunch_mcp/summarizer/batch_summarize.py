@@ -63,7 +63,11 @@ class BatchSummarizer:
             from anthropic import Anthropic
             api_key = os.environ.get("ANTHROPIC_API_KEY")
             if api_key:
-                self.client = Anthropic(api_key=api_key)
+                base_url = os.environ.get("ANTHROPIC_BASE_URL")
+                kwargs = {"api_key": api_key}
+                if base_url:
+                    kwargs["base_url"] = base_url
+                self.client = Anthropic(**kwargs)
         except ImportError:
             if os.environ.get("ANTHROPIC_API_KEY"):
                 import warnings
