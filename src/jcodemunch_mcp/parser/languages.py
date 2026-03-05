@@ -62,6 +62,7 @@ LANGUAGE_EXTENSIONS = {
     ".cs": "csharp",
     ".c": "c",
     ".h": "c",
+    ".swift": "swift",
 }
 
 
@@ -387,6 +388,36 @@ C_SPEC = LanguageSpec(
 )
 
 
+# Swift specification
+# Note: tree-sitter-swift uses class_declaration for class/struct/enum/extension;
+# the declaration_kind child field ("class"/"struct"/"enum"/"extension") disambiguates
+# at the source level but all map to "class" here for uniform treatment.
+# Attributes (@discardableResult etc.) live inside a modifiers child node rather
+# than as preceding siblings, so decorator extraction is not supported in this spec.
+SWIFT_SPEC = LanguageSpec(
+    ts_language="swift",
+    symbol_node_types={
+        "function_declaration": "function",
+        "class_declaration": "class",    # covers class, struct, enum, extension
+        "protocol_declaration": "type",
+        "init_declaration": "method",
+    },
+    name_fields={
+        "function_declaration": "name",  # simple_identifier child
+        "class_declaration": "name",     # type_identifier child
+        "protocol_declaration": "name",  # type_identifier child
+        "init_declaration": "name",      # "init" keyword token
+    },
+    param_fields={},  # Swift params are unnamed children; signature captured via source range
+    return_type_fields={},  # return type shares field "name" with function identifier
+    docstring_strategy="preceding_comment",  # /// and /* */ doc comments
+    decorator_node_type=None,
+    container_node_types=["class_declaration", "protocol_declaration"],
+    constant_patterns=["property_declaration"],  # let/var at file scope
+    type_patterns=["protocol_declaration"],
+)
+
+
 # Language registry
 LANGUAGE_REGISTRY = {
     "python": PYTHON_SPEC,
@@ -399,4 +430,5 @@ LANGUAGE_REGISTRY = {
     "dart": DART_SPEC,
     "csharp": CSHARP_SPEC,
     "c": C_SPEC,
+    "swift": SWIFT_SPEC,
 }
