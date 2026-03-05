@@ -57,7 +57,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="index_folder",
-            description="Index a local folder containing source code. Walks directory, parses ASTs, extracts symbols, and saves to local storage. Works with any folder containing supported language files. The response includes 'discovery_skip_counts' (per-reason counts of files excluded during discovery), 'no_symbols_count' and 'no_symbols_files' (files that were discovered but contained no extractable symbols). Use these fields to diagnose why files may be missing from the index.",
+            description="Index a local folder containing source code. Response includes `discovery_skip_counts` (files filtered per reason), `no_symbols_count`/`no_symbols_files` (files with no extractable symbols) for diagnosing missing files.",
             inputSchema={
                 "type": "object",
                 "properties": {
