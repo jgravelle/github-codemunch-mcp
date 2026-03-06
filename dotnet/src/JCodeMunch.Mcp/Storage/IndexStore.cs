@@ -364,8 +364,12 @@ public sealed partial class IndexStore
     private string IndexPath(string owner, string name) =>
         Path.Combine(_basePath, $"{RepoSlug(owner, name)}.json");
 
-    private string ContentDir(string owner, string name) =>
+    /// <summary>Path to raw content directory for a repository.</summary>
+    public string GetContentDir(string owner, string name) =>
         Path.Combine(_basePath, RepoSlug(owner, name));
+
+    private string ContentDir(string owner, string name) =>
+        GetContentDir(owner, name);
 
     /// <summary>
     /// Resolve a content path and ensure it stays within contentDir.
