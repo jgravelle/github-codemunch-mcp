@@ -117,23 +117,31 @@ def test_parse_tsx():
     """Test tsx parsing."""
     symbols = parse_file(TSX_SOURCE, "service.tsx", "tsx")
     
-    # Should have interface, function, class, method, type alias
-    func = next((s for s in symbols if s.name == "getUser"), None)
-    assert func is not None
-    assert func.kind == "function"
+    # Should have interface, function, class, method, type
+    symbol = next((s for s in symbols if s.name == "User"), None)
+    assert symbol is not None
+    assert symbol.kind == "type"
     
-    # Should have interface, function, class, method, type alias
-    func = next((s for s in symbols if s.name == "UserList"), None)
-    assert func is not None
-    assert func.kind == "function"
+    symbol = next((s for s in symbols if s.name == "getUser"), None)
+    assert symbol is not None
+    assert symbol.kind == "function"
     
-    interface = next((s for s in symbols if s.name == "User"), None)
-    assert interface is not None
-    assert interface.kind == "type"
+    symbol = next((s for s in symbols if s.name == "UserService"), None)
+    assert symbol is not None
+    assert symbol.kind == "class"
     
-    interface = next((s for s in symbols if s.name == "UserService"), None)
-    assert interface is not None
-    assert interface.kind == "class"
+    symbol = next((s for s in symbols if s.name == "findById"), None)
+    assert symbol is not None
+    assert symbol.kind == "method"
+    
+    symbol = next((s for s in symbols if s.name == "ID"), None)
+    assert symbol is not None
+    assert symbol.kind == "type"
+    
+    # Should properly parse tsx function
+    symbol = next((s for s in symbols if s.name == "UserList"), None)
+    assert symbol is not None
+    assert symbol.kind == "function"
 
 
 GO_SOURCE = '''
