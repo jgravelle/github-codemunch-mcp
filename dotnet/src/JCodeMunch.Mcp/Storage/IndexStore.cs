@@ -364,7 +364,7 @@ public sealed partial class IndexStore
     private string IndexPath(string owner, string name) =>
         Path.Combine(_basePath, $"{RepoSlug(owner, name)}.json");
 
-    private string ContentDir(string owner, string name) =>
+    internal string ContentDir(string owner, string name) =>
         Path.Combine(_basePath, RepoSlug(owner, name));
 
     /// <summary>
