@@ -31,7 +31,11 @@ PRICING = {
 
 
 def _savings_path(base_path: Optional[str] = None) -> Path:
-    root = Path(base_path) if base_path else Path.home() / ".code-index"
+    # Keep CLI reporting and tool-side recording aligned by honoring
+    # CODE_INDEX_PATH as the implicit base path when explicit base_path
+    # is not provided.
+    configured_base = base_path or os.environ.get("CODE_INDEX_PATH")
+    root = Path(configured_base) if configured_base else Path.home() / ".code-index"
     root.mkdir(parents=True, exist_ok=True)
     return root / _SAVINGS_FILE
 
