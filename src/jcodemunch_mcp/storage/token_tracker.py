@@ -47,6 +47,36 @@ def _get_or_create_anon_id(data: dict) -> str:
     return data["anon_id"]
 
 
+def _read_savings_data(path: Path) -> dict[str, Any]:
+    """Load savings JSON robustly across platforms/encodings."""
+    if not path.exists():
+        return {}
+
+    try:
+        raw = path.read_bytes()
+    except Exception:
+        return {}
+
+    if not raw:
+        return {}
+
+    for encoding in ("utf-8-sig", "utf-8", "cp1252"):
+        try:
+            return json.loads(raw.decode(encoding))
+        except Exception:
+            continue
+
+    return {}
+
+
+def _write_savings_data(path: Path, data: dict[str, Any]) -> None:
+    """Persist savings JSON using stable UTF-8 encoding."""
+    try:
+        path.write_text(json.dumps(data), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def _share_savings(delta: int, anon_id: str) -> None:
     """Fire-and-forget POST to the community meter. Never raises."""
     def _post() -> None:
@@ -66,10 +96,7 @@ def _share_savings(delta: int, anon_id: str) -> None:
 def record_savings(tokens_saved: int, base_path: Optional[str] = None) -> int:
     """Add tokens_saved to the running total. Returns new cumulative total."""
     path = _savings_path(base_path)
-    try:
-        data = json.loads(path.read_text()) if path.exists() else {}
-    except Exception:
-        data = {}
+    data = _read_savings_data(path)
 
     delta = max(0, tokens_saved)
     total = data.get("total_tokens_saved", 0) + delta
@@ -79,10 +106,7 @@ def record_savings(tokens_saved: int, base_path: Optional[str] = None) -> int:
         anon_id = _get_or_create_anon_id(data)
         _share_savings(delta, anon_id)
 
-    try:
-        path.write_text(json.dumps(data))
-    except Exception:
-        pass
+    _write_savings_data(path, data)
 
     return total
 
@@ -92,10 +116,7 @@ def record_savings(tokens_saved: int, base_path: Optional[str] = None) -> int:
 def get_savings_report(base_path: Optional[str] = None) -> dict[str, Any]:
     """Return an enriched summary of token savings for CLI and dashboards."""
     path = _savings_path(base_path)
-    try:
-        data = json.loads(path.read_text()) if path.exists() else {}
-    except Exception:
-        data = {}
+    data = _read_savings_data(path)
 
     total_tokens_saved = max(0, int(data.get("total_tokens_saved", 0) or 0))
     approx_raw_bytes_avoided = total_tokens_saved * _BYTES_PER_TOKEN
@@ -122,10 +143,7 @@ def get_savings_report(base_path: Optional[str] = None) -> dict[str, Any]:
 def get_total_saved(base_path: Optional[str] = None) -> int:
     """Return the current cumulative total without modifying it."""
     path = _savings_path(base_path)
-    try:
-        return json.loads(path.read_text()).get("total_tokens_saved", 0)
-    except Exception:
-        return 0
+    return _read_savings_data(path).get("total_tokens_saved", 0)
 
 
 def estimate_savings(raw_bytes: int, response_bytes: int) -> int:
