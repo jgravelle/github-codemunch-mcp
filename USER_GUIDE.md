@@ -110,6 +110,25 @@ Environment variables are optional:
 
 Restart Claude Desktop after saving the config.
 
+### Cursor
+
+Open **Cursor Settings** (`Ctrl+Shift+J`) → **Tools & MCP** → **+ New MCP Server** to open `mcp.json`, then add:
+
+```json
+{
+  "mcpServers": {
+    "jcodemunch": {
+      "command": "uvx",
+      "args": ["jcodemunch-mcp"]
+    }
+  }
+}
+```
+
+Save and check **Tools & MCP** — it will confirm whether the server started successfully. You may need to restart Cursor.
+
+> **WSL users:** Configure separately for Windows and your Linux distro, and switch between them via the Tools & MCP panel as needed.
+
 ### VS Code
 
 Add to `.vscode/settings.json`:
