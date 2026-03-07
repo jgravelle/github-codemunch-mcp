@@ -227,10 +227,8 @@ def test_save_index_sanitizes_special_chars_in_name(tmp_path):
     # Index should be retrievable under the sanitized slug
     index = store.load_index("local", "my project (v2)")
     assert index is not None
-    # The on-disk file should use the sanitized name
-    assert (tmp_path / "local-my-project-v2-.json").exists() or any(
-        f.name.startswith("local-my-project") for f in tmp_path.iterdir() if f.suffix == ".json"
-    )
+    # The on-disk file should use the sanitized name (spaces/parens → hyphens, collapsed)
+    assert (tmp_path / "local-my-project-v2.json").exists()
 
 
 def test_codeindex_get_symbol():
