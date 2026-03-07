@@ -63,6 +63,7 @@ class BatchSummarizer:
             from anthropic import Anthropic
             api_key = os.environ.get("ANTHROPIC_API_KEY")
             if api_key:
+                self.model = os.environ.get("ANTHROPIC_MODEL", self.model)
                 base_url = os.environ.get("ANTHROPIC_BASE_URL")
                 kwargs = {"api_key": api_key}
                 if base_url:
@@ -182,7 +183,7 @@ class BatchSummarizer:
 class GeminiBatchSummarizer:
     """AI-based batch summarization using Google Gemini Flash (Tier 2)."""
 
-    model: str = "gemini-1.5-flash"
+    model: str = "gemini-2.5-flash-lite"
     max_tokens_per_batch: int = 500
 
     def __post_init__(self):
@@ -195,6 +196,7 @@ class GeminiBatchSummarizer:
             import google.generativeai as genai
             api_key = os.environ.get("GOOGLE_API_KEY")
             if api_key:
+                self.model = os.environ.get("GOOGLE_MODEL", self.model)
                 genai.configure(api_key=api_key)
                 self.client = genai.GenerativeModel(self.model)
         except ImportError:

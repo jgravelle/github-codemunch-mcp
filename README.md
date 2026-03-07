@@ -429,7 +429,9 @@ For **LM Studio**, ensure the Local Server is running (usually on port 1234):
 | `GITHUB_TOKEN`              | GitHub API auth           | No       |
 | `ANTHROPIC_API_KEY`         | Symbol summaries via Claude Haiku (takes priority) | No       |
 | `ANTHROPIC_BASE_URL`        | Third-party Anthropic-compatible endpoints (e.g. z.ai) | No       |
+| `ANTHROPIC_MODEL`           | Model name for Claude summaries (default: `claude-haiku-4-5-20251001`) | No       |
 | `GOOGLE_API_KEY`            | Symbol summaries via Gemini Flash | No       |
+| `GOOGLE_MODEL`              | Model name for Gemini summaries (default: `gemini-2.5-flash-lite`) | No       |
 | `OPENAI_API_BASE`           | Base URL for local LLMs (e.g. `http://localhost:11434/v1`) | No |
 | `OPENAI_API_KEY`            | API key for local LLMs (default: `local-llm`) | No |
 | `OPENAI_MODEL`              | Model name for local LLMs (default: `qwen3-coder`) | No |

@@ -105,7 +105,9 @@ Environment variables are optional:
 
 * `GITHUB_TOKEN` enables private repositories and higher GitHub API rate limits.
 * `ANTHROPIC_API_KEY` enables AI-generated summaries via Claude Haiku.
+* `ANTHROPIC_MODEL` overrides the Claude model (default: `claude-haiku-4-5-20251001`).
 * `GOOGLE_API_KEY` enables AI-generated summaries via Gemini Flash (used if `ANTHROPIC_API_KEY` is not set).
+* `GOOGLE_MODEL` overrides the Gemini model (default: `gemini-2.5-flash-lite`).
 * If neither key is set, summaries fall back to docstrings or signatures.
 
 Restart Claude Desktop after saving the config.

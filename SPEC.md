@@ -278,5 +278,7 @@ All errors return:
 | ------------------- | -------------------------------------------------------- | -------- |
 | `GITHUB_TOKEN`      | GitHub API authentication (higher limits, private repos) | No       |
 | `ANTHROPIC_API_KEY` | AI summarization via Claude Haiku (takes priority if both keys set) | No       |
+| `ANTHROPIC_MODEL`   | Model name for Claude summaries (default: `claude-haiku-4-5-20251001`) | No       |
 | `GOOGLE_API_KEY`    | AI summarization via Gemini Flash (used if `ANTHROPIC_API_KEY` not set) | No       |
+| `GOOGLE_MODEL`      | Model name for Gemini summaries (default: `gemini-2.5-flash-lite`) | No       |
 | `CODE_INDEX_PATH`   | Custom storage path (default: `~/.code-index/`)          | No       |
