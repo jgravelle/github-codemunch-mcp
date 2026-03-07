@@ -196,8 +196,8 @@ def test_save_index_rejects_invalid_owner_component(tmp_path):
         )
 
 
-def test_save_index_rejects_invalid_name_component(tmp_path):
-    """Reject names with path separators or unsafe characters."""
+def test_save_index_rejects_path_separator_in_name(tmp_path):
+    """Reject names that contain path separators (/ or \\)."""
     store = IndexStore(base_path=str(tmp_path))
 
     with pytest.raises(ValueError, match="Invalid name"):
@@ -209,6 +209,28 @@ def test_save_index_rejects_invalid_name_component(tmp_path):
             raw_files={"main.py": ""},
             languages={"python": 1},
         )
+
+
+def test_save_index_sanitizes_special_chars_in_name(tmp_path):
+    """Names with spaces or other special characters are sanitized to hyphens."""
+    store = IndexStore(base_path=str(tmp_path))
+
+    store.save_index(
+        owner="local",
+        name="my project (v2)",
+        source_files=["main.py"],
+        symbols=[],
+        raw_files={"main.py": ""},
+        languages={"python": 1},
+    )
+
+    # Index should be retrievable under the sanitized slug
+    index = store.load_index("local", "my project (v2)")
+    assert index is not None
+    # The on-disk file should use the sanitized name
+    assert (tmp_path / "local-my-project-v2-.json").exists() or any(
+        f.name.startswith("local-my-project") for f in tmp_path.iterdir() if f.suffix == ".json"
+    )
 
 
 def test_codeindex_get_symbol():

@@ -149,15 +149,23 @@ class IndexStore:
         self.base_path.mkdir(parents=True, exist_ok=True)
 
     def _safe_repo_component(self, value: str, field_name: str) -> str:
-        """Validate owner/name components used in on-disk cache paths."""
+        """Validate and sanitize owner/name components used in on-disk cache paths.
+
+        Characters outside [A-Za-z0-9._-] (e.g. spaces) are replaced with hyphens
+        so that directories with special characters in their names can be indexed.
+        Path separators are still rejected outright.
+        """
         import re
 
         if not value or value in {".", ".."}:
             raise ValueError(f"Invalid {field_name}: {value!r}")
         if "/" in value or "\\" in value:
             raise ValueError(f"Invalid {field_name}: {value!r}")
-        if not re.fullmatch(r"[A-Za-z0-9._-]+", value):
-            raise ValueError(f"Invalid {field_name}: {value!r}")
+        # Sanitize invalid characters to hyphens rather than raising
+        value = re.sub(r"[^A-Za-z0-9._-]", "-", value)
+        value = re.sub(r"-+", "-", value).strip("-")
+        if not value:
+            raise ValueError(f"Invalid {field_name}: sanitized to empty string")
         return value
 
     def _repo_slug(self, owner: str, name: str) -> str:
