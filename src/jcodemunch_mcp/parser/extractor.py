@@ -30,6 +30,8 @@ def parse_file(content: str, filename: str, language: str) -> list[Symbol]:
         symbols = _parse_elixir_symbols(source_bytes, filename)
     elif language == "blade":
         symbols = _parse_blade_symbols(source_bytes, filename)
+    elif language == "al":
+        symbols = _parse_al_symbols(source_bytes, filename)
     else:
         spec = LANGUAGE_REGISTRY[language]
         symbols = _parse_with_spec(source_bytes, filename, language, spec)
@@ -1345,6 +1347,267 @@ def _parse_blade_symbols(source_bytes: bytes, filename: str) -> list[Symbol]:
                 byte_length=len(sym_bytes),
                 content_hash=compute_content_hash(sym_bytes),
             ))
+
+    symbols.sort(key=lambda s: s.line)
+    return symbols
+
+
+# ---------------------------------------------------------------------------
+# AL (Business Central) parser (regex-based; no tree-sitter grammar available)
+# ---------------------------------------------------------------------------
+
+_AL_OBJECT_TYPES_TYPE = frozenset({"enum", "interface"})
+
+_AL_OBJECT_RE = re.compile(
+    r"^(?P<objtype>table|page|codeunit|report|xmlport|query|enum|interface|"
+    r"controladdin|profile|pagecustomization|entitlement|permissionset|"
+    r"permissionsetextension|tableextension|pageextension|enumextension|reportextension)"
+    r"\s+(?:(?P<objid>\d+)\s+)?(?:\"(?P<qname>[^\"]+)\"|(?P<iname>[A-Za-z_]\w*))"
+    r"(?:\s+extends\s+(?:\"[^\"]+\"|[A-Za-z_]\w*))?",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+_AL_PROCEDURE_RE = re.compile(
+    r"(?P<access>local|internal|protected)\s+procedure\s+(?P<name>[A-Za-z_]\w*)\s*\((?P<params>[^)]*)\)(?:\s*:\s*(?P<return>[^;\n{]+))?"
+    r"|procedure\s+(?P<name2>[A-Za-z_]\w*)\s*\((?P<params2>[^)]*)\)(?:\s*:\s*(?P<return2>[^;\n{]+))?",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+_AL_TRIGGER_RE = re.compile(
+    r"trigger\s+(?P<name>[A-Za-z_]\w*)\s*\(",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+_AL_FIELD_RE = re.compile(
+    r"field\s*\(\s*(?P<id>\d+)\s*;\s*(?:\"(?P<qname>[^\"]+)\"|(?P<iname>[A-Za-z_]\w*))\s*;\s*(?P<type>[^)]+)\)",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+_AL_ATTR_RE = re.compile(
+    r"\[(?P<attr>[A-Za-z_]\w*)\s*(?:\([^]]*\))?\]",
+)
+
+_AL_DOC_RE = re.compile(
+    r"///\s*(?:<summary>)?\s*(?P<text>.*?)(?:</summary>)?\s*$",
+)
+
+
+def _parse_al_symbols(source_bytes: bytes, filename: str) -> list[Symbol]:
+    """Extract AL (Business Central) symbols using regex.
+
+    Scans for object declarations (table, page, codeunit, etc.),
+    procedures, triggers, and table fields.
+    """
+    content = source_bytes.decode("utf-8", errors="replace")
+    lines = content.splitlines()
+
+    # Build line offset table
+    line_start_offsets: list[int] = []
+    offset = 0
+    for line in lines:
+        line_start_offsets.append(offset)
+        offset += len(line.encode("utf-8")) + 1
+
+    def byte_to_line(byte_pos: int) -> int:
+        lo, hi = 0, len(line_start_offsets) - 1
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if line_start_offsets[mid] <= byte_pos:
+                lo = mid
+            else:
+                hi = mid - 1
+        return lo + 1
+
+    # Pass 1: find top-level objects and their byte ranges
+    objects: list[tuple[str, str, int, int]] = []  # (name, kind, start, end)
+    obj_matches = list(_AL_OBJECT_RE.finditer(content))
+    for i, m in enumerate(obj_matches):
+        objtype = m.group("objtype").lower()
+        name = m.group("qname") or m.group("iname")
+        if not name:
+            continue
+        kind = "type" if objtype in _AL_OBJECT_TYPES_TYPE else "class"
+        start = m.start()
+        end = obj_matches[i + 1].start() if i + 1 < len(obj_matches) else len(content)
+        objects.append((name, kind, start, end))
+
+    symbols: list[Symbol] = []
+
+    # Emit object symbols
+    for name, kind, start, end in objects:
+        line_no = byte_to_line(start)
+        sig_end = content.find("\n", start)
+        if sig_end == -1:
+            sig_end = len(content)
+        signature = content[start:sig_end].strip()
+        sym_bytes = signature.encode("utf-8")
+        symbols.append(Symbol(
+            id=make_symbol_id(filename, name, kind),
+            file=filename,
+            name=name,
+            qualified_name=name,
+            kind=kind,
+            language="al",
+            signature=signature,
+            docstring="",
+            parent=None,
+            line=line_no,
+            end_line=line_no,
+            byte_offset=start,
+            byte_length=len(sym_bytes),
+            content_hash=compute_content_hash(sym_bytes),
+        ))
+
+    def _find_parent(pos: int) -> Optional[tuple[str, str]]:
+        """Find the parent object for a given byte position."""
+        for name, kind, start, end in objects:
+            if start <= pos < end:
+                return (name, make_symbol_id(filename, name, kind))
+        return None
+
+    def _extract_al_docstring(pos: int) -> str:
+        """Extract XML doc comment (/// lines) preceding a byte position."""
+        line_idx = byte_to_line(pos) - 1  # 0-indexed
+        doc_lines: list[str] = []
+        idx = line_idx - 1
+        while idx >= 0:
+            stripped = lines[idx].strip()
+            if stripped.startswith("///"):
+                doc_lines.insert(0, stripped[3:].strip())
+                idx -= 1
+            elif _AL_ATTR_RE.match(stripped):
+                # Skip past attribute lines to find doc comments above them
+                idx -= 1
+            else:
+                break
+        if not doc_lines:
+            return ""
+        text = " ".join(doc_lines)
+        # Strip <summary> / </summary> tags
+        text = text.replace("<summary>", "").replace("</summary>", "").strip()
+        return text
+
+    def _extract_al_decorators(pos: int) -> list[str]:
+        """Extract [Attribute(...)] lines preceding a byte position."""
+        line_idx = byte_to_line(pos) - 1  # 0-indexed
+        attrs: list[str] = []
+        idx = line_idx - 1
+        while idx >= 0:
+            stripped = lines[idx].strip()
+            if _AL_ATTR_RE.match(stripped):
+                attrs.insert(0, stripped)
+                idx -= 1
+            elif stripped.startswith("///"):
+                # Skip past doc comment lines
+                idx -= 1
+            else:
+                break
+        return attrs
+
+    # Pass 2: find procedures
+    for m in _AL_PROCEDURE_RE.finditer(content):
+        access = m.group("access") or ""
+        name = m.group("name") or m.group("name2")
+        params = m.group("params") or m.group("params2") or ""
+        ret = m.group("return") or m.group("return2") or ""
+        if not name:
+            continue
+
+        parent_info = _find_parent(m.start())
+        parent_name = parent_info[0] if parent_info else None
+        parent_id = parent_info[1] if parent_info else None
+        qualified_name = f"{parent_name}.{name}" if parent_name else name
+
+        sig_parts = []
+        if access:
+            sig_parts.append(access)
+        sig_parts.append(f"procedure {name}({params.strip()})")
+        if ret:
+            sig_parts.append(f": {ret.strip()}")
+        signature = " ".join(sig_parts)
+
+        docstring = _extract_al_docstring(m.start())
+        decorators = _extract_al_decorators(m.start())
+
+        line_no = byte_to_line(m.start())
+        sym_bytes = signature.encode("utf-8")
+        symbols.append(Symbol(
+            id=make_symbol_id(filename, qualified_name, "method"),
+            file=filename,
+            name=name,
+            qualified_name=qualified_name,
+            kind="method",
+            language="al",
+            signature=signature,
+            docstring=docstring,
+            decorators=decorators,
+            parent=parent_id,
+            line=line_no,
+            end_line=line_no,
+            byte_offset=m.start(),
+            byte_length=len(sym_bytes),
+            content_hash=compute_content_hash(sym_bytes),
+        ))
+
+    # Pass 3: find triggers
+    for m in _AL_TRIGGER_RE.finditer(content):
+        name = m.group("name")
+        parent_info = _find_parent(m.start())
+        parent_name = parent_info[0] if parent_info else None
+        parent_id = parent_info[1] if parent_info else None
+        qualified_name = f"{parent_name}.{name}" if parent_name else name
+
+        signature = f"trigger {name}()"
+        line_no = byte_to_line(m.start())
+        sym_bytes = signature.encode("utf-8")
+        symbols.append(Symbol(
+            id=make_symbol_id(filename, qualified_name, "method"),
+            file=filename,
+            name=name,
+            qualified_name=qualified_name,
+            kind="method",
+            language="al",
+            signature=signature,
+            docstring="",
+            parent=parent_id,
+            line=line_no,
+            end_line=line_no,
+            byte_offset=m.start(),
+            byte_length=len(sym_bytes),
+            content_hash=compute_content_hash(sym_bytes),
+        ))
+
+    # Pass 4: find fields (only in table/tableextension objects)
+    for m in _AL_FIELD_RE.finditer(content):
+        name = m.group("qname") or m.group("iname")
+        field_type = m.group("type").strip()
+        if not name:
+            continue
+
+        parent_info = _find_parent(m.start())
+        parent_name = parent_info[0] if parent_info else None
+        parent_id = parent_info[1] if parent_info else None
+        qualified_name = f"{parent_name}.{name}" if parent_name else name
+
+        signature = f"field({m.group('id')}; {name}; {field_type})"
+        line_no = byte_to_line(m.start())
+        sym_bytes = signature.encode("utf-8")
+        symbols.append(Symbol(
+            id=make_symbol_id(filename, qualified_name, "constant"),
+            file=filename,
+            name=name,
+            qualified_name=qualified_name,
+            kind="constant",
+            language="al",
+            signature=signature,
+            docstring="",
+            parent=parent_id,
+            line=line_no,
+            end_line=line_no,
+            byte_offset=m.start(),
+            byte_length=len(sym_bytes),
+            content_hash=compute_content_hash(sym_bytes),
+        ))
 
     symbols.sort(key=lambda s: s.line)
     return symbols
