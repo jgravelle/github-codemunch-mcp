@@ -99,6 +99,7 @@ LANGUAGE_EXTENSIONS = {
     ".f": "fortran",
     ".for": "fortran",
     ".fpp": "fortran",
+    ".sql": "sql",
 }
 
 
@@ -878,6 +879,26 @@ LUA_SPEC = LanguageSpec(
 )
 
 
+# SQL specification
+# NOTE: The derekstride/tree-sitter-sql grammar has no named field accessors.
+# Names live in positional children (object_reference → identifier, or direct
+# identifier). CREATE PROCEDURE and CREATE TRIGGER produce ERROR nodes and are
+# not supported by this grammar. All extraction logic is in _parse_sql_symbols()
+# in extractor.py.
+SQL_SPEC = LanguageSpec(
+    ts_language="sql",
+    symbol_node_types={},
+    name_fields={},
+    param_fields={},
+    return_type_fields={},
+    docstring_strategy="preceding_comment",
+    decorator_node_type=None,
+    container_node_types=[],
+    constant_patterns=[],
+    type_patterns=[],
+)
+
+
 # Language registry
 LANGUAGE_REGISTRY = {
     "python": PYTHON_SPEC,
@@ -908,6 +929,7 @@ LANGUAGE_REGISTRY = {
     "lua": LUA_SPEC,
     "erlang": ERLANG_SPEC,
     "fortran": FORTRAN_SPEC,
+    "sql": SQL_SPEC,
 }
 
 logger = logging.getLogger(__name__)

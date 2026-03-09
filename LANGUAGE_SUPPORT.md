@@ -17,6 +17,7 @@
 | C++        | `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh`, `.hxx`, `.h`* | tree-sitter-cpp | function, class, method, type (struct/enum/union/alias), constant | — | `/* */` and `//` comments | Namespace symbols are used for qualification but not emitted as standalone symbols |
 | Elixir     | `.ex`, `.exs` | tree-sitter-elixir | class (defmodule/defimpl), type (defprotocol/@type/@callback), method (def/defp/defmacro/defguard inside module), function (top-level def) | — | `@doc`/`@moduledoc` strings | Homoiconic grammar; custom walker required. `defstruct`, `use`, `import`, `alias` not indexed |
 | Ruby       | `.rb`, `.rake` | tree-sitter-ruby  | class, type (module), method (instance + `self.` singleton), function (top-level def) | — | `#` preceding comments | `attr_accessor`, constants, and `include`/`extend` not indexed |
+| SQL        | `.sql`         | tree-sitter-sql (derekstride) | function (CREATE FUNCTION), type (CREATE TABLE/VIEW/SCHEMA/INDEX), function (CTE names) | — | `--` and `/* */` preceding comments | Jinja-templated SQL (dbt models) auto-preprocessed; CREATE PROCEDURE and CREATE TRIGGER not supported by grammar |
 
 \* `.h` uses C++ parsing first, then falls back to C when no C++ symbols are extracted.
 
@@ -125,6 +126,6 @@ JCODEMUNCH_EXTRA_EXTENSIONS=".cgi:perl,.psgi:perl,.mjs:javascript"
 - Comma-separated `.ext:lang` pairs
 - Overrides built-in mappings on collision
 - Unknown languages and malformed entries are skipped with a warning
-- Valid language names: `python`, `javascript`, `typescript`, `go`, `rust`, `java`, `php`, `dart`, `csharp`, `c`, `cpp`, `swift`, `elixir`, `ruby`, `perl`
+- Valid language names: `python`, `javascript`, `typescript`, `go`, `rust`, `java`, `php`, `dart`, `csharp`, `c`, `cpp`, `swift`, `elixir`, `ruby`, `perl`, `sql`
 
 Set via `.mcp.json` `env` block or any environment mechanism supported by your MCP client.

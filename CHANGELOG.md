@@ -14,6 +14,13 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ### Fixed
 - `test_respects_env_file_limit` now uses `JCODEMUNCH_MAX_FOLDER_FILES` (the correct higher-priority env var) instead of the legacy `JCODEMUNCH_MAX_INDEX_FILES`
+- **SQL language support** — `.sql` files are now indexed via `tree-sitter-sql` (derekstride grammar)
+  - CREATE TABLE, VIEW, FUNCTION, INDEX, SCHEMA extracted as symbols
+  - CTE names (`WITH name AS (...)`) extracted as function symbols
+  - dbt Jinja preprocessing: `{{ }}`, `{% %}`, `{# #}` stripped before parsing
+  - dbt directives extracted as symbols: `{% macro %}`, `{% test %}`, `{% snapshot %}`, `{% materialization %}`
+  - Docstrings from preceding `--` comments and `{# #}` Jinja block comments
+  - 27 new tests covering DDL, CTEs, Jinja preprocessing, and all dbt directive types
 
 ## [1.2.5] - 2026-03-08
 
