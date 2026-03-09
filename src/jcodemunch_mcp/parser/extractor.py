@@ -44,6 +44,8 @@ def parse_file(content: str, filename: str, language: str) -> list[Symbol]:
         symbols = _parse_erlang_symbols(source_bytes, filename)
     elif language == "fortran":
         symbols = _parse_fortran_symbols(source_bytes, filename)
+    elif language == "sql":
+        symbols = _parse_sql_symbols(source_bytes, filename)
     else:
         spec = LANGUAGE_REGISTRY[language]
         symbols = _parse_with_spec(source_bytes, filename, language, spec)
@@ -3178,3 +3180,223 @@ def _parse_fortran_symbols(source_bytes: bytes, filename: str) -> list[Symbol]:
 
     symbols.sort(key=lambda s: s.line)
     return symbols
+
+
+def _parse_sql_symbols(source_bytes: bytes, filename: str) -> list[Symbol]:
+    """Extract symbols from SQL source files using tree-sitter.
+
+    The derekstride/tree-sitter-sql grammar exposes these top-level node types
+    (inside ``program → statement``):
+
+    - ``create_table``    — table DDL.  Name in ``object_reference → identifier``.
+    - ``create_view``     — view DDL.   Name in ``object_reference → identifier``.
+    - ``create_function`` — UDF/stored function.  Name in ``object_reference``.
+                            Parameters in ``function_arguments``.
+    - ``create_index``    — index DDL.  Name is a direct ``identifier`` child.
+    - ``create_schema``   — schema DDL. Name is a direct ``identifier`` child.
+    - ``cte``             — CTE definition inside a WITH clause.  Name is a
+                            direct ``identifier`` child.
+
+    ``CREATE PROCEDURE`` and ``CREATE TRIGGER`` produce ERROR nodes in this
+    grammar and are not extracted.
+
+    Jinja-templated SQL (dbt models) is pre-processed by ``sql_preprocessor``
+    to replace ``{{ }}``, ``{% %}``, and ``{# #}`` tokens with ``__jinja__``
+    before parsing.  dbt directives (``{% macro %}``, ``{% test %}``,
+    ``{% snapshot %}``, ``{% materialization %}``) are extracted as symbols
+    before stripping.
+    """
+    from tree_sitter_language_pack import get_parser as _get_parser
+    from .sql_preprocessor import strip_jinja, is_jinja_sql, extract_dbt_directives
+
+    # Extract dbt directives before stripping Jinja (macro, test, snapshot, etc.)
+    dbt_symbols: list[Symbol] = []
+    has_jinja = is_jinja_sql(source_bytes)
+    if has_jinja:
+        dbt_directives = extract_dbt_directives(source_bytes)
+        for d in dbt_directives:
+            # Map directive type to symbol kind
+            if d.directive in ("macro", "test", "materialization"):
+                kind = "function"
+            else:  # snapshot
+                kind = "type"
+
+            # Build a readable signature
+            if d.params:
+                sig = f"{{% {d.directive} {d.name}({d.params}) %}}"
+            else:
+                sig = f"{{% {d.directive} {d.name} %}}"
+
+            c_hash = compute_content_hash(
+                source_bytes[d.byte_offset:d.byte_offset + d.byte_length]
+            )
+
+            dbt_symbols.append(Symbol(
+                id=make_symbol_id(filename, d.name, kind),
+                file=filename,
+                name=d.name,
+                qualified_name=d.name,
+                kind=kind,
+                language="sql",
+                signature=sig,
+                docstring=d.docstring,
+                line=d.line,
+                end_line=d.end_line,
+                byte_offset=d.byte_offset,
+                byte_length=d.byte_length,
+                content_hash=c_hash,
+            ))
+
+        source_bytes = strip_jinja(source_bytes)
+
+    try:
+        parser = _get_parser("sql")
+        tree = parser.parse(source_bytes)
+    except Exception:
+        return []
+
+    symbols: list[Symbol] = []
+
+    # Node types we extract and their symbol kind
+    NODE_KIND_MAP = {
+        "create_table": "type",
+        "create_view": "type",
+        "create_function": "function",
+        "create_index": "type",
+        "create_schema": "type",
+        "cte": "function",
+    }
+
+    def _node_text(node) -> str:
+        return source_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
+
+    def _extract_name(node) -> str | None:
+        """Extract the name from a SQL DDL node."""
+        node_type = node.type
+
+        # create_table, create_view, create_function: name in object_reference child
+        if node_type in ("create_table", "create_view", "create_function"):
+            for child in node.children:
+                if child.type == "object_reference":
+                    # object_reference may contain schema.name (multiple identifiers)
+                    # Take the full text as the name (e.g. "schema.table_name")
+                    return _node_text(child)
+            return None
+
+        # create_index, create_schema, cte: name is a direct identifier child
+        if node_type in ("create_index", "create_schema", "cte"):
+            for child in node.children:
+                if child.type == "identifier":
+                    return _node_text(child)
+            return None
+
+        return None
+
+    def _build_signature(node) -> str:
+        """Build a concise signature for a SQL symbol."""
+        node_type = node.type
+
+        if node_type == "create_function":
+            name = _extract_name(node) or "?"
+            # Look for function_arguments and return type
+            args_text = ""
+            return_text = ""
+            for child in node.children:
+                if child.type == "function_arguments":
+                    args_text = _node_text(child)
+                elif child.type == "keyword_returns":
+                    # Return type is the next sibling after RETURNS keyword
+                    idx = node.children.index(child)
+                    if idx + 1 < len(node.children):
+                        return_text = f" RETURNS {_node_text(node.children[idx + 1])}"
+            return f"CREATE FUNCTION {name}{args_text}{return_text}"
+
+        if node_type == "create_table":
+            name = _extract_name(node) or "?"
+            # Include column list summary
+            for child in node.children:
+                if child.type == "column_definitions":
+                    cols = [_node_text(c).split()[0] for c in child.children
+                            if c.type == "column_definition"]
+                    if cols:
+                        return f"CREATE TABLE {name} ({', '.join(cols)})"
+            return f"CREATE TABLE {name}"
+
+        if node_type == "create_view":
+            name = _extract_name(node) or "?"
+            return f"CREATE VIEW {name}"
+
+        if node_type == "create_index":
+            name = _extract_name(node) or "?"
+            # Find the ON target
+            on_target = ""
+            for i, child in enumerate(node.children):
+                if child.type == "keyword_on" and i + 1 < len(node.children):
+                    on_target = f" ON {_node_text(node.children[i + 1])}"
+            return f"CREATE INDEX {name}{on_target}"
+
+        if node_type == "create_schema":
+            name = _extract_name(node) or "?"
+            return f"CREATE SCHEMA {name}"
+
+        if node_type == "cte":
+            name = _extract_name(node) or "?"
+            return f"WITH {name} AS (...)"
+
+        return _node_text(node)[:120]
+
+    def _collect_docstring(node) -> str:
+        """Collect preceding -- or /* */ comment siblings as a docstring."""
+        lines: list[str] = []
+        prev = node.prev_named_sibling
+        while prev and prev.type in ("comment", "marginalia"):
+            raw = _node_text(prev).lstrip("-").lstrip("/").lstrip("*").strip()
+            lines.insert(0, raw)
+            prev = prev.prev_named_sibling
+        return "\n".join(lines) if lines else ""
+
+    def _walk(node) -> None:
+        """Recursively walk the AST to find extractable nodes."""
+        if node.type in NODE_KIND_MAP:
+            name = _extract_name(node)
+            if name:
+                kind = NODE_KIND_MAP[node.type]
+                signature = _build_signature(node)
+
+                # Collect docstring from preceding comment sibling
+                # For nodes inside statement wrappers, check the statement's sibling
+                doc_node = node
+                if node.parent and node.parent.type == "statement":
+                    doc_node = node.parent
+                docstring = _collect_docstring(doc_node)
+
+                c_hash = compute_content_hash(
+                    source_bytes[node.start_byte:node.end_byte]
+                )
+
+                sym = Symbol(
+                    id=make_symbol_id(filename, name, kind),
+                    file=filename,
+                    name=name,
+                    qualified_name=name,
+                    kind=kind,
+                    language="sql",
+                    signature=signature,
+                    docstring=docstring,
+                    line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    byte_offset=node.start_byte,
+                    byte_length=node.end_byte - node.start_byte,
+                    content_hash=c_hash,
+                )
+                symbols.append(sym)
+
+        for child in node.children:
+            _walk(child)
+
+    _walk(tree.root_node)
+
+    # Merge dbt directive symbols with tree-sitter SQL symbols
+    all_symbols = dbt_symbols + symbols
+    all_symbols.sort(key=lambda s: s.line)
+    return all_symbols

@@ -2,6 +2,17 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [Unreleased]
+
+### Added
+- **SQL language support** — `.sql` files are now indexed via `tree-sitter-sql` (derekstride grammar)
+  - CREATE TABLE, VIEW, FUNCTION, INDEX, SCHEMA extracted as symbols
+  - CTE names (`WITH name AS (...)`) extracted as function symbols
+  - dbt Jinja preprocessing: `{{ }}`, `{% %}`, `{# #}` stripped before parsing
+  - dbt directives extracted as symbols: `{% macro %}`, `{% test %}`, `{% snapshot %}`, `{% materialization %}`
+  - Docstrings from preceding `--` comments and `{# #}` Jinja block comments
+  - 27 new tests covering DDL, CTEs, Jinja preprocessing, and all dbt directive types
+
 ## [1.2.5] - 2026-03-08
 
 ### Added
