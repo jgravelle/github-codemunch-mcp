@@ -25,7 +25,6 @@ from ..security import (
     DEFAULT_MAX_FILE_SIZE,
     get_max_folder_files,
     get_extra_ignore_patterns,
-    SKIP_PATTERNS,
     SKIP_DIRECTORIES,
     SKIP_FILES
 )
@@ -47,22 +46,6 @@ def get_filtered_files(path: str) -> Generator[str, None, None]:
         for file in filenames:
             if not SKIP_FILES_REGEX.match(file):
                 yield dpath / file
-
-
-def should_skip_file(path: str) -> bool:
-    """Check if file should be skipped based on path patterns."""
-    normalized = path.replace("\\", "/")
-    for pattern in SKIP_PATTERNS:
-        if pattern.endswith("/"):
-            # Directory pattern: match only complete path segments to avoid
-            # false positives on names like "rebuild/" or "proto-utils/"
-            if normalized.startswith(pattern) or ("/" + pattern) in normalized:
-                return True
-        else:
-            if pattern in normalized:
-                return True
-    return False
-
 
 def _load_gitignore(folder_path: Path) -> Optional[pathspec.PathSpec]:
     """Load .gitignore from the folder root if it exists."""
