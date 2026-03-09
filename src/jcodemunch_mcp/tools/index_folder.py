@@ -1,5 +1,6 @@
 """Index local folder tool - walk, parse, summarize, save."""
 
+from collections.abc import Generator
 import hashlib
 import logging
 import os
@@ -7,6 +8,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Optional
+import re
 
 import pathspec
 
@@ -24,10 +26,27 @@ from ..security import (
     get_max_folder_files,
     get_extra_ignore_patterns,
     SKIP_PATTERNS,
+    SKIP_DIRECTORIES,
+    SKIP_FILES
 )
 from ..storage import IndexStore
 from ..storage.index_store import _file_hash, _get_git_head
 from ..summarizer import summarize_symbols
+
+SKIP_DIRS_REGEX = re.compile("^(" + "|".join(SKIP_DIRECTORIES) + ")")
+SKIP_FILES_REGEX = re.compile("^(" + "|".join(SKIP_FILES) + ")")
+
+def get_filtered_files(path: str) -> Generator[str, None, None]:
+    """Generator function to filter directories and files"""
+    # Use os.walk with followlinks=False to avoid infinite loops caused by
+    # NTFS junctions or symlinks pointing back to ancestor directories.
+    for dirpath, dirnames, filenames in os.walk(path, followlinks=False):
+        # Don't walk directories that should be skipped
+        dirnames[:] = [dir for dir in dirnames if not SKIP_DIRS_REGEX.match(dir)]
+        dpath = Path(dirpath)
+        for file in filenames:
+            if not SKIP_FILES_REGEX.match(f):
+                yield dpath / file
 
 
 def should_skip_file(path: str) -> bool:
@@ -161,7 +180,6 @@ def discover_local_files(
         "symlink": 0,
         "symlink_escape": 0,
         "path_traversal": 0,
-        "skip_pattern": 0,
         "gitignore": 0,
         "extra_ignore": 0,
         "secret": 0,
@@ -184,15 +202,8 @@ def discover_local_files(
         except Exception:
             pass
 
-    # Use os.walk with followlinks=False to avoid infinite loops caused by
-    # NTFS junctions or symlinks pointing back to ancestor directories.
-    raw_walk = (
-        Path(dirpath) / filename
-        for dirpath, dirnames, filenames in os.walk(str(folder_path), followlinks=False)
-        for filename in filenames
-    )
-    for file_path in raw_walk:
 
+    for file_path in get_filtered_files(str(folder_path)):
         # Symlink protection
         if not follow_symlinks and file_path.is_symlink():
             skip_counts["symlink"] += 1
@@ -215,12 +226,6 @@ def discover_local_files(
         except ValueError:
             skip_counts["path_traversal"] += 1
             logger.debug("SKIP relative_to_failed: %s", file_path)
-            continue
-
-        # Skip patterns
-        if should_skip_file(rel_path):
-            skip_counts["skip_pattern"] += 1
-            logger.debug("SKIP skip_pattern: %s", rel_path)
             continue
 
         # .gitignore matching (root + all nested .gitignore files)

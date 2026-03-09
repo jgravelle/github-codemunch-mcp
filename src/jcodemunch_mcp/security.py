@@ -146,6 +146,19 @@ SKIP_PATTERNS: frozenset[str] = frozenset({
     "*.xcodeproj/", "*.xcworkspace/", "DerivedData/", ".build/",
 })
 
+SKIP_DIRECTORIES = [
+    "node_modules", "vendor", "venv", ".venv", "__pycache__",
+    "dist", "build", ".git", ".tox", ".mypy_cache", "target",
+    ".gradle", "test_data", "testdata", "fixtures", "snapshots",
+    "migrations", "generated", "proto", ".*.xcodeproj", 
+    ".*.xcworkspace", "DerivedData", ".build"
+]
+
+SKIP_FILES = [
+    ".min.js", ".min.ts", ".bundle.js", 
+    "package-lock.json", "yarn.lock", "go.sum"
+]
+
 BINARY_EXTENSIONS = frozenset([
     # Executables
     ".exe", ".dll", ".so", ".dylib", ".bin", ".out",
