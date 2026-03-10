@@ -2816,7 +2816,7 @@ def _parse_luau_symbols(source_bytes: bytes, filename: str) -> list[Symbol]:
         for child in node.children:
             if child.type == "local":
                 is_local = True
-            elif child.type in ("identifier", "dot_index_expression", "method_index_expression"):
+            elif child.type in ("identifier", "dot_index_expression", "method_index_expression") and name_node is None:
                 name_node = child
             elif child.type == "parameters":
                 params_node = child
