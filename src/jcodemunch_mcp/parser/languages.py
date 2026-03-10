@@ -90,6 +90,7 @@ LANGUAGE_EXTENSIONS = {
     ".ejs": "ejs",
     ".verse": "verse",
     ".lua": "lua",
+    ".luau": "luau",
     ".erl": "erlang",
     ".hrl": "erlang",
     ".f90": "fortran",
@@ -879,6 +880,28 @@ LUA_SPEC = LanguageSpec(
 )
 
 
+# Luau specification (Roblox)
+# NOTE: Luau is Roblox's typed superset of Lua. The tree-sitter-luau grammar
+# uses the same ``function_declaration`` node type as Lua, with the same
+# ``name``, ``parameters``, and ``body`` fields, plus Luau-specific constructs:
+# - ``type_definition`` for ``type Foo = ...`` and ``export type Foo = ...``
+# - Typed parameters (``param: Type``) inside ``parameter`` children
+# - Return type annotations after the closing ``)``
+# Custom extraction is performed by _parse_luau_symbols() in extractor.py.
+LUAU_SPEC = LanguageSpec(
+    ts_language="luau",
+    symbol_node_types={},
+    name_fields={},
+    param_fields={},
+    return_type_fields={},
+    docstring_strategy="preceding_comment",
+    decorator_node_type=None,
+    container_node_types=[],
+    constant_patterns=[],
+    type_patterns=[],
+)
+
+
 # SQL specification
 # NOTE: The derekstride/tree-sitter-sql grammar has no named field accessors.
 # Names live in positional children (object_reference → identifier, or direct
@@ -927,6 +950,7 @@ LANGUAGE_REGISTRY = {
     "ejs": EJS_SPEC,
     "verse": VERSE_SPEC,
     "lua": LUA_SPEC,
+    "luau": LUAU_SPEC,
     "erlang": ERLANG_SPEC,
     "fortran": FORTRAN_SPEC,
     "sql": SQL_SPEC,

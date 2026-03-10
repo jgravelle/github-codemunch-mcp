@@ -40,6 +40,8 @@ def parse_file(content: str, filename: str, language: str) -> list[Symbol]:
         symbols = _parse_verse_symbols(source_bytes, filename)
     elif language == "lua":
         symbols = _parse_lua_symbols(source_bytes, filename)
+    elif language == "luau":
+        symbols = _parse_luau_symbols(source_bytes, filename)
     elif language == "erlang":
         symbols = _parse_erlang_symbols(source_bytes, filename)
     elif language == "fortran":
@@ -2726,6 +2728,191 @@ def _parse_lua_symbols(source_bytes: bytes, filename: str) -> list[Symbol]:
             signature=signature,
             docstring=docstring,
             parent=parent,
+            line=row + 1,
+            end_line=end_row + 1,
+            byte_offset=node.start_byte,
+            byte_length=len(sym_bytes),
+            content_hash=compute_content_hash(sym_bytes),
+        ))
+
+    _walk(tree.root_node)
+    symbols.sort(key=lambda s: s.line)
+    return symbols
+
+
+def _parse_luau_symbols(source_bytes: bytes, filename: str) -> list[Symbol]:
+    """Extract symbols from Luau (Roblox) source files using tree-sitter.
+
+    Luau is Roblox's typed superset of Lua.  Function declarations use the
+    same ``function_declaration`` node type as Lua, with ``name``,
+    ``parameters``, and ``body`` named fields:
+
+    - ``local function name(p: T): R`` — local function, ``identifier`` name child
+    - ``function Module.name(p: T): R`` — module function, ``dot_index_expression``
+    - ``function Module:name(p: T): R`` — OOP method, ``method_index_expression``
+
+    Additionally, Luau supports:
+    - ``type_definition`` — ``type Foo = ...`` and ``export type Foo = ...``
+      with an ``identifier`` name child
+    - Typed parameters and return type annotations (captured in signature text)
+
+    Preceding ``--`` line-comments are collected as docstrings.
+    """
+    from tree_sitter_language_pack import get_parser as _get_parser
+    parser = _get_parser("luau")
+    tree = parser.parse(source_bytes)
+
+    symbols: list[Symbol] = []
+
+    def _node_text(node) -> str:
+        return source_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
+
+    def _resolve_name(name_node) -> tuple[str, str, Optional[str]]:
+        """Return (name, qualified_name, parent) for a function name node."""
+        ntype = name_node.type
+        if ntype == "identifier":
+            name = _node_text(name_node)
+            return name, name, None
+        elif ntype == "dot_index_expression":
+            table_node = name_node.child_by_field_name("table")
+            field_node = name_node.child_by_field_name("field")
+            table = _node_text(table_node) if table_node else ""
+            field = _node_text(field_node) if field_node else _node_text(name_node)
+            return field, f"{table}.{field}", table or None
+        elif ntype == "method_index_expression":
+            table_node = name_node.child_by_field_name("table")
+            method_node = name_node.child_by_field_name("method")
+            table = _node_text(table_node) if table_node else ""
+            method = _node_text(method_node) if method_node else _node_text(name_node)
+            return method, f"{table}:{method}", table or None
+        else:
+            text = _node_text(name_node)
+            return text, text, None
+
+    def _collect_docstring(node) -> str:
+        """Collect preceding -- comment siblings as a docstring."""
+        comments: list[str] = []
+        prev = node.prev_named_sibling
+        while prev and prev.type == "comment":
+            raw = _node_text(prev)
+            line = raw.lstrip("-").strip()
+            comments.insert(0, line)
+            prev = prev.prev_named_sibling
+        return "\n".join(comments) if comments else ""
+
+    def _walk(node) -> None:
+        if node.type == "function_declaration":
+            _extract_luau_function(node)
+        elif node.type == "type_definition":
+            _extract_luau_type(node)
+        for child in node.children:
+            _walk(child)
+
+    def _extract_luau_function(node) -> None:
+        name_node = None
+        params_node = None
+        is_local = False
+
+        for child in node.children:
+            if child.type == "local":
+                is_local = True
+            elif child.type in ("identifier", "dot_index_expression", "method_index_expression"):
+                name_node = child
+            elif child.type == "parameters":
+                params_node = child
+
+        if name_node is None:
+            return
+
+        name, qualified_name, parent = _resolve_name(name_node)
+        if not name:
+            return
+
+        kind = "method" if name_node.type in ("dot_index_expression", "method_index_expression") else "function"
+        params_text = _node_text(params_node) if params_node else "()"
+        prefix = "local function" if is_local else "function"
+
+        # Capture return type annotation if present (between params ')' and 'block').
+        # The AST places a ':' token, then a type node (identifier, builtin_type,
+        # object_type, union_type, etc.) between the parameters and the block.
+        # Skip comment nodes that may appear in the same region.
+        return_type = ""
+        seen_params = False
+        seen_colon = False
+        for child in node.children:
+            if child.type == "parameters":
+                seen_params = True
+                seen_colon = False
+            elif seen_params and child.type == ":":
+                seen_colon = True
+            elif seen_params and child.type in ("block", "end"):
+                break
+            elif seen_params and child.type == "comment":
+                continue
+            elif seen_params and seen_colon:
+                return_type = _node_text(child)
+                break
+
+        signature = f"{prefix} {qualified_name}{params_text}"
+        if return_type:
+            signature += f": {return_type}"
+        docstring = _collect_docstring(node)
+
+        row, _ = node.start_point
+        end_row, _ = node.end_point
+        sym_bytes = source_bytes[node.start_byte:node.end_byte]
+
+        symbols.append(Symbol(
+            id=make_symbol_id(filename, qualified_name, kind),
+            file=filename,
+            name=name,
+            qualified_name=qualified_name,
+            kind=kind,
+            language="luau",
+            signature=signature,
+            docstring=docstring,
+            parent=parent,
+            line=row + 1,
+            end_line=end_row + 1,
+            byte_offset=node.start_byte,
+            byte_length=len(sym_bytes),
+            content_hash=compute_content_hash(sym_bytes),
+        ))
+
+    def _extract_luau_type(node) -> None:
+        """Extract ``type Foo = ...`` and ``export type Foo = ...`` definitions."""
+        name_node = node.child_by_field_name("name")
+        if name_node is None:
+            return
+
+        name = _node_text(name_node)
+        if not name:
+            return
+
+        is_export = any(child.type == "export" for child in node.children)
+        prefix = "export type" if is_export else "type"
+
+        # Build a compact signature from the full node text (first line only for brevity)
+        full_text = _node_text(node)
+        first_line = full_text.split("\n", 1)[0].rstrip()
+        signature = first_line
+
+        docstring = _collect_docstring(node)
+
+        row, _ = node.start_point
+        end_row, _ = node.end_point
+        sym_bytes = source_bytes[node.start_byte:node.end_byte]
+
+        symbols.append(Symbol(
+            id=make_symbol_id(filename, name, "type"),
+            file=filename,
+            name=name,
+            qualified_name=name,
+            kind="type",
+            language="luau",
+            signature=signature,
+            docstring=docstring,
+            parent=None,
             line=row + 1,
             end_line=end_row + 1,
             byte_offset=node.start_byte,
