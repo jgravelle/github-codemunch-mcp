@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.types import Tool, TextContent, Resource
 
 from . import __version__
 from .tools.index_repo import index_repo
@@ -329,6 +329,18 @@ async def list_tools() -> list[Tool]:
             }
         ),
     ]
+
+
+@server.list_resources()
+async def list_resources() -> list[Resource]:
+    """Return empty resource list for client compatibility (e.g. Windsurf)."""
+    return []
+
+
+@server.list_prompts()
+async def list_prompts() -> list:
+    """Return empty prompt list for client compatibility (e.g. Windsurf)."""
+    return []
 
 
 @server.call_tool()
