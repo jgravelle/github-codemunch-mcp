@@ -26,6 +26,7 @@ from .tools.search_text import search_text
 from .tools.get_repo_outline import get_repo_outline
 from .tools.find_importers import find_importers
 from .tools.find_references import find_references
+from .tools.search_columns import search_columns
 
 
 logger = logging.getLogger(__name__)
@@ -361,6 +362,33 @@ async def list_tools() -> list[Tool]:
                 "required": ["repo", "identifier"],
             },
         ),
+        Tool(
+            name="search_columns",
+            description="Search column metadata across indexed models. Works with any ecosystem provider that emits column data (dbt, SQLMesh, database catalogs, etc.). Returns model name, file path, column name, and description. Use instead of grep/search_text for column discovery — 77% fewer tokens.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Repository identifier (owner/repo or just repo name)"
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Search query (matches column names and descriptions)"
+                    },
+                    "model_pattern": {
+                        "type": "string",
+                        "description": "Optional glob to filter by model name (e.g., 'fact_*', 'dim_provider')"
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return",
+                        "default": 20
+                    }
+                },
+                "required": ["repo", "query"]
+            }
+        ),
     ]
 
 
@@ -517,6 +545,17 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     repo=arguments["repo"],
                     identifier=arguments["identifier"],
                     max_results=arguments.get("max_results", 50),
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "search_columns":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    search_columns,
+                    repo=arguments["repo"],
+                    query=arguments["query"],
+                    model_pattern=arguments.get("model_pattern"),
+                    max_results=arguments.get("max_results", 20),
                     storage_path=storage_path,
                 )
             )

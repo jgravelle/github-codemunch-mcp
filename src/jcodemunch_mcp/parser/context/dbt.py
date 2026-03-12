@@ -247,6 +247,16 @@ class DbtContextProvider(ContextProvider):
             return model.to_file_context()
         return None
 
+    def get_metadata(self) -> dict:
+        """Return dbt column metadata for index persistence."""
+        dbt_columns: dict[str, dict[str, str]] = {}
+        for model_name, model in self._models.items():
+            if model.columns:
+                dbt_columns[model_name] = dict(model.columns)
+        if not dbt_columns:
+            return {}
+        return {"dbt_columns": dbt_columns}
+
     def stats(self) -> dict:
         return {
             "doc_blocks": len(self._doc_blocks),

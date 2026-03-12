@@ -99,6 +99,120 @@ class TestExtractImportsPython:
         assert result[0]["names"] == []
 
 
+class TestExtractImportsSqlDbt:
+    """Test dbt ref() and source() extraction from SQL files."""
+
+    def test_basic_ref(self):
+        content = "SELECT * FROM {{ ref('dim_client') }}"
+        result = extract_imports(content, "models/fact_orders.sql", "sql")
+        assert len(result) == 1
+        assert result[0]["specifier"] == "dim_client"
+        assert result[0]["names"] == []
+
+    def test_multiple_refs(self):
+        content = (
+            "WITH clients AS (SELECT * FROM {{ ref('dim_client') }})\n"
+            ",orders AS (SELECT * FROM {{ ref('fact_order') }})\n"
+            "SELECT * FROM clients JOIN orders ON clients.id = orders.client_id"
+        )
+        result = extract_imports(content, "models/agg_summary.sql", "sql")
+        specifiers = [r["specifier"] for r in result]
+        assert "dim_client" in specifiers
+        assert "fact_order" in specifiers
+        assert len(result) == 2
+
+    def test_duplicate_ref_deduplicated(self):
+        content = (
+            "SELECT * FROM {{ ref('dim_client') }}\n"
+            "UNION ALL\n"
+            "SELECT * FROM {{ ref('dim_client') }}"
+        )
+        result = extract_imports(content, "models/combined.sql", "sql")
+        assert len(result) == 1
+        assert result[0]["specifier"] == "dim_client"
+
+    def test_source_extraction(self):
+        content = "SELECT * FROM {{ source('salesforce', 'accounts') }}"
+        result = extract_imports(content, "models/stg_accounts.sql", "sql")
+        assert len(result) == 1
+        assert result[0]["specifier"] == "source:salesforce.accounts"
+
+    def test_mixed_ref_and_source(self):
+        content = (
+            "WITH raw AS (SELECT * FROM {{ source('erp', 'gl_entries') }})\n"
+            ",dim AS (SELECT * FROM {{ ref('dim_date') }})\n"
+            "SELECT * FROM raw JOIN dim ON raw.date_sk = dim.date_sk"
+        )
+        result = extract_imports(content, "models/stg_gl.sql", "sql")
+        specifiers = [r["specifier"] for r in result]
+        assert "source:erp.gl_entries" in specifiers
+        assert "dim_date" in specifiers
+
+    def test_ref_with_whitespace_variants(self):
+        content = (
+            "SELECT * FROM {{ref('model_a')}}\n"
+            "UNION ALL\n"
+            "SELECT * FROM {{ ref('model_b') }}\n"
+            "UNION ALL\n"
+            "SELECT * FROM {{- ref('model_c') -}}\n"
+        )
+        result = extract_imports(content, "models/union.sql", "sql")
+        specifiers = [r["specifier"] for r in result]
+        assert "model_a" in specifiers
+        assert "model_b" in specifiers
+        assert "model_c" in specifiers
+
+    def test_ref_with_version(self):
+        content = "SELECT * FROM {{ ref('dim_client', v=2) }}"
+        result = extract_imports(content, "models/fact.sql", "sql")
+        assert len(result) == 1
+        assert result[0]["specifier"] == "dim_client"
+
+    def test_no_ref_no_source(self):
+        content = "SELECT id, name FROM my_table WHERE active = 1"
+        result = extract_imports(content, "scripts/query.sql", "sql")
+        assert result == []
+
+    def test_plain_sql_no_false_positives(self):
+        content = "-- ref to dim_client for documentation\nSELECT 1"
+        result = extract_imports(content, "scripts/notes.sql", "sql")
+        assert result == []
+
+
+class TestResolveSpecifierDbt:
+    """Test stem-matching resolution for dbt model names."""
+
+    SOURCE_FILES = {
+        "DBT/models/dim/dim_client.sql",
+        "DBT/models/fact/fact_orders.sql",
+        "DBT/models/staging/stg_accounts.sql",
+        "src/app.js",
+    }
+
+    def test_bare_model_name_resolves(self):
+        result = resolve_specifier("dim_client", "DBT/models/fact/fact_orders.sql", self.SOURCE_FILES)
+        assert result == "DBT/models/dim/dim_client.sql"
+
+    def test_bare_name_case_insensitive(self):
+        result = resolve_specifier("Dim_Client", "DBT/models/fact/fact_orders.sql", self.SOURCE_FILES)
+        assert result == "DBT/models/dim/dim_client.sql"
+
+    def test_source_specifier_unresolvable(self):
+        result = resolve_specifier("source:salesforce.accounts", "DBT/models/staging/stg_accounts.sql", self.SOURCE_FILES)
+        # source: specifiers contain dots, so they won't match the bare-name fallback
+        assert result is None
+
+    def test_bare_name_no_match(self):
+        result = resolve_specifier("nonexistent_model", "DBT/models/fact/fact_orders.sql", self.SOURCE_FILES)
+        assert result is None
+
+    def test_does_not_interfere_with_js_resolution(self):
+        """Stem matching should not break existing JS resolution."""
+        js_files = {"src/utils.js", "src/app.js"}
+        result = resolve_specifier("./utils", "src/app.js", js_files)
+        assert result == "src/utils.js"
+
+
 class TestExtractImportsUnsupported:
     """Unknown language returns empty list, no crash."""
 
@@ -292,6 +406,30 @@ class TestFindImporters:
         assert "note" in importers
         assert "Re-index" in importers["note"]
 
+    def test_dbt_ref_importer(self, tmp_path):
+        """find_importers for dim_client.sql should find models that ref('dim_client')."""
+        src = tmp_path / "src"
+        store = tmp_path / "store"
+
+        _write(src / "dim_client.sql", "SELECT id, name FROM raw_clients\n")
+        _write(src / "fact_orders.sql", "SELECT * FROM {{ ref('dim_client') }}\n")
+        _write(src / "agg_summary.sql", "SELECT * FROM {{ ref('dim_client') }}\n")
+        _write(src / "unrelated.sql", "SELECT 1\n")
+
+        result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
+        assert result["success"] is True
+
+        importers = find_importers(
+            repo=result["repo"],
+            file_path="dim_client.sql",
+            storage_path=str(store),
+        )
+        assert importers["importer_count"] == 2
+        importer_files = [i["file"] for i in importers["importers"]]
+        assert "fact_orders.sql" in importer_files
+        assert "agg_summary.sql" in importer_files
+        assert "dim_client.sql" not in importer_files
+
     def test_max_results_truncation(self, tmp_path):
         src = tmp_path / "src"
         store = tmp_path / "store"
@@ -406,6 +544,30 @@ class TestFindReferences:
         )
         assert "error" in result
 
+    def test_dbt_ref_reference(self, tmp_path):
+        """find_references('dim_client') should find SQL files that ref('dim_client')."""
+        src = tmp_path / "src"
+        store = tmp_path / "store"
+
+        _write(src / "dim_client.sql", "SELECT id, name FROM raw_clients\n")
+        _write(src / "fact_orders.sql", "SELECT * FROM {{ ref('dim_client') }}\n")
+        _write(src / "agg_summary.sql", "SELECT * FROM {{ ref('dim_client') }} JOIN {{ ref('fact_orders') }}\n")
+        _write(src / "unrelated.sql", "SELECT 1\n")
+
+        result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
+        assert result["success"] is True
+
+        refs = find_references(
+            repo=result["repo"],
+            identifier="dim_client",
+            storage_path=str(store),
+        )
+        assert refs["reference_count"] == 2
+        ref_files = [r["file"] for r in refs["references"]]
+        assert "fact_orders.sql" in ref_files
+        assert "agg_summary.sql" in ref_files
+        assert "unrelated.sql" not in ref_files
+
     def test_meta_tip_present(self, tmp_path):
         src = tmp_path / "src"
         store = tmp_path / "store"
@@ -445,6 +607,27 @@ class TestImportsPersistence:
         assert index is not None
         assert index.imports  # non-empty
         assert "app.js" in index.imports
+
+    def test_dbt_refs_saved_in_index(self, tmp_path):
+        src = tmp_path / "src"
+        store_path = tmp_path / "store"
+
+        _write(src / "dim_client.sql", "SELECT id, name FROM {{ source('crm', 'clients') }}\n")
+        _write(src / "fact_orders.sql", (
+            "WITH clients AS (SELECT * FROM {{ ref('dim_client') }})\n"
+            "SELECT * FROM clients\n"
+        ))
+
+        result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store_path))
+        assert result["success"] is True
+
+        store = IndexStore(base_path=str(store_path))
+        owner, name = result["repo"].split("/", 1)
+        index = store.load_index(owner, name)
+        assert index.imports is not None
+        assert "fact_orders.sql" in index.imports
+        refs = [i["specifier"] for i in index.imports["fact_orders.sql"]]
+        assert "dim_client" in refs
 
     def test_imports_merged_on_incremental(self, tmp_path):
         src = tmp_path / "src"

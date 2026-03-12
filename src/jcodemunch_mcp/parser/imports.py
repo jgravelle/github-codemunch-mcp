@@ -244,6 +244,37 @@ def _extract_haskell_imports(content: str) -> list[dict]:
     return [{"specifier": m.group(1), "names": []} for m in _HASKELL_IMPORT.finditer(content)]
 
 
+# SQL/dbt: {{ ref('model_name') }} and {{ source('source', 'table') }}
+_DBT_REF = re.compile(
+    r"""\{\{[\s-]*ref\s*\(\s*['"]([^'"]+)['"]\s*(?:,\s*v\s*=\s*\d+\s*)?\)\s*[\s-]*\}\}"""
+)
+_DBT_SOURCE = re.compile(
+    r"""\{\{[\s-]*source\s*\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*\)\s*[\s-]*\}\}"""
+)
+
+
+def _extract_sql_dbt_imports(content: str) -> list[dict]:
+    """Extract dbt ref() and source() calls as import edges."""
+    edges = []
+    seen: set[str] = set()
+
+    for m in _DBT_REF.finditer(content):
+        model_name = m.group(1)
+        if model_name not in seen:
+            seen.add(model_name)
+            edges.append({"specifier": model_name, "names": []})
+
+    for m in _DBT_SOURCE.finditer(content):
+        source_name = m.group(1)
+        table_name = m.group(2)
+        specifier = f"source:{source_name}.{table_name}"
+        if specifier not in seen:
+            seen.add(specifier)
+            edges.append({"specifier": specifier, "names": []})
+
+    return edges
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -268,6 +299,7 @@ _LANGUAGE_EXTRACTORS = {
     "swift": _extract_swift_imports,
     "scala": _extract_scala_imports,
     "haskell": _extract_haskell_imports,
+    "sql": _extract_sql_dbt_imports,
 }
 
 
@@ -339,5 +371,15 @@ def resolve_specifier(specifier: str, importer_path: str, source_files: set[str]
     for c in _candidates(specifier):
         if c in source_files:
             return c
+
+    # Stem matching fallback: bare names like dbt ref('dim_client')
+    # resolve to any .sql file whose stem matches.
+    spec_lower = specifier.lower()
+    if not posixpath.sep in specifier and "/" not in specifier and "." not in specifier:
+        for sf in source_files:
+            if sf.endswith(".sql"):
+                stem = posixpath.splitext(posixpath.basename(sf))[0].lower()
+                if stem == spec_lower:
+                    return sf
 
     return None

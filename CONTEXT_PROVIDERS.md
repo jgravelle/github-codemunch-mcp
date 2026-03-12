@@ -8,6 +8,7 @@ This metadata flows into:
 - **AI summaries** — providers inject business context into summarization prompts, producing summaries that reflect what the code *means*, not just what it *does*
 - **File summaries** — model descriptions, tags, and property counts appear in file-level overviews
 - **Search keywords** — tags and property names become searchable terms in `search_symbols`
+- **Column search** — providers that emit column metadata enable the `search_columns` tool for structured column discovery
 
 Context enrichment is **automatic** — no configuration required. Providers self-detect during `index_folder` and activate when their ecosystem is present.
 
@@ -140,6 +141,12 @@ index_folder()
   │         → set symbol.ecosystem_context (for AI prompt)
   │         → extend symbol.keywords (for search)
   │
+  ├─ collect_metadata(providers)
+  │    └─ For each provider:
+  │         provider.get_metadata() → {"dbt_columns": {...}, ...}
+  │         → persisted in index.context_metadata
+  │         → powers search_columns tool
+  │
   ├─ Summarize symbols (AI sees ecosystem_context)
   │
   └─ Generate file summaries (providers consulted per-file)
@@ -171,7 +178,10 @@ class ContextProvider(ABC):
     def load(self, folder_path: Path) -> None          # Parse its metadata
     def get_file_context(self, path: str) -> FileContext | None  # Per-file lookup
     def stats(self) -> dict                            # Enrichment statistics
+    def get_metadata(self) -> dict                     # Structured metadata for index (optional override)
 ```
+
+The `get_metadata()` method returns a dict that gets persisted in `index.context_metadata`. Keys should be namespaced by provider (e.g., `"dbt_columns"`). Keys ending in `_columns` are auto-discovered by the `search_columns` tool.
 
 ---
 
@@ -240,7 +250,50 @@ If your provider needs extra packages, add them to `pyproject.toml`:
 terraform = ["python-hcl2>=4.0"]
 ```
 
-### 4. Test it
+### 4. Expose column metadata (optional)
+
+If your ecosystem has column-level information (database schemas, model fields, table catalogs), you can make it searchable via the `search_columns` tool by overriding `get_metadata()`.
+
+**The convention:** emit a key ending in `_columns` whose value is `{model_name: {col_name: col_desc}}`.
+
+```python
+def get_metadata(self) -> dict:
+    """Return column metadata for search_columns."""
+    columns: dict[str, dict[str, str]] = {}
+    for model_name, model in self._models.items():
+        if model.columns:
+            columns[model_name] = dict(model.columns)
+    if not columns:
+        return {}
+    return {"terraform_columns": columns}  # key = {provider}_columns
+```
+
+That's it. `search_columns` auto-discovers any `*_columns` key in `context_metadata` — no changes to the tool itself are needed. When multiple providers contribute columns, results include a `source` field so users can distinguish origins.
+
+**What the key name controls:**
+- `"dbt_columns"` → source shown as `"dbt"`
+- `"sqlmesh_columns"` → source shown as `"sqlmesh"`
+- `"catalog_columns"` → source shown as `"catalog"`
+
+The suffix `_columns` is stripped to derive the display name.
+
+**Required shape:**
+
+```python
+{
+    "{provider}_columns": {
+        "model_or_table_name": {
+            "column_name": "Human-readable description",
+            "another_column": "Another description",
+        },
+        "another_model": { ... }
+    }
+}
+```
+
+Descriptions should be plain text (resolve any template references like Jinja `{{ doc() }}` at index time, not search time). Empty descriptions are allowed — the column will still be searchable by name.
+
+### 5. Test it
 
 ```python
 def test_terraform_provider():
@@ -249,22 +302,34 @@ def test_terraform_provider():
     assert any(p.name == "terraform" for p in providers)
 ```
 
+```python
+def test_terraform_column_metadata():
+    from jcodemunch_mcp.parser.context import discover_providers, collect_metadata
+    providers = discover_providers(Path("/path/to/terraform/project"))
+    metadata = collect_metadata(providers)
+    # Verify columns are emitted under the right key
+    assert "terraform_columns" in metadata
+    assert isinstance(metadata["terraform_columns"], dict)
+```
+
 ---
 
 ## Provider Ideas
 
 Potential future providers for community contribution:
 
-| Provider       | Detects                   | Could Enrich With                                    |
-| -------------- | ------------------------- | ---------------------------------------------------- |
-| Terraform      | `*.tf` files              | Resource descriptions, variable docs, module metadata |
-| OpenAPI        | `openapi.yaml`/`swagger.json` | Endpoint descriptions, parameter schemas         |
-| Django         | `manage.py` + `models.py` | Model field descriptions, admin labels              |
-| Helm           | `Chart.yaml`              | Chart descriptions, value documentation              |
-| Protobuf       | `*.proto`                 | Service/message comments, field descriptions         |
-| SQLAlchemy     | `models.py` with `Column` | Column docs, table comments                         |
-| AsyncAPI       | `asyncapi.yaml`           | Channel descriptions, message schemas                |
-| GraphQL        | `schema.graphql`          | Type/field descriptions                              |
+| Provider       | Detects                   | Could Enrich With                                    | Column metadata? |
+| -------------- | ------------------------- | ---------------------------------------------------- | ---------------- |
+| SQLMesh        | `config.yaml` + models    | Model descriptions, column lineage, audits           | Yes — `sqlmesh_columns` |
+| Terraform      | `*.tf` files              | Resource descriptions, variable docs, module metadata | No |
+| OpenAPI        | `openapi.yaml`/`swagger.json` | Endpoint descriptions, parameter schemas         | Yes — schema properties |
+| Django         | `manage.py` + `models.py` | Model field descriptions, admin labels               | Yes — `django_columns` |
+| SQLAlchemy     | `models.py` with `Column` | Column docs, table comments                          | Yes — `sqlalchemy_columns` |
+| DB catalog     | Connection config         | `INFORMATION_SCHEMA` column comments                 | Yes — `catalog_columns` |
+| Protobuf       | `*.proto`                 | Service/message comments, field descriptions         | Yes — message fields |
+| GraphQL        | `schema.graphql`          | Type/field descriptions                              | Yes — type fields |
+| Helm           | `Chart.yaml`              | Chart descriptions, value documentation              | No |
+| AsyncAPI       | `asyncapi.yaml`           | Channel descriptions, message schemas                | No |
 
 ---
 

@@ -15,7 +15,7 @@ import pathspec
 logger = logging.getLogger(__name__)
 
 from ..parser import parse_file, LANGUAGE_EXTENSIONS, get_language_for_path
-from ..parser.context import discover_providers, enrich_symbols, ContextProvider
+from ..parser.context import discover_providers, enrich_symbols, collect_metadata, ContextProvider
 from ..parser.imports import extract_imports
 from ..summarizer import generate_file_summaries
 from ..security import (
@@ -470,6 +470,9 @@ def index_folder(
 
             git_head = _get_git_head(folder_path) or ""
 
+            # Collect structured metadata from providers (always full refresh)
+            incr_context_metadata = collect_metadata(active_providers) if active_providers else None
+
             updated = store.incremental_save(
                 owner=owner, name=repo_name,
                 changed_files=changed, new_files=new, deleted_files=deleted,
@@ -479,6 +482,7 @@ def index_folder(
                 file_summaries=incr_file_summaries,
                 file_languages=incr_file_languages,
                 imports=incr_file_imports,
+                context_metadata=incr_context_metadata,
             )
 
             result = {
@@ -553,6 +557,9 @@ def index_folder(
                 if imps:
                     file_imports[rel_path] = imps
 
+        # Collect structured metadata from providers
+        full_context_metadata = collect_metadata(active_providers) if active_providers else None
+
         # Save index
         # Track hashes for all discovered source files so incremental change detection
         # does not repeatedly report no-symbol files as "new".
@@ -574,6 +581,7 @@ def index_folder(
             file_languages=file_languages,
             display_name=folder_path.name,
             imports=file_imports,
+            context_metadata=full_context_metadata,
         )
 
         result = {

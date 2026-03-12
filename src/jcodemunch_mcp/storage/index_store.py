@@ -58,6 +58,7 @@ class CodeIndex:
     file_languages: dict[str, str] = field(default_factory=dict)  # file_path -> language
     display_name: str = ""       # User-facing name (for local hashed repo IDs)
     imports: Optional[dict[str, list[dict]]] = None  # file_path -> [{specifier, names}]; None = not indexed yet (pre-v1.3.0)
+    context_metadata: dict = field(default_factory=dict)  # Provider metadata (e.g., dbt_columns)
 
     def __post_init__(self) -> None:
         if not self.display_name:
@@ -290,6 +291,7 @@ class IndexStore:
         file_languages: Optional[dict[str, str]] = None,
         display_name: str = "",
         imports: Optional[dict[str, list[dict]]] = None,
+        context_metadata: Optional[dict] = None,
     ) -> "CodeIndex":
         """Save index and raw files to storage."""
         normalized_source_files = sorted(dict.fromkeys(source_files or list(raw_files.keys())))
@@ -322,6 +324,7 @@ class IndexStore:
             file_languages=merged_file_languages,
             display_name=display_name or name,
             imports=imports if imports is not None else {},
+            context_metadata=context_metadata or {},
         )
 
         # Save index JSON atomically: write to temp then rename
@@ -395,6 +398,7 @@ class IndexStore:
             file_languages=file_languages,
             display_name=data.get("display_name", stored_name),
             imports=data["imports"] if "imports" in data else None,
+            context_metadata=data.get("context_metadata", {}),
         )
 
     def get_symbol_content(self, owner: str, name: str, symbol_id: str, _index: Optional["CodeIndex"] = None) -> Optional[str]:
@@ -482,6 +486,7 @@ class IndexStore:
         file_summaries: Optional[dict[str, str]] = None,
         file_languages: Optional[dict[str, str]] = None,
         imports: Optional[dict[str, list[dict]]] = None,
+        context_metadata: Optional[dict] = None,
     ) -> Optional[CodeIndex]:
         """Incrementally update an existing index.
 
@@ -569,6 +574,7 @@ class IndexStore:
             file_languages={fp: merged_file_languages[fp] for fp in updated_source_files if fp in merged_file_languages},
             display_name=index.display_name,
             imports=merged_imports,
+            context_metadata=context_metadata if context_metadata else index.context_metadata,
         )
 
         # Save atomically
@@ -694,4 +700,5 @@ class IndexStore:
             "file_languages": index.file_languages,
             "display_name": index.display_name,
             **({} if index.imports is None else {"imports": index.imports}),
+            **({"context_metadata": index.context_metadata} if index.context_metadata else {}),
         }

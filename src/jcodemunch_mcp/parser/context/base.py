@@ -105,6 +105,24 @@ class ContextProvider(ABC):
         """Return provider-specific stats for the index response."""
         ...
 
+    def get_metadata(self) -> dict:
+        """Return structured metadata to persist in the index.
+
+        Override in subclasses to expose searchable metadata.
+        Keys should be namespaced by provider (e.g., 'dbt_columns').
+
+        Column metadata convention:
+            To expose columns for ``search_columns``, emit a key ending in
+            ``_columns`` whose value is ``{model_name: {col_name: col_desc}}``.
+            Example::
+
+                {"dbt_columns": {"fact_orders": {"order_id": "Primary key", ...}}}
+
+            Any provider following this convention will be automatically
+            discovered by ``search_columns`` — no tool-side changes needed.
+        """
+        return {}
+
 
 # -- Registry of known providers --
 
@@ -133,6 +151,19 @@ def discover_providers(folder_path: Path) -> list[ContextProvider]:
         except Exception as e:
             logger.warning("Context provider '%s' failed: %s", cls.__name__, e)
     return active
+
+
+def collect_metadata(providers: list[ContextProvider]) -> dict:
+    """Collect structured metadata from all active providers for index persistence."""
+    metadata: dict = {}
+    for provider in providers:
+        try:
+            provider_meta = provider.get_metadata()
+            if provider_meta:
+                metadata.update(provider_meta)
+        except Exception as e:
+            logger.warning("Metadata collection from '%s' failed: %s", provider.name, e)
+    return metadata
 
 
 def enrich_symbols(symbols: list, providers: list[ContextProvider]) -> None:
