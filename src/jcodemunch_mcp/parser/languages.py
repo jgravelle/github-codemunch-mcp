@@ -133,6 +133,9 @@ LANGUAGE_EXTENSIONS = {
     # AutoHotkey v2
     ".ahk": "autohotkey",
     ".ahk2": "autohotkey",
+    # XML / XUL
+    ".xml": "xml",
+    ".xul": "xml",
 }
 
 
@@ -1184,6 +1187,30 @@ AHK_SPEC = LanguageSpec(
 )
 
 
+# XML / XUL specification
+# NOTE: XML and XUL (Mozilla's XML User Interface Language) share the same
+# tree-sitter-xml grammar. XUL is a strict XML superset — same node types,
+# same attributes. Custom extraction is performed by _parse_xml_symbols()
+# in extractor.py, which extracts:
+#   - Document root element (e.g. <window>, <page>) → type symbol
+#   - Elements with id attributes (e.g. <textbox id="search">) → constant symbols
+#   - <script src="..."> references → function symbols
+# Fields below are intentionally empty — all extraction logic lives in
+# _parse_xml_symbols().
+XML_SPEC = LanguageSpec(
+    ts_language="xml",
+    symbol_node_types={},
+    name_fields={},
+    param_fields={},
+    return_type_fields={},
+    docstring_strategy="preceding_comment",
+    decorator_node_type=None,
+    container_node_types=[],
+    constant_patterns=[],
+    type_patterns=[],
+)
+
+
 # Language registry
 LANGUAGE_REGISTRY = {
     "python": PYTHON_SPEC,
@@ -1228,6 +1255,7 @@ LANGUAGE_REGISTRY = {
     "hcl": HCL_SPEC,
     "graphql": GRAPHQL_SPEC,
     "autohotkey": AHK_SPEC,
+    "xml": XML_SPEC,
 }
 
 logger = logging.getLogger(__name__)

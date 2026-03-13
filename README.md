@@ -368,6 +368,7 @@ Every tool response includes a `_meta` envelope with timing, token savings, and 
 | Elixir     | `.ex`, `.exs` | class (module/impl), type (protocol/@type/@callback), method, function |
 | Ruby       | `.rb`, `.rake` | class, type (module), method, function |
 | SQL        | `.sql`         | function (CREATE FUNCTION, CTE, dbt macro/test/materialization), type (CREATE TABLE/VIEW/SCHEMA/INDEX, dbt snapshot) |
+| XML/XUL    | `.xml`, `.xul` | type (root element), constant (id attributes), function (script refs) |
 
 \* `.h` is parsed as C++ first, then falls back to C when no C++ symbols are extracted.
 

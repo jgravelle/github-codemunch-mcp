@@ -1930,3 +1930,130 @@ def test_vue_extension_mapping():
     """.vue extension maps to vue language."""
     from jcodemunch_mcp.parser.languages import get_language_for_path
     assert get_language_for_path("src/components/Counter.vue") == "vue"
+
+
+XML_SOURCE = '''\
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Configuration for the sample application -->
+<config id="app-config" version="2.0">
+  <!-- Database connection settings -->
+  <database id="db-primary" type="postgresql">
+    <host>localhost</host>
+    <port>5432</port>
+  </database>
+  <!-- Cache layer -->
+  <cache id="redis-cache" driver="redis">
+    <ttl>3600</ttl>
+  </cache>
+  <script type="text/javascript" src="config/validator.js"/>
+  <script type="text/javascript" src="lib/helpers.js"/>
+</config>
+'''
+
+XUL_SOURCE = '''\
+<?xml version="1.0"?>
+<!-- Main application window -->
+<window id="main-window" title="My Application"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+  <!-- Search controls -->
+  <textbox id="search-input" placeholder="Search..."/>
+  <button id="search-button" label="Search"/>
+  <!-- Options menu -->
+  <menulist id="options-menu">
+    <menupopup>
+      <menuitem label="Option 1"/>
+      <menuitem label="Option 2"/>
+    </menupopup>
+  </menulist>
+  <script type="application/javascript" src="chrome://app/content/main.js"/>
+  <script type="application/javascript" src="utils.js"/>
+</window>
+'''
+
+
+def test_parse_xml():
+    """Test XML parsing."""
+    symbols = parse_file(XML_SOURCE, "sample.xml", "xml")
+
+    # Root element → type
+    root = next((s for s in symbols if s.name == "config" and s.kind == "type"), None)
+    assert root is not None
+    assert "config" in root.signature
+
+    # Root also has id attribute → constant
+    root_id = next((s for s in symbols if s.name == "app-config" and s.kind == "constant"), None)
+    assert root_id is not None
+
+    # Elements with id attributes → constants
+    db = next((s for s in symbols if s.name == "db-primary"), None)
+    assert db is not None
+    assert db.kind == "constant"
+    assert "Database connection" in db.docstring
+
+    cache = next((s for s in symbols if s.name == "redis-cache"), None)
+    assert cache is not None
+    assert cache.kind == "constant"
+    assert "Cache layer" in cache.docstring
+
+    # Script references → functions
+    validator = next((s for s in symbols if s.name == "validator.js"), None)
+    assert validator is not None
+    assert validator.kind == "function"
+    assert validator.qualified_name == "config/validator.js"
+
+    helpers = next((s for s in symbols if s.name == "helpers.js"), None)
+    assert helpers is not None
+    assert helpers.kind == "function"
+
+    # All symbols should be xml language
+    assert all(s.language == "xml" for s in symbols)
+
+
+def test_parse_xul():
+    """Test XUL parsing (parsed as XML)."""
+    symbols = parse_file(XUL_SOURCE, "app.xul", "xml")
+
+    # Root window → type
+    window = next((s for s in symbols if s.name == "window" and s.kind == "type"), None)
+    assert window is not None
+    assert "window" in window.signature
+    assert "Main application window" in window.docstring
+
+    # UI elements with ids → constants
+    search_input = next((s for s in symbols if s.name == "search-input"), None)
+    assert search_input is not None
+    assert search_input.kind == "constant"
+    assert "Search controls" in search_input.docstring
+
+    search_btn = next((s for s in symbols if s.name == "search-button"), None)
+    assert search_btn is not None
+    assert search_btn.kind == "constant"
+
+    options_menu = next((s for s in symbols if s.name == "options-menu"), None)
+    assert options_menu is not None
+    assert options_menu.kind == "constant"
+
+    # Script references → functions
+    main_js = next((s for s in symbols if s.name == "main.js"), None)
+    assert main_js is not None
+    assert main_js.kind == "function"
+    assert main_js.qualified_name == "chrome://app/content/main.js"
+
+    utils_js = next((s for s in symbols if s.name == "utils.js"), None)
+    assert utils_js is not None
+    assert utils_js.kind == "function"
+
+    # Window root has id → also produces a constant
+    main_window_id = next((s for s in symbols if s.name == "main-window" and s.kind == "constant"), None)
+    assert main_window_id is not None
+
+    # All xml language
+    assert all(s.language == "xml" for s in symbols)
+
+
+def test_xml_extension_mapping():
+    """.xml and .xul extensions map to xml language."""
+    from jcodemunch_mcp.parser.languages import get_language_for_path
+    assert get_language_for_path("config/settings.xml") == "xml"
+    assert get_language_for_path("ui/main.xul") == "xml"
+    assert get_language_for_path("data/UPPER.XML") == "xml"

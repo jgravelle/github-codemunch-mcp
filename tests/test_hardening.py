@@ -485,6 +485,38 @@ int only_c(void) { int v[] = (int[]){1,2,3}; return v[0]; }
         fmt = _by_name(symbols, "format_name")
         assert fmt.kind == "function"
 
+    # -- XML / XUL -------------------------------------------------------
+
+    def test_xml_root_element(self):
+        content, fname = _fixture("xml", "sample.xml")
+        symbols = parse_file(content, fname, "xml")
+        root = _by_name(symbols, "config")
+        assert root.kind == "type"
+
+    def test_xml_id_elements(self):
+        content, fname = _fixture("xml", "sample.xml")
+        symbols = parse_file(content, fname, "xml")
+        db = _by_name(symbols, "db-primary")
+        assert db.kind == "constant"
+
+    def test_xml_script_refs(self):
+        content, fname = _fixture("xml", "sample.xml")
+        symbols = parse_file(content, fname, "xml")
+        script = _by_name(symbols, "validator.js")
+        assert script.kind == "function"
+
+    def test_xul_window_root(self):
+        content, fname = _fixture("xml", "sample.xul")
+        symbols = parse_file(content, fname, "xml")
+        window = _by_name(symbols, "window")
+        assert window.kind == "type"
+
+    def test_xul_element_kind(self):
+        content, fname = _fixture("xml", "sample.xul")
+        symbols = parse_file(content, fname, "xml")
+        btn = _by_name(symbols, "search-button")
+        assert btn.kind == "constant"
+
 
 # ===========================================================================
 # 2. Overload Disambiguation
@@ -573,6 +605,7 @@ class TestDeterminism:
         ("cpp", "sample.cpp"),
         ("elixir", "sample.ex"),
         ("ruby", "sample.rb"),
+        ("xml", "sample.xml"),
     ])
     def test_deterministic_ids_and_hashes(self, language, filename):
         content, fname = _fixture(language, filename)

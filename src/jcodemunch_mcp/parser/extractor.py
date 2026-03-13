@@ -62,6 +62,8 @@ def parse_file(content: str, filename: str, language: str) -> list[Symbol]:
         symbols = _parse_groovy_symbols(source_bytes, filename)
     elif language == "autohotkey":
         symbols = _parse_autohotkey_symbols(source_bytes, filename)
+    elif language == "xml":
+        symbols = _parse_xml_symbols(source_bytes, filename)
     else:
         spec = LANGUAGE_REGISTRY[language]
         symbols = _parse_with_spec(source_bytes, filename, language, spec)
@@ -4315,4 +4317,213 @@ def _parse_autohotkey_symbols(source_bytes: bytes, filename: str) -> list[Symbol
         )
         symbols.append(sym)
 
+    return symbols
+
+
+def _parse_xml_symbols(source_bytes: bytes, filename: str) -> list[Symbol]:
+    """Parse XML/XUL source and extract meaningful symbols.
+
+    XML and XUL (Mozilla's XML User Interface Language) share the same
+    tree-sitter-xml grammar.  Unlike code languages, XML has no functions
+    or classes — the extractable symbols are:
+
+      - Document root element (<window>, <page>, <root>) -> type symbol
+      - Elements with id attributes (<textbox id="search">) -> constant symbols
+      - <script src="..."> references -> function symbols
+
+    Preceding <!-- ... --> comments are captured as docstrings.
+    """
+    try:
+        parser = get_parser("xml")
+    except Exception:
+        return []
+
+    tree = parser.parse(source_bytes)
+    source = source_bytes.decode("utf-8", errors="replace")
+    symbols: list[Symbol] = []
+    root_extracted = False
+
+    def _tag_name(node) -> Optional[str]:
+        """Extract the tag name from an element node.
+
+        For element nodes, the tag name is the first Name child inside
+        the STag or EmptyElemTag child.
+        """
+        for child in node.children:
+            if child.type in ("STag", "EmptyElemTag"):
+                for sub in child.children:
+                    if sub.type == "Name":
+                        return source[sub.start_byte:sub.end_byte]
+                return None
+        return None
+
+    def _get_attr(node, attr_name: str) -> Optional[str]:
+        """Get the value of a named attribute from an element node.
+
+        Walks through the element's STag or EmptyElemTag to find
+        Attribute children, then matches by Name and extracts AttValue.
+        """
+        for child in node.children:
+            if child.type in ("STag", "EmptyElemTag"):
+                for attr in child.children:
+                    if attr.type == "Attribute":
+                        a_name = None
+                        a_value = None
+                        for sub in attr.children:
+                            if sub.type == "Name":
+                                a_name = source[sub.start_byte:sub.end_byte]
+                            elif sub.type == "AttValue":
+                                # AttValue includes surrounding quotes
+                                raw = source[sub.start_byte:sub.end_byte]
+                                a_value = raw.strip('"').strip("'")
+                        if a_name == attr_name and a_value is not None:
+                            return a_value
+        return None
+
+    def _preceding_comment(node) -> str:
+        """Collect preceding <!-- ... --> XML comment siblings as a docstring.
+
+        In tree-sitter-xml, CharData whitespace nodes sit between Comment and
+        element siblings, so we skip over them.  For root elements whose
+        prev sibling is the prolog, we look for Comments inside the prolog.
+        """
+        lines: list[str] = []
+        prev = node.prev_named_sibling
+
+        # Skip CharData whitespace to find Comments
+        while prev and prev.type == "CharData":
+            prev = prev.prev_named_sibling
+
+        # For root elements, comments may be inside the prolog
+        if prev and prev.type == "prolog":
+            # Walk prolog children in reverse to find trailing Comments
+            for child in reversed(prev.children):
+                if child.type == "Comment":
+                    raw = source[child.start_byte:child.end_byte]
+                    if raw.startswith("<!--"):
+                        raw = raw[4:]
+                    if raw.endswith("-->"):
+                        raw = raw[:-3]
+                    raw = raw.strip()
+                    if raw:
+                        lines.insert(0, raw)
+                elif child.type != "CharData":
+                    break  # Stop at non-comment, non-whitespace
+            return "\n".join(lines) if lines else ""
+
+        while prev and prev.type == "Comment":
+            raw = source[prev.start_byte:prev.end_byte]
+            # Strip <!-- and --> delimiters
+            if raw.startswith("<!--"):
+                raw = raw[4:]
+            if raw.endswith("-->"):
+                raw = raw[:-3]
+            raw = raw.strip()
+            if raw:
+                lines.insert(0, raw)
+            prev = prev.prev_named_sibling
+            # Skip CharData whitespace between consecutive comments
+            while prev and prev.type == "CharData":
+                prev = prev.prev_named_sibling
+        return "\n".join(lines) if lines else ""
+
+    def _walk(node) -> None:
+        nonlocal root_extracted
+
+        if node.type == "element":
+            tag = _tag_name(node)
+            if not tag:
+                for child in node.children:
+                    _walk(child)
+                return
+
+            # 1. Document root element -> type symbol
+            if not root_extracted and node.parent and node.parent.type == "document":
+                root_extracted = True
+                # Build signature from tag + key attributes
+                attrs = []
+                elem_id = _get_attr(node, "id")
+                title = _get_attr(node, "title")
+                xmlns = _get_attr(node, "xmlns")
+                if elem_id:
+                    attrs.append(f'id="{elem_id}"')
+                if title:
+                    attrs.append(f'title="{title}"')
+                if xmlns:
+                    # Shorten long namespace URIs
+                    short_ns = xmlns.rsplit("/", 1)[-1] if "/" in xmlns else xmlns
+                    attrs.append(f'xmlns="...{short_ns}"')
+                attr_str = " " + " ".join(attrs) if attrs else ""
+                signature = f"<{tag}{attr_str}>"
+                docstring = _preceding_comment(node)
+
+                sym = Symbol(
+                    id=make_symbol_id(filename, tag, "type"),
+                    file=filename,
+                    name=tag,
+                    qualified_name=tag,
+                    kind="type",
+                    language="xml",
+                    signature=signature,
+                    docstring=docstring,
+                    line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    byte_offset=node.start_byte,
+                    byte_length=node.end_byte - node.start_byte,
+                    content_hash=compute_content_hash(source_bytes[node.start_byte:node.end_byte]),
+                )
+                symbols.append(sym)
+
+            # 2. <script src="..."> references -> function symbol
+            if tag == "script":
+                src = _get_attr(node, "src")
+                if src:
+                    name = src.rsplit("/", 1)[-1] if "/" in src else src
+                    signature = f'<script src="{src}"/>'
+                    docstring = _preceding_comment(node)
+
+                    sym = Symbol(
+                        id=make_symbol_id(filename, name, "function"),
+                        file=filename,
+                        name=name,
+                        qualified_name=src,
+                        kind="function",
+                        language="xml",
+                        signature=signature,
+                        docstring=docstring,
+                        line=node.start_point[0] + 1,
+                        end_line=node.end_point[0] + 1,
+                        byte_offset=node.start_byte,
+                        byte_length=node.end_byte - node.start_byte,
+                        content_hash=compute_content_hash(source_bytes[node.start_byte:node.end_byte]),
+                    )
+                    symbols.append(sym)
+
+            # 3. Elements with id attribute -> constant symbol
+            elem_id = _get_attr(node, "id")
+            if elem_id:
+                signature = f'<{tag} id="{elem_id}"/>'
+                docstring = _preceding_comment(node)
+
+                sym = Symbol(
+                    id=make_symbol_id(filename, elem_id, "constant"),
+                    file=filename,
+                    name=elem_id,
+                    qualified_name=elem_id,
+                    kind="constant",
+                    language="xml",
+                    signature=signature,
+                    docstring=docstring,
+                    line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    byte_offset=node.start_byte,
+                    byte_length=node.end_byte - node.start_byte,
+                    content_hash=compute_content_hash(source_bytes[node.start_byte:node.end_byte]),
+                )
+                symbols.append(sym)
+
+        for child in node.children:
+            _walk(child)
+
+    _walk(tree.root_node)
     return symbols
