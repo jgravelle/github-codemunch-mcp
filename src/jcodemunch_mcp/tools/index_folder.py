@@ -34,7 +34,7 @@ from ..storage import IndexStore
 from ..storage.index_store import _file_hash, _get_git_head
 from ..summarizer import summarize_symbols
 
-SKIP_DIRS_REGEX = re.compile("^(" + "|".join(SKIP_DIRECTORIES) + ")")
+SKIP_DIRS_REGEX = re.compile("^(" + "|".join(SKIP_DIRECTORIES) + ")$")
 SKIP_FILES_REGEX = re.compile("(" + "|".join(re.escape(p) for p in SKIP_FILES) + ")$")
 
 def get_filtered_files(path: str) -> Generator[str, None, None]:
