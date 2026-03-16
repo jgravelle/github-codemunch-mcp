@@ -964,6 +964,51 @@ def _extract_constant(
             content_hash=c_hash,
         )
 
+    # JS/TS: const FOO = ..., export const bar = query({...}), etc.
+    if node.type in ("lexical_declaration", "variable_declaration"):
+        for child in node.children:
+            if child.type == "variable_declarator":
+                name_node = child.child_by_field_name("name")
+                if not name_node or name_node.type != "identifier":
+                    continue
+                name = source_bytes[name_node.start_byte:name_node.end_byte].decode(
+                    "utf-8"
+                )
+                # JS/TS convention uses camelCase for exports — accept all names
+                if language not in ("javascript", "typescript", "tsx"):
+                    if not (
+                        name.isupper()
+                        or (len(name) > 1 and name[0].isupper() and "_" in name)
+                    ):
+                        continue
+                # Skip arrow/function expressions — handled by _extract_variable_function
+                value_node = child.child_by_field_name("value")
+                if value_node and value_node.type in (
+                    "arrow_function",
+                    "function_expression",
+                    "generator_function",
+                ):
+                    continue
+                sig = source_bytes[node.start_byte:node.end_byte].decode(
+                    "utf-8"
+                ).strip()
+                const_bytes = source_bytes[node.start_byte:node.end_byte]
+                c_hash = compute_content_hash(const_bytes)
+                return Symbol(
+                    id=make_symbol_id(filename, name, "constant"),
+                    file=filename,
+                    name=name,
+                    qualified_name=name,
+                    kind="constant",
+                    language=language,
+                    signature=sig[:200],
+                    line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    byte_offset=node.start_byte,
+                    byte_length=node.end_byte - node.start_byte,
+                    content_hash=c_hash,
+                )
+
     return None
 
 

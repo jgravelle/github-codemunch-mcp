@@ -127,3 +127,67 @@ def test_lua_extension_registered():
     from jcodemunch_mcp.parser.languages import LANGUAGE_EXTENSIONS
     assert LANGUAGE_EXTENSIONS.get(".lua") == "lua"
 
+
+TS_CONST_SOURCE = """\
+const MAX_TIMEOUT: number = 5000;
+
+export const createUser = mutation({
+    args: { name: v.string() },
+    handler: async (ctx, args) => { return ctx.db.insert('users', args); }
+});
+
+export const getUser = query({
+    args: { id: v.id('users') },
+    handler: async (ctx, args) => { return ctx.db.get(args.id); }
+});
+
+const API_BASE_URL = "https://api.example.com";
+
+const greet = (name: string) => `Hello ${name}`;
+"""
+
+
+def test_typescript_const_exports():
+    """Exported const assignments in TS should be indexed as constants."""
+    symbols = parse_file(TS_CONST_SOURCE, "routes.ts", "typescript")
+    names = {s.name for s in symbols}
+    assert "MAX_TIMEOUT" in names
+    assert "createUser" in names
+    assert "getUser" in names
+    assert "API_BASE_URL" in names
+    # Arrow function should be extracted as a function, not a constant
+    const_names = {s.name for s in symbols if s.kind == "constant"}
+    assert "greet" not in const_names
+    # Verify kind
+    for s in symbols:
+        if s.name in ("createUser", "getUser", "API_BASE_URL", "MAX_TIMEOUT"):
+            assert s.kind == "constant"
+
+
+JS_CONST_SOURCE = """\
+const MAX_TIMEOUT = 5000;
+
+export const listUsers = query({
+    handler: async (ctx) => { return ctx.db.query('users').collect(); }
+});
+
+const API_VERSION = "v2";
+
+const handler = function() { return 42; };
+"""
+
+
+def test_javascript_const_exports():
+    """Exported const assignments in JS should be indexed as constants."""
+    symbols = parse_file(JS_CONST_SOURCE, "routes.js", "javascript")
+    names = {s.name for s in symbols}
+    assert "MAX_TIMEOUT" in names
+    assert "listUsers" in names
+    assert "API_VERSION" in names
+    # function expression should be extracted as function, not constant
+    const_names = {s.name for s in symbols if s.kind == "constant"}
+    assert "handler" not in const_names
+    for s in symbols:
+        if s.name in ("listUsers", "API_VERSION", "MAX_TIMEOUT"):
+            assert s.kind == "constant"
+

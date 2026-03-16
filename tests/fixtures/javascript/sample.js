@@ -12,3 +12,9 @@ class UserService {
 function authenticate(token) {
     return token.length > 0;
 }
+
+export const listUsers = query({
+    handler: async (ctx) => { return ctx.db.query('users').collect(); }
+});
+
+const API_VERSION = "v2";
