@@ -387,7 +387,7 @@ Local folder indexes are stored with stable hashed repo ids. Use `list_repos` to
 
 ---
 
-## Tools (14)
+## Tools (23)
 
 | Tool               | Purpose                     |
 | ------------------ | --------------------------- |
@@ -405,6 +405,15 @@ Local folder indexes are stored with stable hashed repo ids. Use `list_repos` to
 | `search_columns`   | Search column metadata across models |
 | `get_repo_outline` | High-level repo overview    |
 | `invalidate_cache` | Remove cached index         |
+| `find_importers`   | Find files that import from a given file |
+| `find_references`  | Find files that reference an identifier |
+| `get_session_stats` | Get token savings statistics |
+| `get_dependency_graph` | Get file-level dependency graph |
+| `get_blast_radius` | Analyze blast radius of symbol changes |
+| `get_symbol_diff`  | Diff symbol sets between repos |
+| `get_class_hierarchy` | Get class inheritance hierarchy |
+| `get_related_symbols` | Find symbols related to a given symbol |
+| `suggest_queries`  | Suggest useful search queries for a repo |
 
 Every tool response includes a `_meta` envelope with timing, token savings, and cost avoided:
 

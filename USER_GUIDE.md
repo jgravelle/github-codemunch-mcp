@@ -270,6 +270,114 @@ get_file_content: {
 }
 ```
 
+### Search Column Metadata
+
+```
+search_columns: { "repo": "owner/repo", "query": "customer_id", "model_pattern": "fact_*" }
+```
+
+Use for discovering columns across dbt models, SQLMesh models, or any indexed data models. More efficient than grep for column discovery.
+
+### Find Files That Import a Module
+
+```
+find_importers: { "repo": "owner/repo", "file_path": "src/services/AuthService.js" }
+```
+
+Answers "what uses this file?". Returns all files that import from the specified file path.
+
+### Find References to a Symbol
+
+```
+find_references: { "repo": "owner/repo", "identifier": "bulkImport" }
+```
+
+Answers "where is this used?". Returns all files that import or reference a given identifier.
+
+### Get Symbol with Context
+
+```
+get_context_bundle: {
+  "repo": "owner/repo",
+  "symbol_id": "src/auth.py::AuthHandler.login#method",
+  "include_callers": true
+}
+```
+
+Retrieves symbol source plus all imports. Set `include_callers: true` to also see which files import the symbol's file.
+
+### Check Token Savings
+
+```
+get_session_stats: {}
+```
+
+Returns tokens saved and cost avoided in the current session and all-time.
+
+### Explore Dependencies
+
+```
+get_dependency_graph: {
+  "repo": "owner/repo",
+  "file":": "src/server.py",
+  "direction": "imports",
+  "depth": 2
+}
+```
+
+Understand file dependencies. `direction` can be "imports", "importers", or "both".
+
+### Analyze Impact Before Refactoring
+
+```
+get_blast_radius: {
+  "repo": "owner/repo",
+  "symbol": "calculateScore",
+  "depth": 2
+}
+```
+
+Finds all files affected by changing a symbol. Use before renaming or changing function signatures.
+
+### Compare Branches
+
+```
+get_symbol_diff: {
+  "repo_a": "owner/repo-main",
+  "repo_b": "owner/repo-feature"
+}
+```
+
+Compare symbol sets between two indexed repositories. Index the same repo under two names to compare branches.
+
+### Understand Class Hierarchy
+
+```
+get_class_hierarchy: { "repo": "owner/repo", "class_name": "BaseController" }
+```
+
+Returns ancestors (base classes) and descendants (subclasses) for any class.
+
+### Find Related Code
+
+```
+get_related_symbols: {
+  "repo": "owner/repo",
+  "symbol_id": "src/auth.py::AuthHandler.login#method",
+  "max_results": 10
+}
+```
+
+Discovers related symbols using same-file co-location, shared importers, and name similarity.
+
+### Get Started with a New Repo
+
+```
+suggest_queries: { "repo": "owner/repo" }
+```
+
+Great first call when exploring unfamiliar code. Suggests useful search queries, entry points, and index statistics.
+
 ### Force Re-index
 
 ```
@@ -281,20 +389,31 @@ index_repo: { "url": "owner/repo" }
 
 ## Tool Reference
 
-| Tool               | Purpose                       | Key Parameters                                                     |
-| ------------------ | ----------------------------- | ------------------------------------------------------------------ |
-| `index_repo`       | Index GitHub repository       | `url`, `use_ai_summaries`                                          |
-| `index_folder`     | Index local folder            | `path`, `extra_ignore_patterns`, `follow_symlinks`                 |
-| `list_repos`       | List all indexed repositories | —                                                                  |
-| `get_file_tree`    | Browse file structure         | `repo`, `path_prefix`                                              |
-| `get_file_outline` | Symbols in a file             | `repo`, `file_path`                                                |
-| `get_file_content` | Cached file content           | `repo`, `file_path`, `start_line`, `end_line`                      |
-| `get_symbol`       | Full source of one symbol     | `repo`, `symbol_id`, `verify`, `context_lines`                     |
-| `get_symbols`      | Batch retrieve symbols        | `repo`, `symbol_ids`                                               |
-| `search_symbols`   | Search symbols                | `repo`, `query`, `kind`, `language`, `file_pattern`, `max_results` |
-| `search_text`      | Full-text search              | `repo`, `query`, `file_pattern`, `max_results`, `context_lines`    |
-| `get_repo_outline` | High-level overview           | `repo`                                                             |
-| `invalidate_cache` | Delete cached index           | `repo`                                                             |
+| Tool                  | Purpose                          | Key Parameters                                                     |
+| --------------------- | -------------------------------- | ------------------------------------------------------------------ |
+| `index_repo`          | Index GitHub repository          | `url`, `use_ai_summaries`                                          |
+| `index_folder`        | Index local folder               | `path`, `extra_ignore_patterns`, `follow_symlinks`                 |
+| `list_repos`          | List all indexed repositories    | —                                                                  |
+| `get_file_tree`       | Browse file structure            | `repo`, `path_prefix`                                              |
+| `get_file_outline`    | Symbols in a file                | `repo`, `file_path`                                                |
+| `get_file_content`    | Cached file content              | `repo`, `file_path`, `start_line`, `end_line`                      |
+| `get_symbol`          | Full source of one symbol        | `repo`, `symbol_id`, `verify`, `context_lines`                     |
+| `get_symbols`         | Batch retrieve symbols           | `repo`, `symbol_ids`                                               |
+| `search_symbols`      | Search symbols                   | `repo`, `query`, `kind`, `language`, `file_pattern`, `max_results` |
+| `search_text`         | Full-text search                 | `repo`, `query`, `file_pattern`, `max_results`, `context_lines`    |
+| `search_columns`      | Search column metadata           | `repo`, `query`, `model_pattern`, `max_results`                    |
+| `get_repo_outline`    | High-level overview              | `repo`                                                             |
+| `invalidate_cache`    | Delete cached index              | `repo`                                                             |
+| `find_importers`      | Find files importing a file      | `repo`, `file_path`, `max_results`                                 |
+| `find_references`     | Find files referencing a symbol  | `repo`, `identifier`, `max_results`                                |
+| `get_context_bundle`  | Symbol source + imports          | `repo`, `symbol_id`/`symbol_ids`, `include_callers`                |
+| `get_session_stats`   | Token savings statistics         | —                                                                  |
+| `get_dependency_graph`| File dependency graph            | `repo`, `file`, `direction`, `depth`                               |
+| `get_blast_radius`    | Analyze impact of changes        | `repo`, `symbol`, `depth`                                          |
+| `get_symbol_diff`     | Compare repos/branches           | `repo_a`, `repo_b`                                                 |
+| `get_class_hierarchy` | Class inheritance                | `repo`, `class_name`                                               |
+| `get_related_symbols` | Find related symbols             | `repo`, `symbol_id`, `max_results`                                 |
+| `suggest_queries`     | Suggest search queries           | `repo`                                                             |
 
 ---
 

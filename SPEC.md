@@ -15,7 +15,7 @@
 
 ---
 
-## MCP Tools (12)
+## MCP Tools (23)
 
 ### Indexing Tools
 
@@ -165,6 +165,141 @@ Weighted scoring search across name, signature, summary, keywords, and docstring
 ```
 
 Case-insensitive substring search across indexed file contents. Returns grouped matches shaped like `[{file, matches:[{line, text, before, after}]}]`, where `before` and `after` are lists of surrounding lines. Use when symbol search misses (string literals, comments, config values).
+
+#### `search_columns` — Search column metadata across models
+
+```json
+{
+  "repo": "owner/repo",
+  "query": "customer_id",
+  "model_pattern": "fact_*",
+  "max_results": 20
+}
+```
+
+Searches column names and descriptions across indexed models. Works with ecosystem providers (dbt, SQLMesh, etc.). Returns model name, file path, column name, and description.
+
+---
+
+### Analysis Tools
+
+#### `find_importers` — Find files that import from a given file
+
+```json
+{
+  "repo": "owner/repo",
+  "file_path": "src/features/intake/IntakeService.js",
+  "max_results": 50
+}
+```
+
+Returns all files that import from the specified file path. Answers "what uses this file?". Requires re-indexing with jcodemunch-mcp >= 1.3.0.
+
+#### `find_references` — Find files that reference an identifier
+
+```json
+{
+  "repo": "owner/repo",
+  "identifier": "IntakeService",
+  "max_results": 50
+}
+```
+
+Finds all files that import or reference a given identifier (symbol name, module name, or class name). Answers "where is this used?". Requires re-indexing with jcodemunch-mcp >= 1.3.0.
+
+#### `get_context_bundle` — Get symbol source + imports in one call
+
+```json
+{
+  "repo": "owner/repo",
+  "symbol_id": "src/main.py::MyClass.login#method",
+  "include_callers": true,
+  "output_format": "json"
+}
+```
+
+Retrieves full source + imports for one or more symbols. Multi-symbol bundles deduplicate imports when symbols share a file. Set `include_callers: true` to also get files that directly import each symbol's file. `output_format` can be "json" or "markdown".
+
+#### `get_dependency_graph` — Get file-level dependency graph
+
+```json
+{
+  "repo": "owner/repo",
+  "file": "src/server.py",
+  "direction": "imports",
+  "depth": 1
+}
+```
+
+Traverses import relationships up to 3 hops. `direction` can be "imports" (files this file depends on), "importers" (files that depend on this file), or "both". Use to understand dependencies before refactoring.
+
+#### `get_blast_radius` — Analyze blast radius of symbol changes
+
+```json
+{
+  "repo": "owner/repo",
+  "symbol": "calculateScore",
+  "depth": 1
+}
+```
+
+Finds every file that imports the symbol's defining file and optionally references the symbol by name. Returns "confirmed" files (import + name match) and "potential" files (import only). Use before renaming, deleting, or changing function/class signatures.
+
+#### `get_symbol_diff` — Diff symbol sets between repos
+
+```json
+{
+  "repo_a": "owner/repo-branch-a",
+  "repo_b": "owner/repo-branch-b"
+}
+```
+
+Compares symbol sets between two indexed repositories using `content_hash` for change detection. Index the same repo under two names to compare branches.
+
+#### `get_class_hierarchy` — Get class inheritance hierarchy
+
+```json
+{
+  "repo": "owner/repo",
+  "class_name": "BaseController"
+}
+```
+
+Returns full inheritance hierarchy for a class: ancestors (base classes) and descendants (subclasses/implementors). Works across Python, Java, TypeScript, C#, and any language where class signatures contain "extends" or "implements".
+
+#### `get_related_symbols` — Find symbols related to a given symbol
+
+```json
+{
+  "repo": "owner/repo",
+  "symbol_id": "src/main.py::MyClass.login#method",
+  "max_results": 10
+}
+```
+
+Finds related symbols using heuristic clustering: same-file co-location, shared importers, and name-token overlap. Useful for discovering what else to read when exploring unfamiliar codebases.
+
+#### `suggest_queries` — Suggest useful search queries
+
+```json
+{
+  "repo": "owner/repo"
+}
+```
+
+Scans the index and suggests useful search queries, key entry-point files, and index statistics. Surfaces most-imported files, top keywords, kind/language distribution, and ready-to-run example queries. Great first call when exploring a new repository.
+
+---
+
+### Utility Tools
+
+#### `get_session_stats` — Get token savings statistics
+
+```json
+{}
+```
+
+Returns tokens saved and cost avoided (this session and all-time), per-tool breakdown, session duration, and cumulative totals. Use to see how much jCodeMunch has saved.
 
 ---
 
