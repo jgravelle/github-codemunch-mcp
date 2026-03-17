@@ -728,6 +728,18 @@ BLADE_SPEC = LanguageSpec(
 # The fields below are intentionally empty.
 AL_SPEC = LanguageSpec(
     ts_language="al",
+    symbol_node_types={},
+    name_fields={},
+    param_fields={},
+    return_type_fields={},
+    docstring_strategy="preceding_comment",
+    decorator_node_type=None,
+    container_node_types=[],
+    constant_patterns=[],
+    type_patterns=[],
+)
+
+
 # Kotlin specification
 # NOTE: Kotlin's tree-sitter grammar exposes no named field accessors for names,
 # parameters, or bodies. All extraction is handled via special-cases in extractor.py

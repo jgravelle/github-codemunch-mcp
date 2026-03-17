@@ -11,6 +11,20 @@ table 50100 "My Table"
             Caption = 'Name';
         }
     }
+    keys
+    {
+        key(PK; "No.")
+        {
+            Clustered = true;
+        }
+        key(Name; Name, "No.")
+        {
+        }
+    }
+    fieldgroups
+    {
+        fieldgroup(DropDown; "No.", Name) { }
+    }
 }
 
 codeunit 50100 "My Codeunit"
@@ -34,6 +48,15 @@ codeunit 50100 "My Codeunit"
     begin
     end;
 
+    // Calculate the total amount for the given record
+    procedure CalcTotal(Rec: Record "My Table"): Decimal
+    var
+        Total: Decimal;
+        LineRec: Record "My Table";
+    begin
+        exit(0);
+    end;
+
     trigger OnRun()
     begin
         MyMethod(1, 'test');
@@ -50,6 +73,34 @@ interface "IMyInterface"
 {
     procedure DoWork();
     procedure GetValue(): Integer;
+}
+
+page 50100 "My Page"
+{
+    SourceTable = "My Table";
+    layout
+    {
+        area(Content)
+        {
+            field(Name; Rec.Name) { }
+            field("No."; Rec."No.") { }
+        }
+    }
+    actions
+    {
+        area(Processing)
+        {
+            // Post the current document
+            action(PostDocument)
+            {
+                Caption = 'Post';
+            }
+            action("Run Report")
+            {
+                Caption = 'Run Report';
+            }
+        }
+    }
 }
 
 pageextension 50100 "My Page Ext" extends "Customer Card"
@@ -128,4 +179,11 @@ xmlport 50100 "My XMLport"
             }
         }
     }
+}
+
+controladdin MyAddIn
+{
+    event OnReady();
+    event OnCallback(data: Text);
+    procedure Initialize(config: Text);
 }
