@@ -28,6 +28,7 @@ from .tools.find_importers import find_importers
 from .tools.find_references import find_references
 from .tools.search_columns import search_columns
 from .tools.get_context_bundle import get_context_bundle
+from .parser.symbols import VALID_KINDS
 
 
 logger = logging.getLogger(__name__)
@@ -100,7 +101,7 @@ async def list_tools() -> list[Tool]:
                     },
                     "follow_symlinks": {
                         "type": "boolean",
-                        "description": "Whether to follow symlinks. Default false for security.",
+                        "description": "Whether to include symlinked files in indexing. Symlinked directories are never followed (prevents infinite loops from circular symlinks). Default false for security.",
                         "default": False
                     },
                     "incremental": {
@@ -252,7 +253,7 @@ async def list_tools() -> list[Tool]:
                     "kind": {
                         "type": "string",
                         "description": "Optional filter by symbol kind",
-                        "enum": ["function", "class", "method", "constant", "type"]
+                        "enum": ["function", "class", "method", "constant", "type", "template", "import"]
                     },
                     "file_pattern": {
                         "type": "string",
@@ -261,7 +262,7 @@ async def list_tools() -> list[Tool]:
                     "language": {
                         "type": "string",
                         "description": "Optional filter by language",
-                        "enum": ["python", "javascript", "typescript", "tsx", "go", "rust", "java", "php", "dart", "csharp", "c", "cpp", "swift", "elixir", "ruby", "perl", "gdscript", "blade", "kotlin", "scala", "haskell", "julia", "r", "lua", "bash", "css", "sql", "toml", "erlang", "fortran", "gleam", "nix", "vue", "ejs", "verse", "groovy", "objc", "proto", "hcl", "graphql", "autohotkey", "xml", "openapi", "al"]
+                        "enum": ["python", "javascript", "typescript", "tsx", "go", "rust", "java", "php", "dart", "csharp", "c", "cpp", "swift", "elixir", "ruby", "perl", "gdscript", "blade", "kotlin", "scala", "haskell", "julia", "r", "lua", "bash", "css", "sql", "toml", "erlang", "fortran", "gleam", "nix", "vue", "ejs", "verse", "groovy", "objc", "proto", "hcl", "graphql", "autohotkey", "asm", "xml", "openapi", "al"]
                     },
                     "max_results": {
                         "type": "integer",
@@ -511,19 +512,23 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 )
             )
         elif name == "search_symbols":
-            result = await asyncio.to_thread(
-                functools.partial(
-                    search_symbols,
-                    repo=arguments["repo"],
-                    query=arguments["query"],
-                    kind=arguments.get("kind"),
-                    file_pattern=arguments.get("file_pattern"),
-                    language=arguments.get("language"),
-                    max_results=arguments.get("max_results", 10),
-                    debug=arguments.get("debug", False),
-                    storage_path=storage_path,
+            kind_filter = arguments.get("kind")
+            if kind_filter and kind_filter not in VALID_KINDS:
+                result = {"error": f"Unknown kind '{kind_filter}'. Valid values: {sorted(VALID_KINDS)}"}
+            else:
+                result = await asyncio.to_thread(
+                    functools.partial(
+                        search_symbols,
+                        repo=arguments["repo"],
+                        query=arguments["query"],
+                        kind=kind_filter,
+                        file_pattern=arguments.get("file_pattern"),
+                        language=arguments.get("language"),
+                        max_results=arguments.get("max_results", 10),
+                        debug=arguments.get("debug", False),
+                        storage_path=storage_path,
+                    )
                 )
-            )
         elif name == "invalidate_cache":
             result = await asyncio.to_thread(
                 functools.partial(
@@ -625,13 +630,42 @@ async def run_stdio_server():
         )
 
 
+def _make_auth_middleware():
+    """Return a Starlette middleware class that checks JCODEMUNCH_HTTP_TOKEN if set."""
+    token = os.environ.get("JCODEMUNCH_HTTP_TOKEN")
+    if not token:
+        return None
+
+    from starlette.middleware import Middleware
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.responses import JSONResponse
+
+    class BearerAuthMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            auth = request.headers.get("authorization", "")
+            if auth != f"Bearer {token}":
+                return JSONResponse(
+                    {"error": "Unauthorized. Set Authorization: Bearer <JCODEMUNCH_HTTP_TOKEN> header."},
+                    status_code=401,
+                )
+            return await call_next(request)
+
+    return Middleware(BearerAuthMiddleware)
+
+
 async def run_sse_server(host: str, port: int):
     """Run the MCP server with SSE transport (persistent HTTP mode)."""
     import sys
-    import uvicorn
-    from starlette.applications import Starlette
-    from starlette.requests import Request
-    from starlette.routing import Mount, Route
+    try:
+        import uvicorn
+        from starlette.applications import Starlette
+        from starlette.requests import Request
+        from starlette.routing import Mount, Route
+    except ImportError as e:
+        raise ImportError(
+            f"SSE transport requires additional packages: {e}. "
+            'Install them with: pip install "jcodemunch-mcp[http]"'
+        ) from e
     from mcp.server.sse import SseServerTransport
 
     sse_transport = SseServerTransport("/messages/")
@@ -646,10 +680,18 @@ async def run_sse_server(host: str, port: int):
                 server.create_initialization_options(),
             )
 
-    starlette_app = Starlette(routes=[
-        Route("/sse", endpoint=handle_sse),
-        Mount("/messages/", app=sse_transport.handle_post_message),
-    ])
+    middleware = []
+    auth_mw = _make_auth_middleware()
+    if auth_mw:
+        middleware.append(auth_mw)
+
+    starlette_app = Starlette(
+        routes=[
+            Route("/sse", endpoint=handle_sse),
+            Mount("/messages/", app=sse_transport.handle_post_message),
+        ],
+        middleware=middleware,
+    )
 
     print(
         f"jcodemunch-mcp {__version__} by jgravelle · SSE server at http://{host}:{port}/sse",
@@ -667,11 +709,17 @@ async def run_sse_server(host: str, port: int):
 async def run_streamable_http_server(host: str, port: int):
     """Run the MCP server with streamable-http transport (persistent HTTP mode)."""
     import sys
-    import anyio
-    import uvicorn
-    from starlette.applications import Starlette
-    from starlette.requests import Request
-    from starlette.routing import Route
+    try:
+        import anyio
+        import uvicorn
+        from starlette.applications import Starlette
+        from starlette.requests import Request
+        from starlette.routing import Route
+    except ImportError as e:
+        raise ImportError(
+            f"Streamable-http transport requires additional packages: {e}. "
+            'Install them with: pip install "jcodemunch-mcp[http]"'
+        ) from e
     from mcp.server.streamable_http import StreamableHTTPServerTransport
 
     async def handle_mcp(request: Request):
@@ -688,9 +736,17 @@ async def run_streamable_http_server(host: str, port: int):
                     request.scope, request.receive, request._send
                 )
 
-    starlette_app = Starlette(routes=[
-        Route("/mcp", endpoint=handle_mcp, methods=["GET", "POST", "DELETE"]),
-    ])
+    middleware = []
+    auth_mw = _make_auth_middleware()
+    if auth_mw:
+        middleware.append(auth_mw)
+
+    starlette_app = Starlette(
+        routes=[
+            Route("/mcp", endpoint=handle_mcp, methods=["GET", "POST", "DELETE"]),
+        ],
+        middleware=middleware,
+    )
 
     print(
         f"jcodemunch-mcp {__version__} by jgravelle · streamable-http server at http://{host}:{port}/mcp",

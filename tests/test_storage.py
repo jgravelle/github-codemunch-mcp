@@ -435,3 +435,160 @@ def test_incremental_save_recomputes_languages_from_merged_symbols(tmp_path):
 
     assert updated is not None
     assert updated.languages == {"python": 1, "cpp": 1}
+
+
+def test_load_v3_index_without_imports(tmp_path):
+    """Verify v3 index (no imports field) loads correctly under v4 server."""
+    store = IndexStore(base_path=str(tmp_path))
+    content_dir = tmp_path / "upgrade-demo"
+    content_dir.mkdir(parents=True)
+    (content_dir / "main.py").write_text("def hello():\n    pass\n", encoding="utf-8")
+
+    v3_index = {
+        "repo": "upgrade/demo",
+        "owner": "upgrade",
+        "name": "demo",
+        "indexed_at": "2025-01-01T00:00:00",
+        "source_files": ["main.py"],
+        "languages": {"python": 1},
+        "symbols": [{
+            "id": "main.py::hello#function",
+            "file": "main.py",
+            "name": "hello",
+            "qualified_name": "hello",
+            "kind": "function",
+            "language": "python",
+            "signature": "def hello():",
+            "docstring": "",
+            "summary": "",
+            "decorators": [],
+            "keywords": [],
+            "parent": "",
+            "line": 1,
+            "end_line": 2,
+            "byte_offset": 0,
+            "byte_length": 21,
+            "content_hash": "",
+        }],
+        "index_version": 3,
+        "file_hashes": {"main.py": "abc123"},
+        "git_head": "",
+        # NOTE: no "imports" key — this is the v3 format
+    }
+    (tmp_path / "upgrade-demo.json").write_text(json.dumps(v3_index), encoding="utf-8")
+
+    loaded = store.load_index("upgrade", "demo")
+    assert loaded is not None
+    assert len(loaded.symbols) == 1
+    assert loaded.symbols[0]["name"] == "hello"
+    assert loaded.imports is None  # v3 had no imports field
+    assert loaded.source_files == ["main.py"]
+
+    # Verify incremental_save works on the loaded v3 index
+    from jcodemunch_mcp.parser import Symbol
+    new_sym = Symbol(
+        id="utils.py::helper#function",
+        file="utils.py",
+        name="helper",
+        qualified_name="helper",
+        kind="function",
+        language="python",
+        signature="def helper():",
+        byte_offset=0,
+        byte_length=18,
+    )
+    updated = store.incremental_save(
+        owner="upgrade",
+        name="demo",
+        changed_files=[],
+        new_files=["utils.py"],
+        deleted_files=[],
+        new_symbols=[new_sym],
+        raw_files={"utils.py": "def helper():\n    pass\n"},
+    )
+    assert updated is not None
+    assert len(updated.symbols) == 2
+    assert "utils.py" in updated.source_files
+
+
+def test_has_source_file_empty_index():
+    """has_source_file should return False for any path when source_files is empty."""
+    index = CodeIndex(
+        repo="test/repo",
+        owner="test",
+        name="repo",
+        indexed_at="2025-01-01T00:00:00",
+        source_files=[],
+        languages={},
+        symbols=[],
+    )
+    assert index.has_source_file("anything.py") is False
+    assert index.has_source_file("") is False
+
+
+def test_has_source_file_populated_index():
+    """has_source_file returns True only for indexed files."""
+    index = CodeIndex(
+        repo="test/repo",
+        owner="test",
+        name="repo",
+        indexed_at="2025-01-01T00:00:00",
+        source_files=["main.py", "utils.py"],
+        languages={"python": 2},
+        symbols=[],
+    )
+    assert index.has_source_file("main.py") is True
+    assert index.has_source_file("other.py") is False
+
+
+def test_index_integrity_checksum(tmp_path):
+    """save_index writes a .sha256 sidecar; load_index verifies it."""
+    import hashlib
+    store = IndexStore(base_path=str(tmp_path))
+
+    store.save_index(
+        owner="check",
+        name="sum",
+        source_files=["main.py"],
+        symbols=[],
+        raw_files={"main.py": "x = 1\n"},
+        languages={"python": 1},
+    )
+
+    # Sidecar should exist
+    sha_path = tmp_path / "check-sum.json.sha256"
+    assert sha_path.exists()
+
+    # Checksum should match the index file
+    index_path = tmp_path / "check-sum.json"
+    actual_sha = hashlib.sha256(index_path.read_bytes()).hexdigest()
+    assert sha_path.read_text(encoding="utf-8").strip() == actual_sha
+
+    # Load should succeed with valid checksum
+    loaded = store.load_index("check", "sum")
+    assert loaded is not None
+
+    # Corrupted checksum logs a warning but still loads (non-blocking)
+    sha_path.write_text("bad_checksum", encoding="utf-8")
+    loaded = store.load_index("check", "sum")
+    assert loaded is not None  # warns but still loads
+
+
+def test_schema_validation_rejects_missing_fields(tmp_path):
+    """load_index should reject index JSON missing required fields."""
+    store = IndexStore(base_path=str(tmp_path))
+
+    # Write a malformed index missing required 'indexed_at'
+    bad_index = {
+        "repo": "bad/index",
+        "owner": "bad",
+        "name": "index",
+        "source_files": [],
+        "languages": {},
+        "symbols": [],
+        "index_version": 4,
+    }
+    (tmp_path / "bad-index.json").write_text(json.dumps(bad_index), encoding="utf-8")
+
+    loaded = store.load_index("bad", "index")
+    assert loaded is None

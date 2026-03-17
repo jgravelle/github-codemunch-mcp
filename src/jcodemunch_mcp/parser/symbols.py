@@ -12,7 +12,7 @@ class Symbol:
     file: str                       # Source file path (e.g., "src/main.py")
     name: str                       # Symbol name (e.g., "login")
     qualified_name: str             # Fully qualified (e.g., "MyClass.login")
-    kind: str                       # "function" | "class" | "method" | "constant" | "type"
+    kind: str                       # One of VALID_KINDS below
     language: str                   # "python" | "javascript" | "typescript" | "go" | "rust" | "java" | "c" | "cpp" | "xml"
     signature: str                  # Full signature line(s)
     docstring: str = ""             # Extracted docstring (language-specific)
@@ -27,6 +27,18 @@ class Symbol:
     content_hash: str = ""         # SHA-256 of symbol source bytes (for drift detection)
     ecosystem_context: str = ""    # Optional context from ecosystem (e.g., dbt model metadata)
 
+
+
+# Single source of truth for all symbol kinds emitted by parsers.
+VALID_KINDS: frozenset[str] = frozenset({
+    "function",   # Standalone functions, procedures, subroutines
+    "class",      # Classes, structs, modules-as-containers
+    "method",     # Methods belonging to a class/module
+    "constant",   # Constants, named values, defines
+    "type",       # Type aliases, interfaces, enums, traits, protocols
+    "template",   # C++ templates
+    "import",     # Import directives (C++ #include, etc.)
+})
 
 
 def make_symbol_id(file_path: str, qualified_name: str, kind: str = "") -> str:

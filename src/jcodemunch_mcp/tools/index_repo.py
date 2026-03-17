@@ -52,6 +52,7 @@ async def fetch_repo_tree(owner: str, repo: str, token: Optional[str] = None) ->
     """Fetch full repository tree via git/trees API.
 
     Uses recursive=1 to get all paths in a single API call.
+    Retries on 403/429 with exponential backoff (max 3 attempts).
 
     Returns:
         Tuple of (tree_entries, tree_sha). The tree_sha can be stored and
@@ -65,12 +66,32 @@ async def fetch_repo_tree(owner: str, repo: str, token: Optional[str] = None) ->
     if token:
         headers["Authorization"] = f"token {token}"
 
+    max_retries = 3
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, params=params, headers=headers)
-        response.raise_for_status()
-        data = response.json()
+        for attempt in range(max_retries):
+            response = await client.get(url, params=params, headers=headers)
+            if response.status_code in (403, 429):
+                retry_after = response.headers.get("retry-after")
+                wait = int(retry_after) if retry_after else (2 ** attempt)
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        "GitHub rate limit hit (%d), retrying in %ds (attempt %d/%d)",
+                        response.status_code, wait, attempt + 1, max_retries,
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                else:
+                    hint = " Set GITHUB_TOKEN env var for 5000 req/hr limit." if not token else ""
+                    raise httpx.HTTPStatusError(
+                        f"GitHub rate limit exceeded ({response.status_code}).{hint}",
+                        request=response.request,
+                        response=response,
+                    )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("tree", []), data.get("sha", "")
 
-    return data.get("tree", []), data.get("sha", "")
+    return [], ""  # unreachable but satisfies type checker
 
 
 def should_skip_file(path: str) -> bool:

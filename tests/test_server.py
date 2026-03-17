@@ -53,7 +53,7 @@ async def test_search_symbols_tool_schema():
 
     # kind should have enum
     assert "enum" in props["kind"]
-    assert set(props["kind"]["enum"]) == {"function", "class", "method", "constant", "type"}
+    assert set(props["kind"]["enum"]) == {"function", "class", "method", "constant", "type", "template", "import"}
     assert "enum" in props["language"]
     assert "cpp" in props["language"]["enum"]
 

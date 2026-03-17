@@ -1,3 +1,5 @@
+Quickstart - https://github.com/jgravelle/jcodemunch-mcp/blob/main/QUICKSTART.md
+
 ## FREE FOR PERSONAL USE
 **Use it to make money, and Uncle J. gets a taste. Fair enough?** [details](#commercial-licenses)
 
@@ -32,19 +34,19 @@ Precision context beats brute-force context.
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/jcodemunch-mcp)](https://pypi.org/project/jcodemunch-mcp/)
 
 > ## Commercial licenses
-> jCodeMunch-MCP is **free for non-commercial use**.  Tip jar: (https://gravelle.gumroad.com/coffee)
-> 
+> jCodeMunch-MCP is **free for non-commercial use**.
+>
 > **Commercial use requires a paid license.**
 >
 > **jCodeMunch-only licenses**
-> - [Builder](https://gravelle.gumroad.com/l/jCodeMunchMCP_builder) — 1 developer
-> - [Studio](https://gravelle.gumroad.com/l/jCodeMunchMCP_studio) — up to 5 developers
-> - [Platform](https://gravelle.gumroad.com/l/jCodeMunchMCP_platform) — org-wide internal deployment
+> - [Builder — $79](https://j.gravelle.us/jCodeMunch/descriptions.php#builder) — 1 developer
+> - [Studio — $349](https://j.gravelle.us/jCodeMunch/descriptions.php#studio) — up to 5 developers
+> - [Platform — $1,999](https://j.gravelle.us/jCodeMunch/descriptions.php#platform) — org-wide internal deployment
 >
 > **Want both code and docs retrieval?**
-> - [Munch Duo Builder Bundle](https://gravelle.gumroad.com/l/MunchDuoBuilderBundle)
-> - [Munch Duo Studio Bundle](https://gravelle.gumroad.com/l/MunchDuoStudioBundle)
-> - [Munch Duo Platform Bundle](https://gravelle.gumroad.com/l/MunchDuoPlatformBundle)
+> - [Munch Duo Builder Bundle — $89](https://j.gravelle.us/jCodeMunch/descriptions.php#builder)
+> - [Munch Duo Studio Bundle — $399](https://j.gravelle.us/jCodeMunch/descriptions.php#studio)
+> - [Munch Duo Platform Bundle — $2,249](https://j.gravelle.us/jCodeMunch/descriptions.php#platform)
 
 **Stop dumping files into context windows. Start retrieving exactly what the agent needs.**
 
@@ -128,6 +130,8 @@ IDs remain stable across re-indexing when path, qualified name, and kind are unc
 ---
 
 ## Installation
+
+> **New here?** See [QUICKSTART.md](QUICKSTART.md) for a focused 3-step setup guide.
 
 ### Prerequisites
 
@@ -328,14 +332,16 @@ get_file_outline: { "repo": "owner/repo", "file_path": "src/main.py" }
 get_file_content: { "repo": "owner/repo", "file_path": "src/main.py", "start_line": 10, "end_line": 25 }
 search_symbols:   { "repo": "owner/repo", "query": "authenticate" }
 get_symbol:       { "repo": "owner/repo", "symbol_id": "src/main.py::MyClass.login#method" }
+get_context_bundle: { "repo": "owner/repo", "symbol_id": "src/main.py::MyClass.login#method" }
 search_text:      { "repo": "owner/repo", "query": "TODO", "context_lines": 1 }
+search_columns:   { "repo": "owner/repo", "query": "customer_id", "model_pattern": "fact_*" }
 ```
 
 Local folder indexes are stored with stable hashed repo ids. Use `list_repos` to inspect the exact id, or the bare display name when it is unique.
 
 ---
 
-## Tools (12)
+## Tools (14)
 
 | Tool               | Purpose                     |
 | ------------------ | --------------------------- |
@@ -347,8 +353,10 @@ Local folder indexes are stored with stable hashed repo ids. Use `list_repos` to
 | `get_file_content` | Retrieve cached file content |
 | `get_symbol`       | Retrieve full symbol source |
 | `get_symbols`      | Batch retrieve symbols      |
+| `get_context_bundle` | Symbol source + file imports in one call |
 | `search_symbols`   | Search symbols with filters |
 | `search_text`      | Full-text search with context |
+| `search_columns`   | Search column metadata across models |
 | `get_repo_outline` | High-level repo overview    |
 | `invalidate_cache` | Remove cached index         |
 

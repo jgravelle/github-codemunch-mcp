@@ -19,12 +19,15 @@ time rather than per-call to avoid spawning a new thread on every tool use.
 
 import atexit
 import json
+import logging
 import os
 import signal
 import threading
 import uuid
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 _SAVINGS_FILE = "_savings.json"
 _BYTES_PER_TOKEN = 4  # ~4 bytes per token (rough but consistent)
@@ -66,6 +69,7 @@ class _State:
         try:
             data = json.loads(path.read_text()) if path.exists() else {}
         except Exception:
+            logger.debug("Failed to load savings data from %s", path, exc_info=True)
             data = {}
         self._total = data.get("total_tokens_saved", 0)
         self._anon_id = data.get("anon_id")
@@ -98,6 +102,7 @@ class _State:
         try:
             data = json.loads(path.read_text()) if path.exists() else {}
         except Exception:
+            logger.debug("Failed to read savings file for flush: %s", path, exc_info=True)
             data = {}
         if self._anon_id is None:
             if "anon_id" not in data:
@@ -105,11 +110,11 @@ class _State:
             self._anon_id = data["anon_id"]
         else:
             data["anon_id"] = self._anon_id
-        data["total_tokens_saved"] = self._total
+        data["total_tokens_saved"] = data.get("total_tokens_saved", 0) + self._unflushed
         try:
             path.write_text(json.dumps(data))
         except Exception:
-            pass
+            logger.debug("Failed to write savings data to %s", path, exc_info=True)
 
         # Send batched telemetry
         if self._pending_telemetry > 0 and os.environ.get("JCODEMUNCH_SHARE_SAVINGS", "1") != "0":
@@ -171,7 +176,7 @@ def _share_savings(delta: int, anon_id: str) -> None:
                 timeout=3.0,
             )
         except Exception:
-            pass
+            logger.debug("Telemetry post failed", exc_info=True)
 
     threading.Thread(target=_post, daemon=True).start()
 
@@ -179,7 +184,7 @@ def _share_savings(delta: int, anon_id: str) -> None:
 def record_savings(tokens_saved: int, base_path: Optional[str] = None) -> int:
     """Add tokens_saved to the running total. Returns new cumulative total.
 
-    Uses an in-memory accumulator; flushes to disk every 10 calls and at exit.
+    Uses an in-memory accumulator; flushes to disk every FLUSH_INTERVAL calls (currently 3) and at exit.
     """
     return _state.add(tokens_saved, base_path)
 
@@ -204,6 +209,7 @@ def cost_avoided(tokens_saved: int, total_tokens_saved: int) -> dict:
     Values are in USD, rounded to 4 decimal places.
     """
     return {
+        "estimate_method": "byte_approx",
         "cost_avoided": {
             model: round(tokens_saved * rate, 4)
             for model, rate in PRICING.items()
