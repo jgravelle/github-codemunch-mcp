@@ -2,6 +2,122 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.6.1] - 2026-03-17
+
+### Added
+- **`watch` CLI subcommand** (PR #113, credit: @DrHayt) — `jcodemunch-mcp watch <path>...` monitors one or more directories for filesystem changes and triggers incremental re-indexing automatically. Uses `watchfiles` (Rust-based, async) for OS-native notifications with configurable debounce. Install with `pip install jcodemunch-mcp[watch]`.
+- `watchfiles>=1.0.0` optional dependency under `[watch]` and `[all]` extras.
+
+### Changed
+- `main()` refactored to use argparse subcommands (`serve`, `watch`). Full backwards compatibility preserved — bare `jcodemunch-mcp` and legacy flags like `--transport` continue to work unchanged.
+
+## [1.6.0] - 2026-03-17
+
+### Added
+- **`get_context_bundle` multi-symbol bundles** — new `symbol_ids` (list) parameter fetches multiple symbols in one call. Import statements are deduplicated when symbols share a file. New `include_callers=true` flag appends the list of files that directly import each symbol's defining file.
+
+### Changed
+- Single `symbol_id` (string) remains fully backward-compatible.
+
+## [1.5.9] - 2026-03-17
+
+### Added
+- **`get_blast_radius` tool** — find every file affected by changing a symbol. Given a symbol name or ID, traverses the reverse import graph (up to 3 hops) and text-scans each importing file. Returns `confirmed` (imports the file + references the symbol name) and `potential` (imports the file only — wildcard/namespace imports). Handles ambiguous names by listing all candidate IDs.
+
+## [1.5.8] - 2026-03-17
+
+### Changed
+- **BM25 search** — replaced hand-tuned substring scoring in `search_symbols` with proper BM25 + IDF. IDF is computed over all indexed symbols at query time (no re-indexing required). CamelCase/snake_case tokenization splits `getUserById` into `get`, `user`, `by`, `id` for natural language queries. Per-field repetition weights: name 3×, keywords 2×, signature 2×, summary 1×, docstring 1×. Exact name match retains a +50 bonus. `debug=true` now returns per-field BM25 score breakdowns.
+
+## [1.5.7] - 2026-03-17
+
+### Added
+- **`get_dependency_graph` tool** — file-level import graph with BFS traversal up to 3 hops. `direction` parameter: `imports` (what this file depends on), `importers` (what depends on this file), or `both`. Returns nodes, edges, and per-node neighbor map. Built from existing index data — no re-indexing required.
+
+## [1.5.6] - 2026-03-17
+
+### Added
+- **`get_session_stats` tool** — process-lifetime token savings dashboard. Reports tokens saved and cost avoided (current session + all-time cumulative), per-tool breakdown, session duration, and call counts.
+
+## [1.5.5] - 2026-03-17
+
+### Added
+- **Tiered loading** (`detail_level` on `search_symbols`) — `compact` returns id/name/kind/file/line only (~15 tokens/result, ideal for discovery); `standard` is unchanged (default); `full` inlines source, docstring, and end_line.
+- `byte_length` field added to all `search_symbols` result entries regardless of detail level.
+
+## [1.5.4] - 2026-03-17
+
+### Added
+- **Token budget search** (`token_budget=N` on `search_symbols`) — greedily packs results by byte length until the budget is exhausted. Overrides `max_results`. Reports `tokens_used` and `tokens_remaining` in `_meta`.
+
+## [1.5.3] - 2026-03-17
+
+### Added
+- **Microsoft Dynamics 365 Business Central AL language support** (PR #110, credit: @DrHayt) — `.al` files are now indexed. Extracts procedures, triggers, codeunits, tables, pages, reports, and XML ports.
+
+## [1.5.2] - 2026-03-17
+
+### Fixed
+- `tokens_saved` always reporting 0 in `get_file_outline` and `get_repo_outline`.
+
+## [1.5.1] - 2026-03-16
+
+### Added
+- **Benchmark reproducibility** — `benchmarks/METHODOLOGY.md` with full reproduction details.
+- **HTTP bearer token auth** — `JCODEMUNCH_HTTP_TOKEN` env var secures HTTP transport endpoints.
+- **`JCODEMUNCH_REDACT_SOURCE_ROOT`** env var redacts absolute local paths from responses.
+- **Schema validation on index load** — rejects indexes missing required fields.
+- **SHA-256 checksum sidecars** — index integrity verification on load.
+- **GitHub rate limit retry** — exponential backoff in `fetch_repo_tree`.
+- **`TROUBLESHOOTING.md`** with 11 common failure scenarios and solutions.
+- CI matrix extended to Windows and Python 3.13.
+
+### Changed
+- Token savings labeled as estimates; `estimate_method` field added to all `_meta` envelopes.
+- `search_text` raw byte count now only includes files with actual matches.
+- `VALID_KINDS` moved to a `frozenset` in `symbols.py`; server-side validation rejects unknown kinds.
+
+## [1.5.0] - 2026-03-16
+
+### Added
+- **Cross-process file locking** via `filelock` — prevents index corruption under concurrent access.
+- **LRU index cache with mtime invalidation** — re-reads index JSON only when the file changes on disk.
+- **Metadata sidecars** — `list_repos` reads lightweight sidecar files instead of loading full index JSON.
+- **Streaming file indexing** — peak memory reduced from ~1 GB to ~500 KB during large repo indexing.
+- **Bounded heap search** — `O(n log k)` instead of `O(n log n)` for bounded result sets.
+- **`BaseSummarizer` base class** — deduplicates `_build_prompt`/`_parse_response` across AI summarizers.
+- +13 new tests covering `search_columns`, `get_context_bundle`, and ReDoS hardening.
+
+### Fixed
+- **ReDoS protection** in `search_text` — pathological regex patterns are rejected before execution.
+- **Symlink-safe temp files** — atomic index writes use `tempfile` rather than direct overwrite.
+- **SSRF prevention** — API base URL validation rejects non-HTTP(S) schemes.
+
+## [1.4.4] - 2026-03-16
+
+### Added
+- **Assembly language support** (PR #105, credit: @astrobleem) — WLA-DX, NASM, GAS, and CA65 dialects. `.asm`, `.s`, `.wla` files indexed. Extracts labels, macros, sections, and directives as symbols.
+- `"asm"` added to `search_symbols` language filter enum.
+
+## [1.4.3] - 2026-03-15
+
+### Fixed
+- Cross-process token savings loss — `token_tracker` now uses additive flush so savings accumulated in one process are not overwritten by a concurrent flush from another.
+
+## [1.4.2] - 2026-03-15
+
+### Added
+- XML `name` and `key` attribute extraction — elements with `name=` or `key=` attributes are now indexed as `constant` symbols (closes #102).
+
+## [1.4.1] - 2026-03-14
+
+### Added
+- **Minimal CLI** (`cli/cli.py`) — 47-line command-line interface over the shared `~/.code-index/` store covering all jMRI ops: `list`, `index`, `outline`, `search`, `get`, `text`, `file`, `invalidate`.
+- `cli/README.md` — explains MCP as the preferred interface and documents CLI usage.
+
+### Changed
+- README onboarding improved: added "Step 3: Tell Claude to actually use it" with copy-pasteable `CLAUDE.md` snippets.
+
 ## [1.4.0] - 2026-03-13
 
 ### Added

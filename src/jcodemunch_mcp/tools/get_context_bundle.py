@@ -1,10 +1,12 @@
-"""Get a context bundle: symbol definition + file imports."""
+"""Get a context bundle: symbol definitions + file imports, with optional caller list."""
 
+import os
 import re
 import time
 from typing import Optional
 
 from ..storage import IndexStore, record_savings, estimate_savings, cost_avoided as _cost_avoided
+from ..parser.imports import resolve_specifier
 from ._utils import resolve_repo
 
 
@@ -73,26 +75,60 @@ def _extract_imports(content: str, language: str) -> list[str]:
     return imports
 
 
+def _direct_callers(index, store, owner: str, name: str, sym_file: str) -> list[str]:
+    """Return files that directly import sym_file (depth=1)."""
+    if index.imports is None:
+        return []
+    source_files = frozenset(index.source_files)
+    callers: list[str] = []
+    for src_file, file_imports in index.imports.items():
+        if src_file == sym_file:
+            continue
+        for imp in file_imports:
+            resolved = resolve_specifier(imp["specifier"], src_file, source_files)
+            if resolved == sym_file:
+                callers.append(src_file)
+                break
+    return sorted(callers)
+
+
 def get_context_bundle(
     repo: str,
-    symbol_id: str,
+    symbol_id: Optional[str] = None,
+    symbol_ids: Optional[list] = None,
+    include_callers: bool = False,
     storage_path: Optional[str] = None,
 ) -> dict:
-    """Get a context bundle: symbol definition + imports from its file.
+    """Get a context bundle: symbol definitions + imports from their files.
 
-    Returns the symbol's full source and all import/require statements from
-    the same file — giving an AI just enough context to understand and modify
-    the symbol without loading the entire file.
+    Supports single or multi-symbol bundles. When multiple symbols share a
+    file, imports for that file are deduplicated — you get one import block
+    per file, not one per symbol.
 
     Args:
         repo: Repository identifier (owner/repo or just repo name).
-        symbol_id: Symbol ID from get_file_outline or search_symbols.
+        symbol_id: Single symbol ID (backward-compatible). Mutually exclusive
+            with symbol_ids.
+        symbol_ids: List of symbol IDs for a multi-symbol bundle.
+        include_callers: When True, each symbol entry gains a ``callers`` list
+            of files that directly import its defining file.
         storage_path: Custom storage path.
 
     Returns:
-        Dict with symbol details, source, imports list, and _meta envelope.
+        Single-symbol: legacy flat response (backward-compatible).
+        Multi-symbol: ``symbols`` list + ``files`` import map.
     """
     start = time.perf_counter()
+
+    # Normalise inputs
+    if symbol_ids is not None:
+        ids = list(dict.fromkeys(symbol_ids))  # deduplicate, preserve order
+        multi = True
+    elif symbol_id is not None:
+        ids = [symbol_id]
+        multi = False
+    else:
+        return {"error": "Provide either 'symbol_id' or 'symbol_ids'."}
 
     try:
         owner, name = resolve_repo(repo, storage_path)
@@ -101,51 +137,110 @@ def get_context_bundle(
 
     store = IndexStore(base_path=storage_path)
     index = store.load_index(owner, name)
-
     if not index:
         return {"error": f"Repository not indexed: {owner}/{name}"}
 
-    symbol = index.get_symbol(symbol_id)
-    if not symbol:
-        return {"error": f"Symbol not found: {symbol_id}"}
+    # Resolve all symbols
+    resolved: list[dict] = []
+    missing: list[str] = []
+    for sid in ids:
+        sym = index.get_symbol(sid)
+        if sym:
+            resolved.append(sym)
+        else:
+            missing.append(sid)
+    if missing:
+        return {"error": f"Symbol(s) not found: {', '.join(missing)}"}
 
-    source = store.get_symbol_content(owner, name, symbol_id, _index=index)
-    file_content = store.get_file_content(owner, name, symbol["file"], _index=index)
+    # Per-file import cache (deduplicate across symbols sharing a file)
+    file_imports_cache: dict[str, list[str]] = {}
+    file_content_cache: dict[str, Optional[str]] = {}
 
-    imports: list[str] = []
-    if file_content:
-        language = symbol.get("language", "")
-        imports = _extract_imports(file_content, language)
+    def _get_file_imports(sym_file: str, language: str) -> list[str]:
+        if sym_file not in file_imports_cache:
+            content = store.get_file_content(owner, name, sym_file, _index=index)
+            file_content_cache[sym_file] = content
+            file_imports_cache[sym_file] = _extract_imports(content, language) if content else []
+        return file_imports_cache[sym_file]
 
-    # Token savings
-    raw_bytes = 0
-    try:
-        raw_file = store._content_dir(owner, name) / symbol["file"]
-        import os
-        raw_bytes = os.path.getsize(raw_file)
-    except OSError:
-        pass
-    tokens_saved = estimate_savings(raw_bytes, symbol.get("byte_length", 0))
+    # Token savings accumulator
+    seen_files_for_savings: set[str] = set()
+    raw_bytes_total = 0
+    response_bytes_total = 0
+
+    # Build per-symbol entries
+    symbol_entries: list[dict] = []
+    for sym in resolved:
+        source = store.get_symbol_content(owner, name, sym["id"], _index=index)
+        language = sym.get("language", "")
+        imports = _get_file_imports(sym["file"], language)
+
+        entry: dict = {
+            "symbol_id": sym["id"],
+            "name": sym["name"],
+            "kind": sym["kind"],
+            "file": sym["file"],
+            "line": sym["line"],
+            "end_line": sym["end_line"],
+            "signature": sym["signature"],
+            "docstring": sym.get("docstring", ""),
+            "source": source or "",
+            "imports": imports,
+        }
+
+        if include_callers:
+            entry["callers"] = _direct_callers(index, store, owner, name, sym["file"])
+
+        symbol_entries.append(entry)
+
+        # Token savings: count each source file only once
+        if sym["file"] not in seen_files_for_savings:
+            seen_files_for_savings.add(sym["file"])
+            try:
+                raw_bytes_total += os.path.getsize(store._content_dir(owner, name) / sym["file"])
+            except OSError:
+                pass
+        response_bytes_total += sym.get("byte_length", 0)
+
+    tokens_saved = estimate_savings(raw_bytes_total, response_bytes_total)
     total_saved = record_savings(tokens_saved, tool_name="get_context_bundle")
 
     elapsed = (time.perf_counter() - start) * 1000
-
-    meta = {
+    meta_kwargs = {
         "tokens_saved": tokens_saved,
         "total_tokens_saved": total_saved,
+        **_cost_avoided(tokens_saved, total_saved),
     }
-    meta.update(_cost_avoided(tokens_saved, total_saved))
+
+    # ── Single-symbol: preserve original flat response shape ──────────────────
+    if not multi:
+        e = symbol_entries[0]
+        result = {
+            "symbol_id": e["symbol_id"],
+            "name": e["name"],
+            "kind": e["kind"],
+            "file": e["file"],
+            "line": e["line"],
+            "end_line": e["end_line"],
+            "signature": e["signature"],
+            "docstring": e["docstring"],
+            "source": e["source"],
+            "imports": e["imports"],
+        }
+        if include_callers:
+            result["callers"] = e["callers"]
+        result["_meta"] = _make_meta(elapsed, **meta_kwargs)
+        return result
+
+    # ── Multi-symbol: new format with deduped file import map ─────────────────
+    files_map: dict[str, dict] = {}
+    for sym_file, imports in file_imports_cache.items():
+        files_map[sym_file] = {"imports": imports}
 
     return {
-        "symbol_id": symbol["id"],
-        "name": symbol["name"],
-        "kind": symbol["kind"],
-        "file": symbol["file"],
-        "line": symbol["line"],
-        "end_line": symbol["end_line"],
-        "signature": symbol["signature"],
-        "docstring": symbol.get("docstring", ""),
-        "source": source or "",
-        "imports": imports,
-        "_meta": _make_meta(elapsed, **meta),
+        "repo": f"{owner}/{name}",
+        "symbol_count": len(symbol_entries),
+        "symbols": symbol_entries,
+        "files": files_map,
+        "_meta": _make_meta(elapsed, **meta_kwargs),
     }

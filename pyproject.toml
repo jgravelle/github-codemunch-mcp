@@ -1,6 +1,6 @@
 [project]
 name = "jcodemunch-mcp"
-version = "1.5.7"
+version = "1.6.1"
 description = "Token-efficient MCP server for source code exploration via tree-sitter AST parsing"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,7 +18,8 @@ anthropic = ["anthropic>=0.40.0"]
 gemini = ["google-generativeai>=0.8.0"]
 dbt = ["pyyaml>=6.0"]
 http = ["uvicorn>=0.20.0", "starlette>=0.27.0", "anyio>=4.0.0"]
-all = ["anthropic>=0.40.0", "google-generativeai>=0.8.0", "pyyaml>=6.0", "uvicorn>=0.20.0", "starlette>=0.27.0", "anyio>=4.0.0"]
+watch = ["watchfiles>=1.0.0"]
+all = ["anthropic>=0.40.0", "google-generativeai>=0.8.0", "pyyaml>=6.0", "uvicorn>=0.20.0", "starlette>=0.27.0", "anyio>=4.0.0", "watchfiles>=1.0.0"]
 
 
 [project.scripts]
