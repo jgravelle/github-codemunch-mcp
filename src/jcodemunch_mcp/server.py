@@ -6,6 +6,7 @@ import functools
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
@@ -830,48 +831,8 @@ async def run_streamable_http_server(host: str, port: int):
     await uvicorn.Server(config).serve()
 
 
-def main(argv: Optional[list[str]] = None):
-    """Main entry point."""
-    parser = argparse.ArgumentParser(
-        prog="jcodemunch-mcp",
-        description="Run the jCodeMunch MCP server.",
-    )
-    parser.add_argument(
-        "-V",
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-    )
-    parser.add_argument(
-        "--transport",
-        default=os.environ.get("JCODEMUNCH_TRANSPORT", "stdio"),
-        choices=["stdio", "sse", "streamable-http"],
-        help="Transport mode: stdio (default), sse, or streamable-http (also via JCODEMUNCH_TRANSPORT env var)",
-    )
-    parser.add_argument(
-        "--host",
-        default=os.environ.get("JCODEMUNCH_HOST", "127.0.0.1"),
-        help="Host to bind to in HTTP transport mode (also via JCODEMUNCH_HOST env var, default: 127.0.0.1)",
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=int(os.environ.get("JCODEMUNCH_PORT", "8901")),
-        help="Port to listen on in HTTP transport mode (also via JCODEMUNCH_PORT env var, default: 8901)",
-    )
-    parser.add_argument(
-        "--log-level",
-        default=os.environ.get("JCODEMUNCH_LOG_LEVEL", "WARNING"),
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Log level (also via JCODEMUNCH_LOG_LEVEL env var)",
-    )
-    parser.add_argument(
-        "--log-file",
-        default=os.environ.get("JCODEMUNCH_LOG_FILE"),
-        help="Log file path (also via JCODEMUNCH_LOG_FILE env var). Defaults to stderr.",
-    )
-    args = parser.parse_args(argv)
-
+def _setup_logging(args) -> None:
+    """Configure logging from parsed args."""
     log_level = getattr(logging, args.log_level)
     handlers: list[logging.Handler] = []
     if args.log_file:
@@ -891,12 +852,129 @@ def main(argv: Optional[list[str]] = None):
     if extra_ext:
         logging.getLogger(__name__).info("JCODEMUNCH_EXTRA_EXTENSIONS: %s", extra_ext)
 
-    if args.transport == "sse":
-        asyncio.run(run_sse_server(args.host, args.port))
-    elif args.transport == "streamable-http":
-        asyncio.run(run_streamable_http_server(args.host, args.port))
+
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
+    """Add logging args shared by all subcommands."""
+    parser.add_argument(
+        "--log-level",
+        default=os.environ.get("JCODEMUNCH_LOG_LEVEL", "WARNING"),
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Log level (also via JCODEMUNCH_LOG_LEVEL env var)",
+    )
+    parser.add_argument(
+        "--log-file",
+        default=os.environ.get("JCODEMUNCH_LOG_FILE"),
+        help="Log file path (also via JCODEMUNCH_LOG_FILE env var). Defaults to stderr.",
+    )
+
+
+def main(argv: Optional[list[str]] = None):
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        prog="jcodemunch-mcp",
+        description="jCodeMunch MCP server and tools.",
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+
+    subparsers = parser.add_subparsers(dest="command")
+
+    # --- serve (default when no subcommand given) ---
+    serve_parser = subparsers.add_parser("serve", help="Run the MCP server (default)")
+    serve_parser.add_argument(
+        "--transport",
+        default=os.environ.get("JCODEMUNCH_TRANSPORT", "stdio"),
+        choices=["stdio", "sse", "streamable-http"],
+        help="Transport mode: stdio (default), sse, or streamable-http (also via JCODEMUNCH_TRANSPORT env var)",
+    )
+    serve_parser.add_argument(
+        "--host",
+        default=os.environ.get("JCODEMUNCH_HOST", "127.0.0.1"),
+        help="Host to bind to in HTTP transport mode (also via JCODEMUNCH_HOST env var, default: 127.0.0.1)",
+    )
+    serve_parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("JCODEMUNCH_PORT", "8901")),
+        help="Port to listen on in HTTP transport mode (also via JCODEMUNCH_PORT env var, default: 8901)",
+    )
+    _add_common_args(serve_parser)
+
+    # --- watch ---
+    watch_parser = subparsers.add_parser(
+        "watch",
+        help="Watch folders for changes and auto-reindex",
+    )
+    watch_parser.add_argument(
+        "paths",
+        nargs="+",
+        help="One or more folder paths to watch",
+    )
+    watch_parser.add_argument(
+        "--debounce",
+        type=int,
+        default=int(os.environ.get("JCODEMUNCH_WATCH_DEBOUNCE_MS", "2000")),
+        help="Debounce interval in milliseconds (default: 2000, also via JCODEMUNCH_WATCH_DEBOUNCE_MS)",
+    )
+    watch_parser.add_argument(
+        "--no-ai-summaries",
+        action="store_true",
+        help="Disable AI-generated summaries during re-indexing",
+    )
+    watch_parser.add_argument(
+        "--follow-symlinks",
+        action="store_true",
+        help="Include symlinked files in indexing",
+    )
+    watch_parser.add_argument(
+        "--extra-ignore",
+        nargs="*",
+        help="Additional gitignore-style patterns to exclude",
+    )
+    _add_common_args(watch_parser)
+
+    # Backwards compat: if first non-flag arg isn't a known subcommand,
+    # prepend "serve" so legacy invocations like `jcodemunch-mcp --transport sse` still work.
+    # But let --help and -V be handled by the top-level parser first.
+    raw_argv = argv if argv is not None else sys.argv[1:]
+    top_level_flags = {"-h", "--help", "-V", "--version"}
+    if any(arg in top_level_flags for arg in raw_argv):
+        args = parser.parse_args(raw_argv)
     else:
-        asyncio.run(run_stdio_server())
+        known_commands = {"serve", "watch"}
+        has_subcommand = any(arg in known_commands for arg in raw_argv if not arg.startswith("-"))
+        if not has_subcommand:
+            raw_argv = ["serve"] + list(raw_argv)
+        args = parser.parse_args(raw_argv)
+
+    _setup_logging(args)
+
+    if args.command == "watch":
+        from .watcher import watch_folders
+
+        use_ai = not args.no_ai_summaries and _default_use_ai_summaries()
+        asyncio.run(
+            watch_folders(
+                paths=args.paths,
+                debounce_ms=args.debounce,
+                use_ai_summaries=use_ai,
+                storage_path=os.environ.get("CODE_INDEX_PATH"),
+                extra_ignore_patterns=args.extra_ignore,
+                follow_symlinks=args.follow_symlinks,
+            )
+        )
+    else:
+        # serve (default)
+        if args.transport == "sse":
+            asyncio.run(run_sse_server(args.host, args.port))
+        elif args.transport == "streamable-http":
+            asyncio.run(run_streamable_http_server(args.host, args.port))
+        else:
+            asyncio.run(run_stdio_server())
 
 
 if __name__ == "__main__":
