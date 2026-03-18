@@ -535,32 +535,6 @@ Use this when:
 * the repo changed substantially
 * you want a clean reset
 
-| Tool                  | Purpose                          | Key Parameters                                                     |
-| --------------------- | -------------------------------- | ------------------------------------------------------------------ |
-| `index_repo`          | Index GitHub repository          | `url`, `use_ai_summaries`                                          |
-| `index_folder`        | Index local folder               | `path`, `extra_ignore_patterns`, `follow_symlinks`                 |
-| `list_repos`          | List all indexed repositories    | —                                                                  |
-| `get_file_tree`       | Browse file structure            | `repo`, `path_prefix`                                              |
-| `get_file_outline`    | Symbols in a file                | `repo`, `file_path`                                                |
-| `get_file_content`    | Cached file content              | `repo`, `file_path`, `start_line`, `end_line`                      |
-| `get_symbol`          | Full source of one symbol        | `repo`, `symbol_id`, `verify`, `context_lines`                     |
-| `get_symbols`         | Batch retrieve symbols           | `repo`, `symbol_ids`                                               |
-| `search_symbols`      | Search symbols                   | `repo`, `query`, `kind`, `language`, `file_pattern`, `max_results` |
-| `search_text`         | Full-text search                 | `repo`, `query`, `file_pattern`, `max_results`, `context_lines`    |
-| `search_columns`      | Search column metadata           | `repo`, `query`, `model_pattern`, `max_results`                    |
-| `get_repo_outline`    | High-level overview              | `repo`                                                             |
-| `invalidate_cache`    | Delete cached index              | `repo`                                                             |
-| `find_importers`      | Find files importing a file      | `repo`, `file_path`, `max_results`                                 |
-| `find_references`     | Find files referencing a symbol  | `repo`, `identifier`, `max_results`                                |
-| `get_context_bundle`  | Symbol source + imports          | `repo`, `symbol_id`/`symbol_ids`, `include_callers`                |
-| `get_session_stats`   | Token savings statistics         | —                                                                  |
-| `get_dependency_graph`| File dependency graph            | `repo`, `file`, `direction`, `depth`                               |
-| `get_blast_radius`    | Analyze impact of changes        | `repo`, `symbol`, `depth`                                          |
-| `get_symbol_diff`     | Compare repos/branches           | `repo_a`, `repo_b`                                                 |
-| `get_class_hierarchy` | Class inheritance                | `repo`, `class_name`                                               |
-| `get_related_symbols` | Find related symbols             | `repo`, `symbol_id`, `max_results`                                 |
-| `suggest_queries`     | Suggest search queries           | `repo`                                                             |
-
 ---
 
 # 5. Core mental model
@@ -600,20 +574,31 @@ These IDs stay stable across re-indexing as long as path, qualified name, and ki
 
 # 6. Tool reference
 
-| Tool               | What it does              | Key parameters                                                     |
-| ------------------ | ------------------------- | ------------------------------------------------------------------ |
-| `index_repo`       | Index a GitHub repository | `url`, `use_ai_summaries`                                          |
-| `index_folder`     | Index a local folder      | `path`, `extra_ignore_patterns`, `follow_symlinks`                 |
-| `list_repos`       | List indexed repos        | —                                                                  |
-| `get_file_tree`    | Browse file structure     | `repo`, `path_prefix`                                              |
-| `get_file_outline` | Show symbols in a file    | `repo`, `file_path`                                                |
-| `get_file_content` | Read cached file content  | `repo`, `file_path`, `start_line`, `end_line`                      |
-| `get_symbol`       | Retrieve one symbol       | `repo`, `symbol_id`, `verify`, `context_lines`                     |
-| `get_symbols`      | Retrieve multiple symbols | `repo`, `symbol_ids`                                               |
-| `search_symbols`   | Search the symbol index   | `repo`, `query`, `kind`, `language`, `file_pattern`, `max_results` |
-| `search_text`      | Full-text search          | `repo`, `query`, `file_pattern`, `max_results`, `context_lines`    |
-| `get_repo_outline` | High-level repo overview  | `repo`                                                             |
-| `invalidate_cache` | Remove cached index       | `repo`                                                             |
+| #  | Tool                  | Purpose                          | Key Parameters                                                     |
+| -- | --------------------- | -------------------------------- | ------------------------------------------------------------------ |
+| 1  | `index_repo`          | Index GitHub repository          | `url`, `use_ai_summaries`                                          |
+| 2  | `index_folder`        | Index local folder               | `path`, `extra_ignore_patterns`, `follow_symlinks`                 |
+| 3  | `list_repos`          | List all indexed repositories    | —                                                                  |
+| 4  | `get_file_tree`       | Browse file structure            | `repo`, `path_prefix`                                              |
+| 5  | `get_file_outline`    | Symbols in a file                | `repo`, `file_path`                                                |
+| 6  | `get_file_content`    | Cached file content              | `repo`, `file_path`, `start_line`, `end_line`                      |
+| 7  | `get_symbol`          | Full source of one symbol        | `repo`, `symbol_id`, `verify`, `context_lines`                     |
+| 8  | `get_symbols`         | Batch retrieve symbols           | `repo`, `symbol_ids`                                               |
+| 9  | `search_symbols`      | Search symbols                   | `repo`, `query`, `kind`, `language`, `file_pattern`, `max_results` |
+| 10 | `search_text`         | Full-text search                 | `repo`, `query`, `file_pattern`, `max_results`, `context_lines`    |
+| 11 | `search_columns`      | Search column metadata           | `repo`, `query`, `model_pattern`, `max_results`                    |
+| 12 | `get_repo_outline`    | High-level overview              | `repo`                                                             |
+| 13 | `invalidate_cache`    | Delete cached index              | `repo`                                                             |
+| 14 | `find_importers`      | Find files importing a file      | `repo`, `file_path`, `max_results`                                 |
+| 15 | `find_references`     | Find files referencing a symbol  | `repo`, `identifier`, `max_results`                                |
+| 16 | `get_context_bundle`  | Symbol source + imports          | `repo`, `symbol_id`/`symbol_ids`, `include_callers`                |
+| 17 | `get_session_stats`   | Token savings statistics         | —                                                                  |
+| 18 | `get_dependency_graph`| File dependency graph            | `repo`, `file`, `direction`, `depth`                               |
+| 19 | `get_blast_radius`    | Analyze impact of changes        | `repo`, `symbol`, `depth`                                          |
+| 20 | `get_symbol_diff`     | Compare repos/branches           | `repo_a`, `repo_b`                                                 |
+| 21 | `get_class_hierarchy` | Class inheritance                | `repo`, `class_name`                                               |
+| 22 | `get_related_symbols` | Find related symbols             | `repo`, `symbol_id`, `max_results`                                 |
+| 23 | `suggest_queries`     | Suggest search queries           | `repo`                                                             |
 
 ---
 
