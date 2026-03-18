@@ -1076,6 +1076,13 @@ def main(argv: Optional[list[str]] = None):
         nargs="*",
         help="Additional gitignore-style patterns to exclude",
     )
+    watch_parser.add_argument(
+        "--idle-timeout",
+        type=int,
+        default=None,
+        metavar="MINUTES",
+        help="Auto-shutdown after N minutes with no re-indexing (default: disabled)",
+    )
     _add_common_args(watch_parser)
 
     # Backwards compat: if first non-flag arg isn't a known subcommand,
@@ -1106,6 +1113,7 @@ def main(argv: Optional[list[str]] = None):
                 storage_path=os.environ.get("CODE_INDEX_PATH"),
                 extra_ignore_patterns=args.extra_ignore,
                 follow_symlinks=args.follow_symlinks,
+                idle_timeout_minutes=args.idle_timeout,
             )
         )
     else:
