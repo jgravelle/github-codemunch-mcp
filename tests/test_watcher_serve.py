@@ -54,6 +54,91 @@ class TestExternalStopEvent:
 # Task 2: Parse watcher flag (placeholder - implemented in server.py)
 # ---------------------------------------------------------------------------
 
+class TestServeWatcherCliArgs:
+    """CLI argument parsing for --watcher on serve subcommand."""
+
+    def test_watcher_flag_absent_is_none(self):
+        from jcodemunch_mcp.server import main
+        captured = []
+
+        def capturing_run(coro, *a, **kw):
+            captured.append(coro)
+
+        with patch("jcodemunch_mcp.server.asyncio.run", side_effect=capturing_run):
+            try:
+                main(["serve"])
+            except SystemExit:
+                pass
+
+        # The coroutine should be run_stdio_server (no wrapper)
+        assert len(captured) == 1
+        assert "watcher" not in captured[0].cr_code.co_name
+        captured[0].close()
+
+    def test_watcher_flag_present_no_value(self):
+        """--watcher with no value should enable the watcher."""
+        from jcodemunch_mcp.server import main
+        captured = []
+
+        def capturing_run(coro, *a, **kw):
+            captured.append(coro)
+
+        with patch("jcodemunch_mcp.server.asyncio.run", side_effect=capturing_run):
+            try:
+                main(["serve", "--watcher"])
+            except SystemExit:
+                pass
+
+        assert len(captured) == 1
+        # Should be _run_server_with_watcher
+        assert "watcher" in captured[0].cr_code.co_name
+        captured[0].close()
+
+    def test_watcher_path_defaults_to_cwd(self, tmp_path):
+        """--watcher without --watcher-path uses CWD."""
+        from jcodemunch_mcp.server import main
+        captured = []
+
+        def capturing_run(coro, *a, **kw):
+            captured.append(coro)
+
+        with patch("jcodemunch_mcp.server.asyncio.run", side_effect=capturing_run), \
+             patch("os.getcwd", return_value=str(tmp_path)):
+            try:
+                main(["serve", "--watcher"])
+            except SystemExit:
+                pass
+
+        coro = captured[0]
+        # Inspect the watcher_kwargs passed to _run_server_with_watcher
+        frame = coro.cr_frame
+        watcher_kwargs = frame.f_locals.get("watcher_kwargs")
+        assert watcher_kwargs["paths"] == [str(tmp_path)]
+        coro.close()
+
+    def test_watcher_false_means_no_watcher(self):
+        """--watcher=false should not launch the watcher."""
+        from jcodemunch_mcp.server import main
+        captured = []
+
+        def capturing_run(coro, *a, **kw):
+            captured.append(coro)
+
+        with patch("jcodemunch_mcp.server.asyncio.run", side_effect=capturing_run):
+            try:
+                main(["serve", "--watcher=false"])
+            except SystemExit:
+                pass
+
+        assert len(captured) == 1
+        assert "watcher" not in captured[0].cr_code.co_name
+        captured[0].close()
+
+
+# ---------------------------------------------------------------------------
+# Task 2: Parse watcher flag (placeholder - implemented in server.py)
+# ---------------------------------------------------------------------------
+
 class TestParseWatcherFlag:
     """Unit tests for _parse_watcher_flag."""
 

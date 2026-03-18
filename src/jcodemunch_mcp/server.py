@@ -1057,6 +1057,61 @@ def main(argv: Optional[list[str]] = None):
     )
     _add_common_args(serve_parser)
 
+    # --- Watcher options for serve ---
+    serve_parser.add_argument(
+        "--watcher",
+        nargs="?",
+        const="true",
+        default=None,
+        metavar="BOOL",
+        help="Enable background file watcher alongside the server. "
+             "Use --watcher or --watcher=true to enable, --watcher=false to disable.",
+    )
+    serve_parser.add_argument(
+        "--watcher-path",
+        nargs="*",
+        default=None,
+        metavar="PATH",
+        help="Folder(s) to watch (default: current working directory)",
+    )
+    serve_parser.add_argument(
+        "--watcher-debounce",
+        type=int,
+        default=int(os.environ.get("JCODEMUNCH_WATCH_DEBOUNCE_MS", "2000")),
+        help="Watcher debounce interval in ms (default: 2000, also via JCODEMUNCH_WATCH_DEBOUNCE_MS)",
+    )
+    serve_parser.add_argument(
+        "--watcher-idle-timeout",
+        type=int,
+        default=None,
+        metavar="MINUTES",
+        help="Auto-stop watcher after N minutes with no re-indexing (default: disabled)",
+    )
+    serve_parser.add_argument(
+        "--watcher-no-ai-summaries",
+        action="store_true",
+        help="Disable AI-generated summaries for watcher re-indexing",
+    )
+    serve_parser.add_argument(
+        "--watcher-extra-ignore",
+        nargs="*",
+        help="Additional gitignore-style patterns to exclude from watching",
+    )
+    serve_parser.add_argument(
+        "--watcher-follow-symlinks",
+        action="store_true",
+        help="Include symlinked files in watcher indexing",
+    )
+    serve_parser.add_argument(
+        "--watcher-log",
+        nargs="?",
+        const="auto",
+        default=None,
+        metavar="PATH",
+        help="Log watcher output to file instead of stderr. "
+             "Use --watcher-log for auto temp file, or --watcher-log=<path> for a specific file.",
+    )
+
     # --- watch ---
     watch_parser = subparsers.add_parser(
         "watch",
