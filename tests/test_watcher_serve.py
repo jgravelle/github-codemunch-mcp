@@ -207,3 +207,49 @@ class TestParseWatcherFlag:
         from jcodemunch_mcp.server import _parse_watcher_flag
         for val in ("false", "False", "0", "no", "No"):
             assert _parse_watcher_flag(val) is False, f"Failed for {val!r}"
+
+
+# ---------------------------------------------------------------------------
+# Task 5: Lock cleanup on external stop
+# ---------------------------------------------------------------------------
+
+class TestLockCleanupOnExternalStop:
+    """Verify locks are released when watch_folders is stopped externally."""
+
+    @pytest.fixture()
+    def folders(self, tmp_path):
+        d = tmp_path / "proj"
+        d.mkdir()
+        return d, tmp_path / "storage"
+
+    def test_locks_released_after_external_stop(self, folders):
+        folder, storage = folders
+        storage.mkdir()
+
+        from jcodemunch_mcp.watcher import _lock_path
+
+        async def run():
+            stop = asyncio.Event()
+
+            async def set_stop_soon():
+                await asyncio.sleep(0.1)
+                stop.set()
+
+            with patch("jcodemunch_mcp.watcher._watch_single") as mock_ws:
+                # _watch_single should just wait forever
+                async def hang(**kw):
+                    await asyncio.Event().wait()
+                mock_ws.side_effect = hang
+
+                asyncio.create_task(set_stop_soon())
+                await watch_folders(
+                    paths=[str(folder)],
+                    storage_path=str(storage),
+                    stop_event=stop,
+                )
+
+            # Lock file should be gone after clean shutdown
+            lp = _lock_path(str(folder), str(storage))
+            assert not lp.exists(), f"Lock file not cleaned up: {lp}"
+
+        asyncio.run(run())
