@@ -393,20 +393,34 @@ async def watch_folders(
 
     # --- Log file setup ---
     _this_handlers: list[logging.Handler] = []
+    _watcher_logger = logging.getLogger("jcodemunch_mcp.watcher")
+    _saved_propagate = _watcher_logger.propagate
     if log_file:
         _log_path = log_file
         if _log_path == "auto":
             _log_path = os.path.join(tempfile.gettempdir(), f"jcw_{os.getpid()}.log")
-        _watcher_logger = logging.getLogger("jcodemunch_mcp.watcher")
-        _fh = logging.FileHandler(_log_path, encoding="utf-8")
-        _fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-        _watcher_logger.addHandler(_fh)
-        _this_handlers.append(_fh)
-        _watcher_logger.propagate = False
-        # Use FileHandler's stream for _watcher_output (no separate open)
-        _watcher_output_stream: Optional[IO] = _fh.stream
+        try:
+            _fh = logging.FileHandler(_log_path, encoding="utf-8")
+        except OSError as exc:
+            _watcher_output(
+                f"WARNING: could not open watcher log {_log_path!r}: {exc} — falling back to quiet mode",
+                quiet=False,
+                log_file_handle=None,
+            )
+            log_file = None
+            _nh = logging.NullHandler()
+            _watcher_logger.addHandler(_nh)
+            _this_handlers.append(_nh)
+            _watcher_logger.propagate = False
+            _watcher_output_stream: Optional[IO] = None
+        else:
+            _fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+            _watcher_logger.addHandler(_fh)
+            _this_handlers.append(_fh)
+            _watcher_logger.propagate = False
+            # Use FileHandler's stream for _watcher_output (no separate open)
+            _watcher_output_stream: Optional[IO] = _fh.stream
     elif quiet:
-        _watcher_logger = logging.getLogger("jcodemunch_mcp.watcher")
         _nh = logging.NullHandler()
         _watcher_logger.addHandler(_nh)
         _this_handlers.append(_nh)
@@ -501,13 +515,14 @@ async def watch_folders(
         # Release locks
         for folder in locked_folders:
             _release_lock(folder, storage_path)
+        # Print "Done." before closing handlers (stream is still open)
+        _watcher_output("Done.", quiet=quiet, log_file_handle=_watcher_output_stream if log_file else None)
         # Clean up only handlers THIS invocation added
         _wl = logging.getLogger("jcodemunch_mcp.watcher")
         for h in _this_handlers:
             h.close()
             _wl.removeHandler(h)
-        _wl.propagate = True
-        _watcher_output("Done.", quiet=quiet, log_file_handle=_watcher_output_stream if log_file else None)
+        _wl.propagate = _saved_propagate
 
 
 # ---------------------------------------------------------------------------

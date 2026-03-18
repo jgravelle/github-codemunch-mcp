@@ -490,19 +490,21 @@ class TestLoggerPropagation:
 # ---------------------------------------------------------------------------
 
 def test_watcher_log_permission_error_is_warning_not_crash(tmp_path):
-    """Unopenable log file produces a WARNING but does not crash the server."""
-    import sys
+    """Unopenable log file is handled gracefully inside watch_folders — no crash at server level.
+
+    Permission handling was moved from server.py into watch_folders (watcher.py), which
+    catches OSError on FileHandler creation and falls back to quiet mode with a warning.
+    The server never sees the error; it passes log_path through unchanged.
+    """
     from jcodemunch_mcp.server import _run_server_with_watcher
-    import io
-
-    captured = []
-
-    mock_stderr = io.StringIO()
 
     async def fake_server():
         await asyncio.sleep(0.05)
 
+    watcher_kwargs_received = {}
+
     async def fake_watch_folders(**kwargs):
+        watcher_kwargs_received.update(kwargs)
         stop = kwargs.get("stop_event")
         if stop:
             stop.set()
@@ -512,24 +514,19 @@ def test_watcher_log_permission_error_is_warning_not_crash(tmp_path):
 
     async def run():
         with patch("jcodemunch_mcp.server.watch_folders", side_effect=fake_watch_folders):
-            with patch("sys.stderr", mock_stderr):
-                await _run_server_with_watcher(
-                    fake_server, (),
-                    dict(paths=["."], debounce_ms=2000, use_ai_summaries=False,
-                         storage_path=None, extra_ignore_patterns=None,
-                         follow_symlinks=False, idle_timeout_minutes=None),
-                    log_path=protected_path,
-                )
+            await _run_server_with_watcher(
+                fake_server, (),
+                dict(paths=["."], debounce_ms=2000, use_ai_summaries=False,
+                     storage_path=None, extra_ignore_patterns=None,
+                     follow_symlinks=False, idle_timeout_minutes=None),
+                log_path=protected_path,
+            )
 
-    # The function should NOT raise PermissionError; it should warn and continue
-    try:
-        asyncio.run(run())
-    except (PermissionError, OSError):
-        pass  # This is the bug - it should not raise
+    # The function must NOT raise PermissionError/OSError — server stays up
+    asyncio.run(run())
 
-    output = mock_stderr.getvalue()
-    # Should have warned about the log file
-    assert "WARNING" in output or "PermissionError" in output or "could not open" in output
+    # server.py passes log_path through to watch_folders (which handles OSError internally)
+    assert watcher_kwargs_received.get("log_file") == protected_path
 
 
 # ---------------------------------------------------------------------------

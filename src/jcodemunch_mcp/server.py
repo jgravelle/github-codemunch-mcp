@@ -883,15 +883,6 @@ async def _run_server_with_watcher(
             f"jcw_{os.getpid()}.log",
         )
 
-    if log_path:
-        try:
-            open(log_path, "w", encoding="utf-8").close()
-        except (PermissionError, OSError) as exc:
-            print(f"WARNING: could not open watcher log {log_path!r}: {exc}", file=sys.stderr)
-            log_path = None
-        else:
-            pass
-
     stop_event = asyncio.Event()
     watcher_task = asyncio.create_task(
         watch_folders(
@@ -902,6 +893,13 @@ async def _run_server_with_watcher(
         ),
         name="embedded-watcher",
     )
+
+    # Give watcher a moment to start; detect early failures before blocking on server
+    await asyncio.sleep(0.1)
+    if watcher_task.done() and not watcher_task.cancelled():
+        exc = watcher_task.exception()
+        if exc is not None:
+            logger.warning("Embedded watcher failed to start: %s", exc)
 
     try:
         await server_coro_func(*server_args)
@@ -915,8 +913,8 @@ async def _run_server_with_watcher(
                 await watcher_task
             except asyncio.CancelledError:
                 pass
-        except WatcherError as exc:
-            logger.warning("Watcher stopped early: %s", exc)
+        except (WatcherError, Exception) as exc:
+            logger.warning("Watcher stopped with error: %s", exc)
 
 
 async def run_stdio_server():
