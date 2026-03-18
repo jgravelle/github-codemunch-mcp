@@ -129,6 +129,10 @@ PORCELAIN_OUTPUT = textwrap.dedent("""\
     HEAD 789abc
     branch refs/heads/worktree-feature-auth
 
+    worktree /home/user/.claude/worktrees/claude-feature-x
+    HEAD ccc333
+    branch refs/heads/claude/feature-x
+
     worktree /home/user/.claude/worktrees/manual-branch
     HEAD aaa111
     branch refs/heads/feature/manual
@@ -153,9 +157,10 @@ class TestParseGitWorktrees:
 
     def test_filters_by_branch(self):
         result = self._run_with_output(PORCELAIN_OUTPUT)
-        # Should include agent/* and worktree-* but not main or feature/manual
+        # Should include agent/*, claude/* and worktree-* but not main or feature/manual
         assert "/home/user/.claude-worktrees/project/dreamy-fox" in result
         assert "/home/user/.claude/worktrees/feature-auth" in result
+        assert "/home/user/.claude/worktrees/claude-feature-x" in result
         assert "/home/user/.claude/worktrees/manual-branch" not in result
 
     def test_skips_main_worktree(self):

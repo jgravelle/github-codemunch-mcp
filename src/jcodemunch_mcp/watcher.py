@@ -515,7 +515,7 @@ async def watch_folders(
 # ---------------------------------------------------------------------------
 
 # Branch patterns that indicate an agent-created worktree
-_WORKTREE_BRANCH_RE = re.compile(r"^refs/heads/(agent/|worktree-)")
+_WORKTREE_BRANCH_RE = re.compile(r"^refs/heads/(claude/|agent/|worktree-)")
 
 
 def _local_repo_id(folder_path: str) -> str:
