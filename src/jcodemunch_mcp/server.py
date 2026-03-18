@@ -50,6 +50,18 @@ def _default_use_ai_summaries() -> bool:
     return True  # default on
 
 
+def _parse_watcher_flag(value: Optional[str]) -> bool:
+    """Parse the --watcher flag value.
+
+    None = not provided (disabled).
+    'true'/'1'/'yes' = enabled (const from nargs='?').
+    'false'/'0'/'no' = explicitly disabled.
+    """
+    if value is None:
+        return False
+    return value.lower() not in ("0", "no", "false")
+
+
 # Create server
 server = Server("jcodemunch-mcp")
 
