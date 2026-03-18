@@ -136,6 +136,58 @@ class TestServeWatcherCliArgs:
 
 
 # ---------------------------------------------------------------------------
+# Task 4: _run_server_with_watcher integration
+# ---------------------------------------------------------------------------
+
+class TestRunServerWithWatcher:
+    """Integration: server + watcher lifecycle."""
+
+    def test_watcher_stops_when_server_exits(self):
+        """When the server coroutine completes, the watcher should be stopped."""
+        from jcodemunch_mcp.server import _run_server_with_watcher
+
+        watcher_stopped = False
+
+        async def fake_server():
+            await asyncio.sleep(0.05)  # simulate short-lived server
+
+        async def fake_watch_folders(**kwargs):
+            nonlocal watcher_stopped
+            stop = kwargs["stop_event"]
+            await stop.wait()
+            watcher_stopped = True
+
+        async def run():
+            with patch("jcodemunch_mcp.server.watch_folders", side_effect=fake_watch_folders):
+                await _run_server_with_watcher(
+                    fake_server, (),
+                    dict(paths=["."], debounce_ms=2000, use_ai_summaries=False,
+                         storage_path=None, extra_ignore_patterns=None,
+                         follow_symlinks=False, idle_timeout_minutes=None),
+                )
+
+        asyncio.run(run())
+        assert watcher_stopped
+
+    def test_missing_watchfiles_exits_cleanly(self, tmp_path):
+        """--watcher with missing watchfiles should exit with error."""
+        from jcodemunch_mcp.server import main
+
+        import builtins
+        real_import = builtins.__import__
+
+        def blocking_import(name, *args, **kwargs):
+            if name == "watchfiles":
+                raise ImportError(f"No module named '{name}'")
+            return real_import(name, *args, **kwargs)
+
+        with patch.object(builtins, "__import__", side_effect=blocking_import):
+            with pytest.raises(SystemExit) as exc_info:
+                main(["serve", "--watcher"])
+            assert exc_info.value.code == 1
+
+
+# ---------------------------------------------------------------------------
 # Task 2: Parse watcher flag (placeholder - implemented in server.py)
 # ---------------------------------------------------------------------------
 
