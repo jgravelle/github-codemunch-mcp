@@ -782,7 +782,7 @@ wheels = [
 
 [[package]]
 name = "jcodemunch-mcp"
-version = "1.5.7"
+version = "1.7.2"
 source = { editable = "." }
 dependencies = [
     { name = "filelock" },
