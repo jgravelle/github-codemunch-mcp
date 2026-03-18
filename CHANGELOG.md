@@ -2,6 +2,18 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [Unreleased]
+
+### Added
+- **`watch-claude` CLI subcommand** — auto-discover and watch Claude Code worktrees via two complementary modes:
+  - **Hook-driven mode** (recommended): install `WorktreeCreate`/`WorktreeRemove` hooks that call `jcodemunch-mcp hook-event create|remove`. Events are written to `~/.claude/jcodemunch-worktrees.jsonl` and `watch-claude` reacts instantly via filesystem watch.
+  - **`--repos` mode**: `jcodemunch-mcp watch-claude --repos ~/project1 ~/project2` polls `git worktree list --porcelain` and filters for Claude-created worktrees (branches matching `claude/*` or `worktree-*`).
+  - Both modes can run simultaneously. When a worktree is removed, the watcher stops and the index is invalidated.
+- **`hook-event` CLI subcommand** — `jcodemunch-mcp hook-event create|remove` reads Claude Code's hook JSON from stdin and appends to the JSONL manifest. Designed to be called from Claude Code's `WorktreeCreate`/`WorktreeRemove` hooks.
+
+### Changed
+- `main()` subcommand set expanded to include `hook-event` and `watch-claude`.
+
 ## [1.7.2] - 2026-03-17
 
 ### Fixed

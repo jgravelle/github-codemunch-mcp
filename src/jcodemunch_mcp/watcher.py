@@ -5,7 +5,9 @@ import hashlib
 import json
 import logging
 import os
+import re
 import signal
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -14,7 +16,9 @@ from typing import Callable, Optional
 
 from watchfiles import awatch, Change
 
+from .hook_event import DEFAULT_MANIFEST_PATH, read_manifest
 from .tools.index_folder import index_folder
+from .tools.invalidate_cache import invalidate_cache
 
 logger = logging.getLogger(__name__)
 
@@ -440,4 +444,298 @@ async def watch_folders(
     for folder in locked_folders:
         _release_lock(folder, storage_path)
 
+    print("Done.", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# watch-claude helpers
+# ---------------------------------------------------------------------------
+
+# Branch patterns that indicate a Claude Code-created worktree
+_CLAUDE_BRANCH_RE = re.compile(r"^refs/heads/(claude/|worktree-)")
+
+
+def _local_repo_id(folder_path: str) -> str:
+    """Compute the repo identifier that index_folder would use for a local path."""
+    p = Path(folder_path).resolve()
+    digest = hashlib.sha1(str(p).encode("utf-8")).hexdigest()[:8]
+    return f"local/{p.name}-{digest}"
+
+
+def parse_git_worktrees(repo_path: str) -> set[str]:
+    """Run ``git worktree list --porcelain`` and return paths of Claude-created worktrees.
+
+    Filters to worktrees whose branch matches ``claude/*`` or ``worktree-*``.
+    Skips the first entry (the main working copy) and prunable entries.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", repo_path, "worktree", "list", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return set()
+
+    if result.returncode != 0:
+        return set()
+
+    worktrees: set[str] = set()
+    current_path: Optional[str] = None
+    current_branch: Optional[str] = None
+    is_prunable = False
+    is_first = True
+
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            # Flush previous entry
+            if current_path and not is_first:
+                if current_branch and _CLAUDE_BRANCH_RE.match(current_branch) and not is_prunable:
+                    worktrees.add(current_path)
+            current_path = line[len("worktree "):]
+            current_branch = None
+            is_prunable = False
+            is_first = False if current_path else is_first
+        elif line.startswith("branch "):
+            current_branch = line[len("branch "):]
+        elif line.startswith("prunable"):
+            is_prunable = True
+        elif line == "":
+            # Blank line separates entries; flush
+            if current_path and not is_first:
+                if current_branch and _CLAUDE_BRANCH_RE.match(current_branch) and not is_prunable:
+                    worktrees.add(current_path)
+            # The very first entry was already processed when we hit the second "worktree" line,
+            # but handle the edge case of only one entry
+            current_path = None
+            current_branch = None
+            is_prunable = False
+
+    # Flush last entry (no trailing blank line in some git versions)
+    if current_path and current_branch and _CLAUDE_BRANCH_RE.match(current_branch) and not is_prunable:
+        worktrees.add(current_path)
+
+    return worktrees
+
+
+# ---------------------------------------------------------------------------
+# watch-claude main
+# ---------------------------------------------------------------------------
+
+
+async def watch_claude_worktrees(
+    repos: Optional[list[str]] = None,
+    poll_interval: float = 5,
+    debounce_ms: int = DEFAULT_DEBOUNCE_MS,
+    use_ai_summaries: bool = True,
+    storage_path: Optional[str] = None,
+    extra_ignore_patterns: Optional[list[str]] = None,
+    follow_symlinks: bool = False,
+) -> None:
+    """Watch Claude Code worktrees via JSONL manifest and/or git repo polling."""
+    manifest_path = DEFAULT_MANIFEST_PATH
+    use_manifest = manifest_path.is_file() or not repos
+    use_repos = bool(repos)
+
+    if not use_manifest and not use_repos:
+        print(
+            "ERROR: no manifest file found and no --repos specified.\n"
+            "Either install Claude Code hooks (see docs) or pass --repos.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    modes = []
+    if use_manifest:
+        modes.append(f"manifest ({manifest_path})")
+    if use_repos:
+        modes.append(f"repos ({len(repos)} repo(s), poll every {poll_interval}s)")
+    print(f"jcodemunch-mcp watch-claude: {' + '.join(modes)}", file=sys.stderr)
+
+    # Handle graceful shutdown
+    stop_event = asyncio.Event()
+    if sys.platform == "win32":
+        signal.signal(signal.SIGINT, lambda s, f: stop_event.set())
+        signal.signal(signal.SIGTERM, lambda s, f: stop_event.set())
+    else:
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, stop_event.set)
+
+    # Track active watchers: path -> task
+    active: dict[str, asyncio.Task] = {}
+
+    def _start_watching(folder: str) -> asyncio.Task:
+        return asyncio.create_task(
+            _watch_single(
+                folder_path=folder,
+                debounce_ms=debounce_ms,
+                use_ai_summaries=use_ai_summaries,
+                storage_path=storage_path,
+                extra_ignore_patterns=extra_ignore_patterns,
+                follow_symlinks=follow_symlinks,
+            ),
+            name=f"watch:{folder}",
+        )
+
+    async def _stop_watching(folder: str) -> None:
+        task = active.pop(folder, None)
+        if task:
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        repo_id = _local_repo_id(folder)
+        try:
+            result = await asyncio.to_thread(
+                invalidate_cache, repo=repo_id, storage_path=storage_path,
+            )
+            if result.get("success"):
+                print(f"  Cleaned up index for {repo_id}", file=sys.stderr)
+            else:
+                print(
+                    f"  WARNING: could not clean up index for {repo_id}: {result.get('error')}",
+                    file=sys.stderr,
+                )
+        except Exception as e:
+            logger.warning("Failed to invalidate cache for %s: %s", repo_id, e)
+
+    def _ensure_watching(folder: str) -> None:
+        if folder not in active and Path(folder).is_dir():
+            print(f"  New worktree detected: {folder}", file=sys.stderr)
+            active[folder] = _start_watching(folder)
+
+    # --- Initial discovery ---
+
+    if use_manifest:
+        for folder in sorted(read_manifest(manifest_path)):
+            _ensure_watching(folder)
+
+    if use_repos:
+        for repo in repos:
+            for folder in sorted(parse_git_worktrees(repo)):
+                _ensure_watching(folder)
+
+    if active:
+        print(f"  Found {len(active)} existing worktree(s)", file=sys.stderr)
+    else:
+        print("  No existing worktrees found, waiting for new ones...", file=sys.stderr)
+
+    # --- Manifest watcher task ---
+
+    async def _manifest_watcher() -> None:
+        """Watch the JSONL manifest for new lines and react to create/remove events."""
+        # Track file position to only read new lines
+        if manifest_path.is_file():
+            last_size = manifest_path.stat().st_size
+        else:
+            last_size = 0
+
+        async for _changes in awatch(
+            str(manifest_path.parent),
+            debounce=500,
+            recursive=False,
+            step=100,
+        ):
+            if not manifest_path.is_file():
+                continue
+            current_size = manifest_path.stat().st_size
+            if current_size <= last_size:
+                last_size = current_size
+                continue
+
+            # Read only new lines
+            import json as _json
+
+            with open(manifest_path) as f:
+                f.seek(last_size)
+                new_lines = f.read()
+            last_size = current_size
+
+            for line in new_lines.strip().splitlines():
+                try:
+                    entry = _json.loads(line)
+                except _json.JSONDecodeError:
+                    continue
+                path = entry.get("path")
+                event = entry.get("event")
+                if not path:
+                    continue
+                if event == "create":
+                    _ensure_watching(path)
+                elif event == "remove":
+                    if path in active:
+                        print(f"  Worktree removed (hook): {path}", file=sys.stderr)
+                        await _stop_watching(path)
+
+    # --- Repos poll task ---
+
+    async def _repos_poller() -> None:
+        """Poll git worktree list on each repo and start/stop watchers."""
+        while not stop_event.is_set():
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=poll_interval)
+                return
+            except asyncio.TimeoutError:
+                pass
+
+            current: set[str] = set()
+            for repo in repos:
+                current |= await asyncio.to_thread(parse_git_worktrees, repo)
+
+            # Only manage worktrees discovered via repos mode — don't touch
+            # manifest-discovered ones. We track repos-discovered paths via task names.
+            repos_known = {
+                folder for folder in active
+                if active[folder].get_name().startswith("watch:")
+            }
+
+            for folder in sorted(current - repos_known):
+                _ensure_watching(folder)
+
+            for folder in sorted(repos_known - current):
+                if folder in active:
+                    print(f"  Worktree removed (git): {folder}", file=sys.stderr)
+                    await _stop_watching(folder)
+
+            # Restart crashed watcher tasks
+            for folder in list(active):
+                task = active[folder]
+                if task.done() and not task.cancelled():
+                    exc = task.exception() if not task.cancelled() else None
+                    if exc:
+                        print(f"  Watcher crashed for {folder}: {exc}, restarting...", file=sys.stderr)
+                        active[folder] = _start_watching(folder)
+
+    # --- Launch tasks ---
+
+    management_tasks: list[asyncio.Task] = []
+
+    if use_manifest:
+        management_tasks.append(
+            asyncio.create_task(_manifest_watcher(), name="manifest-watcher")
+        )
+
+    if use_repos:
+        management_tasks.append(
+            asyncio.create_task(_repos_poller(), name="repos-poller")
+        )
+
+    # Wait until stop signal or a management task finishes
+    stop_waiter = asyncio.ensure_future(stop_event.wait())
+    await asyncio.wait(
+        [stop_waiter] + management_tasks,
+        return_when=asyncio.FIRST_COMPLETED,
+    )
+
+    # Clean up
+    print("\nShutting down watch-claude...", file=sys.stderr)
+    for t in management_tasks:
+        t.cancel()
+    for t in active.values():
+        t.cancel()
+    all_tasks = list(active.values()) + management_tasks
+    await asyncio.gather(*all_tasks, return_exceptions=True)
     print("Done.", file=sys.stderr)

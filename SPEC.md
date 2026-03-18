@@ -758,6 +758,8 @@ Cross-process locking is used to reduce the risk of index corruption under concu
 
 A watch-oriented interface may monitor directories and trigger incremental reindexing automatically.
 
+The `watch-claude` variant extends this for Claude Code specifically: it discovers worktrees via hook-driven events (`WorktreeCreate`/`WorktreeRemove` writing to a JSONL manifest) and/or by polling `git worktree list` on specified repositories. Both mechanisms are cross-platform and layout-agnostic.
+
 ---
 
 ## Token Savings Semantics

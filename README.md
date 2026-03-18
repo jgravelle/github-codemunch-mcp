@@ -75,7 +75,7 @@ That means:
 
 It indexes your codebase once using tree-sitter, stores structured symbol metadata plus byte offsets into the original source, and retrieves exact implementations on demand instead of re-reading entire files over and over.
 
-Recent releases have also made that retrieval workflow sharper and more useful in real engineering work, with BM25-based symbol search, context bundles, compact search modes, query suggestions for unfamiliar repos, dependency graphs, class hierarchy traversal, blast-radius analysis, multi-symbol bundles, live watch-based reindexing, and benchmark reproducibility improvements.
+Recent releases have also made that retrieval workflow sharper and more useful in real engineering work, with BM25-based symbol search, context bundles, compact search modes, query suggestions for unfamiliar repos, dependency graphs, class hierarchy traversal, blast-radius analysis, multi-symbol bundles, live watch-based reindexing, automatic Claude Code worktree discovery (`watch-claude`), and benchmark reproducibility improvements.
 
 ---
 

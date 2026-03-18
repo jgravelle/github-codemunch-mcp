@@ -316,7 +316,17 @@ Enhancements to incremental indexing include:
 
 ### Watch mode
 
-The watch subcommand continuously monitors one or more directories using `watchfiles` and triggers incremental reindexing on change. This is useful for large repositories and multi-worktree development flows where manual reindexing would be inefficient.
+The `watch` subcommand continuously monitors one or more directories using `watchfiles` and triggers incremental reindexing on change. This is useful for large repositories and multi-worktree development flows where manual reindexing would be inefficient.
+
+### watch-claude mode
+
+The `watch-claude` subcommand extends watch mode for Claude Code's worktree workflow. Claude Code creates git worktrees when opening parallel sessions, and removes them when sessions end. Rather than requiring users to manually pass paths, `watch-claude` discovers worktrees automatically via two complementary mechanisms:
+
+* **Hook-driven discovery** — Claude Code's `WorktreeCreate` and `WorktreeRemove` hooks call `jcodemunch-mcp hook-event create|remove`, which appends events to a JSONL manifest at `~/.claude/jcodemunch-worktrees.jsonl`. The `watch-claude` process watches this file with `watchfiles` and reacts to new lines instantly — no polling.
+
+* **Git-based discovery** — When `--repos` paths are specified, `watch-claude` periodically runs `git worktree list --porcelain` on each repo and filters for Claude-created worktrees (branches matching `claude/*` or `worktree-*`). This works with any worktree layout without requiring hooks.
+
+Both modes can run concurrently, sharing a single `active` task map to avoid double-watching. On worktree removal, the watcher task is cancelled and `invalidate_cache` cleans up the index. Crashed watcher tasks are automatically restarted by the repos poller.
 
 ---
 
@@ -479,9 +489,9 @@ A minimal CLI is provided over the shared index store, covering operations such 
 
 ### Watch mode
 
-The `watch` subcommand monitors one or more directories and performs incremental reindexing with debounce. It uses the same underlying store as the MCP server, so updates become immediately visible to MCP consumers.
+The `watch` subcommand monitors one or more directories and performs incremental reindexing with debounce. The `watch-claude` subcommand builds on this for Claude Code's worktree workflow, using hook-driven events and/or `git worktree list` polling to discover worktrees automatically. Both use the same underlying store as the MCP server, so updates become immediately visible to MCP consumers.
 
-Architecturally, both CLI and watch mode are thin interfaces over the same parser, storage, indexing, and retrieval core.
+Architecturally, CLI, watch, and watch-claude are all thin interfaces over the same parser, storage, indexing, and retrieval core.
 
 ---
 

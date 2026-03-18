@@ -132,7 +132,74 @@ pip install "jcodemunch-mcp[watch]"
 jcodemunch-mcp watch /path/to/repo
 ```
 
-The watcher shares the same index storage as the MCP server — no extra configuration needed. See the [File Watching](README.md#file-watching-large-repos) section in the README for full options.
+The watcher shares the same index storage as the MCP server — no extra configuration needed.
+
+### Auto-watching Claude Code worktrees
+
+If you use Claude Code, each session can create a git worktree. `watch-claude` automatically discovers these worktrees and indexes them — no manual paths needed. There are two discovery modes that can be used independently or together.
+
+#### Hook-driven mode (recommended)
+
+This is the fastest option: zero polling, instant reaction. Claude Code's `WorktreeCreate` and `WorktreeRemove` hooks notify jcodemunch-mcp directly.
+
+**Step 1: Install the hooks.** Add the following to your `~/.claude/settings.json` (`%USERPROFILE%\.claude\settings.json` on Windows). If you already have a `hooks` section, merge these entries into it:
+
+```json
+{
+  "hooks": {
+    "WorktreeCreate": [{
+      "matcher": "",
+      "hooks": [{"type": "command", "command": "jcodemunch-mcp hook-event create"}]
+    }],
+    "WorktreeRemove": [{
+      "matcher": "",
+      "hooks": [{"type": "command", "command": "jcodemunch-mcp hook-event remove"}]
+    }]
+  }
+}
+```
+
+> If you installed with `uvx` instead of `pip`, use `uvx jcodemunch-mcp hook-event create` and `uvx jcodemunch-mcp hook-event remove` in the hook commands.
+
+**Step 2: Run watch-claude** in a separate terminal:
+
+```bash
+jcodemunch-mcp watch-claude
+```
+
+Every time Claude Code creates a worktree, the hook records the event to `~/.claude/jcodemunch-worktrees.jsonl` and `watch-claude` picks it up instantly. When a worktree is removed, the watcher stops and the index is cleaned up.
+
+#### `--repos` mode (no hooks needed)
+
+If you prefer not to install hooks, point `watch-claude` at your git repositories. It polls `git worktree list` every 5 seconds and automatically watches any Claude-created worktrees it finds (those with branches named `claude/*` or `worktree-*`):
+
+```bash
+# Watch worktrees across multiple repos
+jcodemunch-mcp watch-claude --repos ~/projects/myapp ~/projects/api
+
+# Custom poll interval (seconds)
+jcodemunch-mcp watch-claude --repos ~/projects/myapp --poll-interval 10
+```
+
+This works with any worktree layout — whether Claude Code puts them in `<repo>/.claude/worktrees/`, `~/.claude-worktrees/`, or a custom location.
+
+#### Combining both modes
+
+If you have hooks installed and also want to cover repos that might have existing worktrees from before the hooks were set up:
+
+```bash
+jcodemunch-mcp watch-claude --repos ~/projects/myapp ~/projects/api
+```
+
+When a manifest file exists, `watch-claude` uses both hook events and git polling. Worktrees discovered by either method are not double-watched.
+
+#### Shared options
+
+All standard watch options work with `watch-claude`:
+
+```bash
+jcodemunch-mcp watch-claude --repos ~/project --debounce 5000 --no-ai-summaries --follow-symlinks
+```
 
 ---
 

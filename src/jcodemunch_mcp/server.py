@@ -1085,6 +1085,57 @@ def main(argv: Optional[list[str]] = None):
     )
     _add_common_args(watch_parser)
 
+    # --- hook-event ---
+    hook_parser = subparsers.add_parser(
+        "hook-event",
+        help="Record a Claude Code worktree lifecycle event (used by hooks)",
+    )
+    hook_parser.add_argument(
+        "event_type",
+        choices=["create", "remove"],
+        help="Event type: 'create' when a worktree is created, 'remove' when deleted",
+    )
+    _add_common_args(hook_parser)
+
+    # --- watch-claude ---
+    wc_parser = subparsers.add_parser(
+        "watch-claude",
+        help="Auto-discover and watch Claude Code worktrees",
+    )
+    wc_parser.add_argument(
+        "--repos",
+        nargs="+",
+        help="One or more git repository paths to poll for worktrees via `git worktree list`",
+    )
+    wc_parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=float(os.environ.get("JCODEMUNCH_CLAUDE_POLL_INTERVAL", "5")),
+        help="How often (in seconds) to poll git for worktrees (default: 5, only with --repos)",
+    )
+    wc_parser.add_argument(
+        "--debounce",
+        type=int,
+        default=int(os.environ.get("JCODEMUNCH_WATCH_DEBOUNCE_MS", "2000")),
+        help="Debounce interval in milliseconds for file watching (default: 2000)",
+    )
+    wc_parser.add_argument(
+        "--no-ai-summaries",
+        action="store_true",
+        help="Disable AI-generated summaries during re-indexing",
+    )
+    wc_parser.add_argument(
+        "--follow-symlinks",
+        action="store_true",
+        help="Include symlinked files in indexing",
+    )
+    wc_parser.add_argument(
+        "--extra-ignore",
+        nargs="*",
+        help="Additional gitignore-style patterns to exclude",
+    )
+    _add_common_args(wc_parser)
+
     # Backwards compat: if first non-flag arg isn't a known subcommand,
     # prepend "serve" so legacy invocations like `jcodemunch-mcp --transport sse` still work.
     # But let --help and -V be handled by the top-level parser first.
@@ -1093,7 +1144,7 @@ def main(argv: Optional[list[str]] = None):
     if any(arg in top_level_flags for arg in raw_argv):
         args = parser.parse_args(raw_argv)
     else:
-        known_commands = {"serve", "watch"}
+        known_commands = {"serve", "watch", "hook-event", "watch-claude"}
         has_subcommand = any(arg in known_commands for arg in raw_argv if not arg.startswith("-"))
         if not has_subcommand:
             raw_argv = ["serve"] + list(raw_argv)
@@ -1114,6 +1165,25 @@ def main(argv: Optional[list[str]] = None):
                 extra_ignore_patterns=args.extra_ignore,
                 follow_symlinks=args.follow_symlinks,
                 idle_timeout_minutes=args.idle_timeout,
+            )
+        )
+    elif args.command == "hook-event":
+        from .hook_event import handle_hook_event
+
+        handle_hook_event(event_type=args.event_type)
+    elif args.command == "watch-claude":
+        from .watcher import watch_claude_worktrees
+
+        use_ai = not args.no_ai_summaries and _default_use_ai_summaries()
+        asyncio.run(
+            watch_claude_worktrees(
+                repos=args.repos,
+                poll_interval=args.poll_interval,
+                debounce_ms=args.debounce,
+                use_ai_summaries=use_ai,
+                storage_path=os.environ.get("CODE_INDEX_PATH"),
+                extra_ignore_patterns=args.extra_ignore,
+                follow_symlinks=args.follow_symlinks,
             )
         )
     else:
