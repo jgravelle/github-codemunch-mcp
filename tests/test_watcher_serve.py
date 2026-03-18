@@ -399,6 +399,93 @@ class TestWatcherEnvVar:
 
 
 # ---------------------------------------------------------------------------
+# Fix 1: Logger propagation leak in quiet mode
+# ---------------------------------------------------------------------------
+
+class TestLoggerPropagation:
+    """Logger messages must not leak to stderr via root logger in quiet/log mode.
+
+    Fix: When quiet=True, watch_folders must set propagate=False on the watcher
+    logger so that logger.exception() calls inside _watch_single do not bubble up
+    to the root logger's StreamHandler (stderr). The finally block must restore
+    propagate to its original value.
+    """
+
+    def test_quiet_mode_prevents_logger_exception_propagation(self, tmp_path):
+        """watch_folders(quiet=True) must block logger.exception() from reaching stderr."""
+        import logging
+        import io
+
+        d = tmp_path / "proj"
+        d.mkdir()
+        storage = tmp_path / "storage"
+        storage.mkdir()
+
+        # Capture root logger output
+        root_handler = logging.StreamHandler(io.StringIO())
+        root_handler.setLevel(logging.DEBUG)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(root_handler)
+
+        try:
+            watcher_logger = logging.getLogger("jcodemunch_mcp.watcher")
+            propagate_before = watcher_logger.propagate
+
+            # Patch asyncio.wait to return immediately so _watch_single is actually awaited
+            original_wait = asyncio.wait
+
+            async def fake_wait(tasks, *, return_when):
+                done, pending = await original_wait(tasks, return_when=asyncio.ALL_COMPLETED)
+                return done, pending
+
+            # Side effect that runs INSIDE _watch_single's execution window
+            # (when propagate=False should be active in quiet mode)
+            propagate_during_execution = []
+
+            async def run_with_propagate_check(**kw):
+                # This coroutine runs during watch_folders' execution window
+                # Check that propagate=False is active
+                propagate_during_execution.append(watcher_logger.propagate)
+                # Simulate the finally restoration so we don't break cleanup
+                old = watcher_logger.propagate
+                watcher_logger.propagate = propagate_before
+                watcher_logger.addHandler(logging.NullHandler())
+                return None
+
+            async def run():
+                stop = asyncio.Event()
+                stop.set()
+
+                with patch("jcodemunch_mcp.watcher._watch_single", side_effect=run_with_propagate_check), \
+                     patch("jcodemunch_mcp.watcher.asyncio.wait", side_effect=fake_wait):
+                    await watch_folders(
+                        paths=[str(d)],
+                        storage_path=str(storage),
+                        stop_event=stop,
+                        quiet=True,
+                    )
+
+                # Key assertion: propagate must have been False DURING execution
+                # (without the fix, propagate=True throughout and the test fails here)
+                assert len(propagate_during_execution) == 1, \
+                    f"_watch_single was not called (got {len(propagate_during_execution)} calls)"
+                assert propagate_during_execution[0] is False, (
+                    f"propagate must be False during quiet mode execution, "
+                    f"got {propagate_during_execution[0]}"
+                )
+
+                # After watch_folders returns, propagate must be restored
+                assert watcher_logger.propagate is propagate_before, (
+                    f"propagate was not restored: expected {propagate_before}, "
+                    f"got {watcher_logger.propagate}"
+                )
+
+            asyncio.run(run())
+        finally:
+            root_logger.removeHandler(root_handler)
+
+
+# ---------------------------------------------------------------------------
 # Bug 5: Log file permission error produces warning, not crash
 # ---------------------------------------------------------------------------
 

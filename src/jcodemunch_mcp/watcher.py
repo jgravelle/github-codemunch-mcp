@@ -408,9 +408,11 @@ async def watch_folders(
         _fh = logging.FileHandler(_log_path, encoding="utf-8")
         _fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
         _watcher_logger.addHandler(_fh)
+        _watcher_logger.propagate = False
     elif quiet:
         _watcher_logger = logging.getLogger("jcodemunch_mcp.watcher")
         _watcher_logger.addHandler(logging.NullHandler())
+        _watcher_logger.propagate = False
 
     # Handle graceful shutdown
     _external_stop = stop_event is not None
@@ -502,6 +504,7 @@ async def watch_folders(
             if isinstance(h, (logging.FileHandler, logging.NullHandler)):
                 h.close()
                 _wl.removeHandler(h)
+        _wl.propagate = True
         _watcher_output("Done.", quiet=quiet, log_file_handle=log_fh)
         # Close log file handle
         if log_fh:
