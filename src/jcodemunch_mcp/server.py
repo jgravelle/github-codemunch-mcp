@@ -6,6 +6,7 @@ import functools
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
@@ -27,6 +28,13 @@ from .tools.search_text import search_text
 from .tools.get_repo_outline import get_repo_outline
 from .tools.find_importers import find_importers
 from .tools.find_references import find_references
+from .tools.get_session_stats import get_session_stats
+from .tools.get_dependency_graph import get_dependency_graph
+from .tools.get_blast_radius import get_blast_radius
+from .tools.get_symbol_diff import get_symbol_diff
+from .tools.get_class_hierarchy import get_class_hierarchy
+from .tools.get_related_symbols import get_related_symbols
+from .tools.suggest_queries import suggest_queries
 from .tools.search_columns import search_columns
 from .tools.get_context_bundle import get_context_bundle
 from .parser.symbols import VALID_KINDS
@@ -291,8 +299,18 @@ async def list_tools() -> list[Tool]:
                     },
                     "max_results": {
                         "type": "integer",
-                        "description": "Maximum number of results to return",
+                        "description": "Maximum number of results to return (ignored when token_budget is set)",
                         "default": 10
+                    },
+                    "token_budget": {
+                        "type": "integer",
+                        "description": "Token budget cap. When set, results are sorted by score and greedily packed until the budget is exhausted. Overrides max_results. Reports token_budget, tokens_used, and tokens_remaining in _meta."
+                    },
+                    "detail_level": {
+                        "type": "string",
+                        "description": "Controls result verbosity. 'compact' returns id/name/kind/file/line only (~15 tokens each, best for broad discovery). 'standard' returns signatures and summaries (default). 'full' inlines source code, docstring, and end_line — equivalent to search + get_symbol in one call.",
+                        "enum": ["compact", "standard", "full"],
+                        "default": "standard"
                     },
                     "debug": {
                         "type": "boolean",
@@ -370,7 +388,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="find_importers",
-            description="Find all files that import from a given file path. Answers 'what uses this file?'. Requires re-indexing with v1.3.0+.",
+            description="Find all files that import from a given file path. Answers 'what uses this file?'. For dbt, resolves {{ ref() }} edges; {{ source() }} edges are extracted but not resolvable to files since sources are external. Requires re-indexing with v1.3.0+.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -383,7 +401,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="find_references",
-            description="Find all files that import or reference a given identifier (symbol name, module name, or class name). Answers 'where is this used?'. Requires re-indexing with v1.3.0+.",
+            description="Find all files that import or reference a given identifier (symbol name, module name, or class name). Answers 'where is this used?'. For dbt, traces {{ ref() }} edges; {{ source() }} specifiers are extracted but not resolvable since sources are external. Requires re-indexing with v1.3.0+.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -423,7 +441,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_context_bundle",
-            description="Get a context bundle for a symbol: its full definition plus all import/require statements from the same file. Gives an AI just enough context to understand and modify a symbol without loading the entire file. Use after identifying a symbol via search_symbols or get_file_outline.",
+            description="Get a context bundle: full source + imports for one or more symbols. Multi-symbol bundles deduplicate imports when symbols share a file. Set include_callers=true to also get the list of files that directly import each symbol's file — useful for understanding usage before refactoring.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -433,10 +451,134 @@ async def list_tools() -> list[Tool]:
                     },
                     "symbol_id": {
                         "type": "string",
-                        "description": "Symbol ID from get_file_outline or search_symbols"
+                        "description": "Single symbol ID (backward-compatible). Use symbol_ids for multi-symbol bundles."
+                    },
+                    "symbol_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of symbol IDs for a multi-symbol bundle. Imports are deduplicated across symbols that share a file."
+                    },
+                    "include_callers": {
+                        "type": "boolean",
+                        "description": "When true, each symbol entry includes a 'callers' list of files that directly import its defining file.",
+                        "default": False
+                    },
+                    "output_format": {
+                        "type": "string",
+                        "description": "'json' (default) or 'markdown' — markdown renders a paste-ready document with imports, docstrings, and source blocks.",
+                        "enum": ["json", "markdown"],
+                        "default": "json"
                     }
                 },
-                "required": ["repo", "symbol_id"]
+                "required": ["repo"]
+            }
+        ),
+        Tool(
+            name="get_session_stats",
+            description="Get token savings stats for the current MCP session. Returns tokens saved and cost avoided (this session and all-time), per-tool breakdown, session duration, and cumulative totals. Use to see how much jCodeMunch has saved you.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            }
+        ),
+        Tool(
+            name="get_dependency_graph",
+            description="Get the file-level dependency graph for a given file. Traverses import relationships up to 3 hops. Use to understand what a file depends on ('imports'), what depends on it ('importers'), or both. Prerequisite for blast radius analysis.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Repository identifier (owner/repo or just repo name)"
+                    },
+                    "file": {
+                        "type": "string",
+                        "description": "File path within the repo (e.g. 'src/server.py')"
+                    },
+                    "direction": {
+                        "type": "string",
+                        "description": "'imports' (files this file depends on), 'importers' (files that depend on this file), or 'both'",
+                        "enum": ["imports", "importers", "both"],
+                        "default": "imports"
+                    },
+                    "depth": {
+                        "type": "integer",
+                        "description": "Number of hops to traverse (1–3)",
+                        "default": 1
+                    }
+                },
+                "required": ["repo", "file"]
+            }
+        ),
+        Tool(
+            name="get_symbol_diff",
+            description="Diff the symbol sets of two indexed repositories (or two branches indexed separately). Shows added, removed, and changed symbols using content_hash for change detection. Index the same repo under two names to compare branches.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo_a": {"type": "string", "description": "First repo identifier (the 'before' snapshot)"},
+                    "repo_b": {"type": "string", "description": "Second repo identifier (the 'after' snapshot)"},
+                },
+                "required": ["repo_a", "repo_b"],
+            },
+        ),
+        Tool(
+            name="get_class_hierarchy",
+            description="Get the full inheritance hierarchy for a class: ancestors (base classes via extends/implements) and descendants (subclasses/implementors). Works across Python, Java, TypeScript, C#, and any language where class signatures contain 'extends' or 'implements'.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {"type": "string", "description": "Repository identifier (owner/repo or just repo name)"},
+                    "class_name": {"type": "string", "description": "Name of the class to analyse"},
+                },
+                "required": ["repo", "class_name"],
+            },
+        ),
+        Tool(
+            name="get_related_symbols",
+            description="Find symbols related to a given symbol using heuristic clustering: same-file co-location (weight 3), shared importers (weight 1.5), and name-token overlap (weight 0.5/token). Useful for discovering what else to read when exploring an unfamiliar codebase.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {"type": "string", "description": "Repository identifier (owner/repo or just repo name)"},
+                    "symbol_id": {"type": "string", "description": "ID of the symbol to find relatives for"},
+                    "max_results": {"type": "integer", "description": "Maximum results (default 10, max 50)", "default": 10},
+                },
+                "required": ["repo", "symbol_id"],
+            },
+        ),
+        Tool(
+            name="suggest_queries",
+            description="Scan the index and suggest useful search queries, key entry-point files, and index statistics. Great first call when starting to explore an unfamiliar repository — surfaces the most-imported files, top keywords, kind/language distribution, and ready-to-run example queries.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {"type": "string", "description": "Repository identifier (owner/repo or just repo name)"},
+                },
+                "required": ["repo"],
+            },
+        ),
+        Tool(
+            name="get_blast_radius",
+            description="Analyse the blast radius of changing a symbol: find every file that imports its defining file and (optionally) references the symbol by name. Returns 'confirmed' files (import + name match) and 'potential' files (import only, e.g. wildcard). Use before renaming, deleting, or changing a function/class signature.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Repository identifier (owner/repo or just repo name)"
+                    },
+                    "symbol": {
+                        "type": "string",
+                        "description": "Symbol name or ID to analyse (e.g. 'calculateScore' or a full symbol ID)"
+                    },
+                    "depth": {
+                        "type": "integer",
+                        "description": "Import hops to traverse (1 = direct importers only, max 3). Default 1.",
+                        "default": 1
+                    }
+                },
+                "required": ["repo", "symbol"]
             }
         ),
     ]
@@ -561,6 +703,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                         file_pattern=arguments.get("file_pattern"),
                         language=arguments.get("language"),
                         max_results=arguments.get("max_results", 10),
+                        token_budget=arguments.get("token_budget"),
+                        detail_level=arguments.get("detail_level", "standard"),
                         debug=arguments.get("debug", False),
                         storage_path=storage_path,
                     )
@@ -630,7 +774,74 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 functools.partial(
                     get_context_bundle,
                     repo=arguments["repo"],
+                    symbol_id=arguments.get("symbol_id"),
+                    symbol_ids=arguments.get("symbol_ids"),
+                    include_callers=arguments.get("include_callers", False),
+                    output_format=arguments.get("output_format", "json"),
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "get_session_stats":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    get_session_stats,
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "get_dependency_graph":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    get_dependency_graph,
+                    repo=arguments["repo"],
+                    file=arguments["file"],
+                    direction=arguments.get("direction", "imports"),
+                    depth=arguments.get("depth", 1),
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "get_blast_radius":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    get_blast_radius,
+                    repo=arguments["repo"],
+                    symbol=arguments["symbol"],
+                    depth=arguments.get("depth", 1),
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "get_symbol_diff":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    get_symbol_diff,
+                    repo_a=arguments["repo_a"],
+                    repo_b=arguments["repo_b"],
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "get_class_hierarchy":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    get_class_hierarchy,
+                    repo=arguments["repo"],
+                    class_name=arguments["class_name"],
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "get_related_symbols":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    get_related_symbols,
+                    repo=arguments["repo"],
                     symbol_id=arguments["symbol_id"],
+                    max_results=arguments.get("max_results", 10),
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "suggest_queries":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    suggest_queries,
+                    repo=arguments["repo"],
                     storage_path=storage_path,
                 )
             )
@@ -797,48 +1008,8 @@ async def run_streamable_http_server(host: str, port: int):
     await uvicorn.Server(config).serve()
 
 
-def main(argv: Optional[list[str]] = None):
-    """Main entry point."""
-    parser = argparse.ArgumentParser(
-        prog="jcodemunch-mcp",
-        description="Run the jCodeMunch MCP server.",
-    )
-    parser.add_argument(
-        "-V",
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-    )
-    parser.add_argument(
-        "--transport",
-        default=os.environ.get("JCODEMUNCH_TRANSPORT", "stdio"),
-        choices=["stdio", "sse", "streamable-http"],
-        help="Transport mode: stdio (default), sse, or streamable-http (also via JCODEMUNCH_TRANSPORT env var)",
-    )
-    parser.add_argument(
-        "--host",
-        default=os.environ.get("JCODEMUNCH_HOST", "127.0.0.1"),
-        help="Host to bind to in HTTP transport mode (also via JCODEMUNCH_HOST env var, default: 127.0.0.1)",
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=int(os.environ.get("JCODEMUNCH_PORT", "8901")),
-        help="Port to listen on in HTTP transport mode (also via JCODEMUNCH_PORT env var, default: 8901)",
-    )
-    parser.add_argument(
-        "--log-level",
-        default=os.environ.get("JCODEMUNCH_LOG_LEVEL", "WARNING"),
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Log level (also via JCODEMUNCH_LOG_LEVEL env var)",
-    )
-    parser.add_argument(
-        "--log-file",
-        default=os.environ.get("JCODEMUNCH_LOG_FILE"),
-        help="Log file path (also via JCODEMUNCH_LOG_FILE env var). Defaults to stderr.",
-    )
-    args = parser.parse_args(argv)
-
+def _setup_logging(args) -> None:
+    """Configure logging from parsed args."""
     log_level = getattr(logging, args.log_level)
     handlers: list[logging.Handler] = []
     if args.log_file:
@@ -858,12 +1029,129 @@ def main(argv: Optional[list[str]] = None):
     if extra_ext:
         logging.getLogger(__name__).info("JCODEMUNCH_EXTRA_EXTENSIONS: %s", extra_ext)
 
-    if args.transport == "sse":
-        asyncio.run(run_sse_server(args.host, args.port))
-    elif args.transport == "streamable-http":
-        asyncio.run(run_streamable_http_server(args.host, args.port))
+
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
+    """Add logging args shared by all subcommands."""
+    parser.add_argument(
+        "--log-level",
+        default=os.environ.get("JCODEMUNCH_LOG_LEVEL", "WARNING"),
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Log level (also via JCODEMUNCH_LOG_LEVEL env var)",
+    )
+    parser.add_argument(
+        "--log-file",
+        default=os.environ.get("JCODEMUNCH_LOG_FILE"),
+        help="Log file path (also via JCODEMUNCH_LOG_FILE env var). Defaults to stderr.",
+    )
+
+
+def main(argv: Optional[list[str]] = None):
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        prog="jcodemunch-mcp",
+        description="jCodeMunch MCP server and tools.",
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+
+    subparsers = parser.add_subparsers(dest="command")
+
+    # --- serve (default when no subcommand given) ---
+    serve_parser = subparsers.add_parser("serve", help="Run the MCP server (default)")
+    serve_parser.add_argument(
+        "--transport",
+        default=os.environ.get("JCODEMUNCH_TRANSPORT", "stdio"),
+        choices=["stdio", "sse", "streamable-http"],
+        help="Transport mode: stdio (default), sse, or streamable-http (also via JCODEMUNCH_TRANSPORT env var)",
+    )
+    serve_parser.add_argument(
+        "--host",
+        default=os.environ.get("JCODEMUNCH_HOST", "127.0.0.1"),
+        help="Host to bind to in HTTP transport mode (also via JCODEMUNCH_HOST env var, default: 127.0.0.1)",
+    )
+    serve_parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("JCODEMUNCH_PORT", "8901")),
+        help="Port to listen on in HTTP transport mode (also via JCODEMUNCH_PORT env var, default: 8901)",
+    )
+    _add_common_args(serve_parser)
+
+    # --- watch ---
+    watch_parser = subparsers.add_parser(
+        "watch",
+        help="Watch folders for changes and auto-reindex",
+    )
+    watch_parser.add_argument(
+        "paths",
+        nargs="+",
+        help="One or more folder paths to watch",
+    )
+    watch_parser.add_argument(
+        "--debounce",
+        type=int,
+        default=int(os.environ.get("JCODEMUNCH_WATCH_DEBOUNCE_MS", "2000")),
+        help="Debounce interval in milliseconds (default: 2000, also via JCODEMUNCH_WATCH_DEBOUNCE_MS)",
+    )
+    watch_parser.add_argument(
+        "--no-ai-summaries",
+        action="store_true",
+        help="Disable AI-generated summaries during re-indexing",
+    )
+    watch_parser.add_argument(
+        "--follow-symlinks",
+        action="store_true",
+        help="Include symlinked files in indexing",
+    )
+    watch_parser.add_argument(
+        "--extra-ignore",
+        nargs="*",
+        help="Additional gitignore-style patterns to exclude",
+    )
+    _add_common_args(watch_parser)
+
+    # Backwards compat: if first non-flag arg isn't a known subcommand,
+    # prepend "serve" so legacy invocations like `jcodemunch-mcp --transport sse` still work.
+    # But let --help and -V be handled by the top-level parser first.
+    raw_argv = argv if argv is not None else sys.argv[1:]
+    top_level_flags = {"-h", "--help", "-V", "--version"}
+    if any(arg in top_level_flags for arg in raw_argv):
+        args = parser.parse_args(raw_argv)
     else:
-        asyncio.run(run_stdio_server())
+        known_commands = {"serve", "watch"}
+        has_subcommand = any(arg in known_commands for arg in raw_argv if not arg.startswith("-"))
+        if not has_subcommand:
+            raw_argv = ["serve"] + list(raw_argv)
+        args = parser.parse_args(raw_argv)
+
+    _setup_logging(args)
+
+    if args.command == "watch":
+        from .watcher import watch_folders
+
+        use_ai = not args.no_ai_summaries and _default_use_ai_summaries()
+        asyncio.run(
+            watch_folders(
+                paths=args.paths,
+                debounce_ms=args.debounce,
+                use_ai_summaries=use_ai,
+                storage_path=os.environ.get("CODE_INDEX_PATH"),
+                extra_ignore_patterns=args.extra_ignore,
+                follow_symlinks=args.follow_symlinks,
+            )
+        )
+    else:
+        # serve (default)
+        if args.transport == "sse":
+            asyncio.run(run_sse_server(args.host, args.port))
+        elif args.transport == "streamable-http":
+            asyncio.run(run_streamable_http_server(args.host, args.port))
+        else:
+            asyncio.run(run_stdio_server())
 
 
 if __name__ == "__main__":

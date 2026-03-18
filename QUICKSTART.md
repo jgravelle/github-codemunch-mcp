@@ -119,4 +119,21 @@ You can also add the same block to a project-level `CLAUDE.md` in your repo root
 
 ---
 
+## Keeping the index fresh (large repos)
+
+For large monorepos, re-running `index_folder` after every edit can be slow. Run the **watch daemon** in a separate terminal to automatically re-index when files change:
+
+```bash
+# With uvx (note the --with flag for the optional extra)
+uvx --with "jcodemunch-mcp[watch]" jcodemunch-mcp watch /path/to/repo
+
+# With pip
+pip install "jcodemunch-mcp[watch]"
+jcodemunch-mcp watch /path/to/repo
+```
+
+The watcher shares the same index storage as the MCP server — no extra configuration needed. See the [File Watching](README.md#file-watching-large-repos) section in the README for full options.
+
+---
+
 For the full reference — all env vars, AI summaries, HTTP transport, dbt/SQL support, and more — see [README.md](README.md).

@@ -1,5 +1,6 @@
 """Search column metadata across indexed models."""
 
+import fnmatch
 import os
 import time
 from typing import Optional
@@ -81,11 +82,10 @@ def search_columns(
         if stem not in model_files:
             model_files[stem] = file_path
 
-    # Apply model pattern filter
-    if model_pattern:
-        import fnmatch
-
     # Search across all sources
+    # When query is empty, all columns score > 0 ("" is a substring of any
+    # string), so an empty query with a model_pattern acts as "list all
+    # columns for matching models".
     query_lower = query.lower()
     query_words = set(query_lower.split())
     results = []
@@ -151,7 +151,7 @@ def search_columns(
     raw_bytes = total_columns * 50
     response_bytes = sum(len(r["column"]) + len(r["description"]) + len(r["model"]) + 20 for r in results)
     tokens_saved = estimate_savings(raw_bytes, response_bytes)
-    total_saved = record_savings(tokens_saved)
+    total_saved = record_savings(tokens_saved, tool_name="search_columns")
 
     elapsed = (time.perf_counter() - start) * 1000
 

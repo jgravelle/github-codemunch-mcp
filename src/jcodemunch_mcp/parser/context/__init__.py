@@ -9,6 +9,7 @@ from .base import ContextProvider, FileContext, discover_providers, enrich_symbo
 # Import provider modules so @register_provider decorators execute.
 # Each module registers itself on import — add new providers here.
 from . import dbt  # noqa: F401
+from . import git_blame  # noqa: F401
 
 __all__ = [
     "ContextProvider",
