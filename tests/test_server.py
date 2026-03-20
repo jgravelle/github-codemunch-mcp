@@ -5,7 +5,7 @@ import json
 import threading
 from unittest.mock import AsyncMock, patch
 
-from jcodemunch_mcp.server import server, list_tools, call_tool
+from jcodemunch_mcp.server import server, list_tools, call_tool, _coerce_arguments, _ensure_tool_schemas
 
 
 @pytest.mark.asyncio
@@ -176,3 +176,204 @@ async def test_call_tool_forwards_get_file_content_bounds():
         end_line=8,
         storage_path=None,
     )
+
+
+# ---------------------------------------------------------------------------
+# Tests for _coerce_arguments
+# ---------------------------------------------------------------------------
+
+def test_coerce_boolean_strings():
+    """String booleans are coerced to real booleans."""
+    schema = {
+        "properties": {
+            "enabled": {"type": "boolean"},
+            "verbose": {"type": "boolean"},
+        }
+    }
+    args = {"enabled": "true", "verbose": "false"}
+    result = _coerce_arguments(args, schema)
+    assert result["enabled"] is True
+    assert result["verbose"] is False
+
+
+def test_coerce_boolean_strings_variant_forms():
+    """Boolean coercion handles '1', '0', 'yes', 'no', 'on', 'off' variants."""
+    schema = {"properties": {"a": {"type": "boolean"}, "b": {"type": "boolean"}, "c": {"type": "boolean"}, "d": {"type": "boolean"}}}
+    args = {"a": "1", "b": "0", "c": "yes", "d": "no"}
+    result = _coerce_arguments(args, schema)
+    assert result == {"a": True, "b": False, "c": True, "d": False}
+
+
+def test_coerce_boolean_case_insensitive():
+    """Boolean string coercion is case-insensitive."""
+    schema = {"properties": {"a": {"type": "boolean"}, "b": {"type": "boolean"}}}
+    args = {"a": "TRUE", "b": "FALSE"}
+    result = _coerce_arguments(args, schema)
+    assert result["a"] is True
+    assert result["b"] is False
+
+
+def test_coerce_integer_strings():
+    """String integers are coerced to int."""
+    schema = {
+        "properties": {
+            "max_results": {"type": "integer"},
+            "depth": {"type": "integer"},
+        }
+    }
+    args = {"max_results": "10", "depth": "3"}
+    result = _coerce_arguments(args, schema)
+    assert result["max_results"] == 10
+    assert isinstance(result["max_results"], int)
+    assert result["depth"] == 3
+    assert isinstance(result["depth"], int)
+
+
+def test_coerce_number_strings():
+    """String numbers are coerced to float."""
+    schema = {"properties": {"threshold": {"type": "number"}}}
+    args = {"threshold": "0.75"}
+    result = _coerce_arguments(args, schema)
+    assert result["threshold"] == 0.75
+    assert isinstance(result["threshold"], float)
+
+
+def test_coerce_leaves_non_string_values_unchanged():
+    """Already-typed values pass through without modification."""
+    schema = {"properties": {"enabled": {"type": "boolean"}, "count": {"type": "integer"}}}
+    args = {"enabled": True, "count": 42}
+    result = _coerce_arguments(args, schema)
+    assert result == {"enabled": True, "count": 42}
+
+
+def test_coerce_preserves_unknown_keys():
+    """Keys not in the schema pass through untouched."""
+    schema = {"properties": {"known": {"type": "boolean"}}}
+    args = {"known": "true", "extra": "keep-me"}
+    result = _coerce_arguments(args, schema)
+    assert result == {"known": True, "extra": "keep-me"}
+
+
+def test_coerce_non_coercible_string_stays_string():
+    """Strings that can't be coerced to the expected type are left unchanged."""
+    schema = {"properties": {"count": {"type": "integer"}, "flag": {"type": "boolean"}}}
+    args = {"count": "not_a_number", "flag": "maybe"}
+    result = _coerce_arguments(args, schema)
+    # Not coercible → stays as string (tool will receive it and handle the error)
+    assert result["count"] == "not_a_number"
+    assert result["flag"] == "maybe"
+
+
+def test_coerce_empty_properties_returns_arguments_unchanged():
+    """Schema with no properties returns arguments as-is."""
+    schema = {"properties": {}}
+    args = {"foo": "bar", "count": "5"}
+    result = _coerce_arguments(args, schema)
+    assert result == args
+
+
+def test_coerce_empty_arguments():
+    """Empty arguments dict is returned unchanged."""
+    schema = {"properties": {"foo": {"type": "boolean"}}}
+    result = _coerce_arguments({}, schema)
+    assert result == {}
+
+
+def test_coerce_mixed_types_in_single_call():
+    """Boolean, integer, number, and string fields all coexist correctly."""
+    schema = {
+        "properties": {
+            "enabled": {"type": "boolean"},
+            "limit": {"type": "integer"},
+            "ratio": {"type": "number"},
+            "name": {"type": "string"},
+        }
+    }
+    args = {
+        "enabled": "true",
+        "limit": "42",
+        "ratio": "1.5",
+        "name": "my-repo",
+    }
+    result = _coerce_arguments(args, schema)
+    assert result["enabled"] is True
+    assert result["limit"] == 42
+    assert result["ratio"] == 1.5
+    assert result["name"] == "my-repo"
+
+
+# ---------------------------------------------------------------------------
+# Integration tests for call_tool coercion
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_call_tool_coerces_string_boolean_to_true():
+    """call_tool coerces string 'true' to boolean True before dispatching."""
+    with patch("jcodemunch_mcp.server.index_folder", return_value={"success": True}) as mock_index_folder:
+        # "true" as a string — how Claude Code serialises booleans
+        await call_tool("index_folder", {"path": "/tmp", "follow_symlinks": "true"})
+
+    mock_index_folder.assert_called_once()
+    call_kwargs = mock_index_folder.call_args[1]
+    assert call_kwargs["follow_symlinks"] is True
+
+
+@pytest.mark.asyncio
+async def test_call_tool_coerces_string_boolean_to_false():
+    """call_tool coerces string 'false' to boolean False before dispatching."""
+    with patch("jcodemunch_mcp.server.index_folder", return_value={"success": True}) as mock_index_folder:
+        await call_tool("index_folder", {"path": "/tmp", "incremental": "false"})
+
+    mock_index_folder.assert_called_once()
+    call_kwargs = mock_index_folder.call_args[1]
+    assert call_kwargs["incremental"] is False
+
+
+@pytest.mark.asyncio
+async def test_call_tool_coerces_string_integer():
+    """call_tool coerces string integers to int before dispatching."""
+    with patch("jcodemunch_mcp.server.search_symbols", return_value={}) as mock_search:
+        await call_tool(
+            "search_symbols",
+            {"repo": "owner/repo", "query": "foo", "max_results": "20"},
+        )
+
+    mock_search.assert_called_once()
+    call_kwargs = mock_search.call_args[1]
+    assert call_kwargs["max_results"] == 20
+    assert isinstance(call_kwargs["max_results"], int)
+
+
+@pytest.mark.asyncio
+async def test_call_tool_validation_error_returns_json_error():
+    """call_tool returns a JSON error when coerced arguments still fail validation."""
+    result = await call_tool("search_symbols", {"repo": "owner/repo", "query": "foo", "max_results": "not_an_int"})
+
+    assert len(result) == 1
+    payload = json.loads(result[0].text)
+    assert "error" in payload
+    assert "Input validation error" in payload["error"]
+
+
+@pytest.mark.asyncio
+async def test_call_tool_unexpected_coerce_error_returns_json():
+    """Unexpected errors during coercion are caught by the outer try/except and return JSON."""
+    with patch("jcodemunch_mcp.server._ensure_tool_schemas", side_effect=RuntimeError("boom")):
+        result = await call_tool("index_folder", {"path": "/tmp"})
+
+    assert len(result) == 1
+    payload = json.loads(result[0].text)
+    assert "error" in payload
+    assert "boom" in payload["error"]
+
+
+@pytest.mark.asyncio
+async def test_call_tool_uses_our_schema_cache_not_sdk():
+    """call_tool uses _ensure_tool_schemas, not the private SDK method."""
+    with patch("jcodemunch_mcp.server._ensure_tool_schemas") as mock_ensure:
+        mock_ensure.return_value = {"index_folder": {"properties": {"path": {"type": "string"}}}}
+        with patch("jcodemunch_mcp.server.index_folder", return_value={"success": True}):
+            await call_tool("index_folder", {"path": "/tmp"})
+
+    mock_ensure.assert_called_once()
+
