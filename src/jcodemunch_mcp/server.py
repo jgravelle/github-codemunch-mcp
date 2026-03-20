@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import functools
 import json
+import jsonschema
 import logging
 import os
 import sys
@@ -82,6 +83,58 @@ def _get_watcher_enabled(args) -> bool:
     if env_val:
         return _parse_watcher_flag(env_val)
     return False
+
+
+_BOOL_TRUE = frozenset(("true", "1", "yes", "on"))
+_BOOL_FALSE = frozenset(("false", "0", "no", "off"))
+
+
+def _coerce_arguments(arguments: dict, schema: dict) -> dict:
+    """Coerce stringified values to their expected types per JSON schema.
+
+    Handles boolean ("true"/"false"), integer ("5"), and number ("3.14")
+    without eval. Unknown or already-correct types are passed through unchanged.
+    """
+    props = schema.get("properties", {})
+    if not props:
+        return arguments
+    result = {}
+    for k, v in arguments.items():
+        if k in props and isinstance(v, str):
+            expected = props[k].get("type")
+            if expected == "boolean":
+                if v.lower() in _BOOL_TRUE:
+                    v = True
+                elif v.lower() in _BOOL_FALSE:
+                    v = False
+            elif expected == "integer":
+                try:
+                    v = int(v)
+                except (ValueError, TypeError):
+                    pass
+            elif expected == "number":
+                try:
+                    v = float(v)
+                except (ValueError, TypeError):
+                    pass
+        result[k] = v
+    return result
+
+
+_TOOL_SCHEMAS: dict[str, dict] | None = None
+
+
+async def _ensure_tool_schemas() -> dict[str, dict]:
+    """Lazy-initialize the tool name → inputSchema lookup for type coercion.
+
+    Uses our own list_tools() — no coupling to private MCP SDK internals.
+    Populated once on the first tool call, then cached for the process lifetime.
+    """
+    global _TOOL_SCHEMAS
+    if _TOOL_SCHEMAS is None:
+        tools = await list_tools()
+        _TOOL_SCHEMAS = {t.name: t.inputSchema for t in tools if t.inputSchema}
+    return _TOOL_SCHEMAS
 
 
 # Create server
@@ -629,11 +682,22 @@ async def list_prompts() -> list:
     return []
 
 
-@server.call_tool()
+@server.call_tool(validate_input=False)
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     """Handle tool calls."""
     storage_path = os.environ.get("CODE_INDEX_PATH")
     logger.info("tool_call: %s args=%s", name, {k: v for k, v in arguments.items() if k != "content"})
+
+    # Coerce stringified booleans/integers/numbers before routing
+    tool_def = await server._get_cached_tool_definition(name)
+    if tool_def and tool_def.inputSchema:
+        arguments = _coerce_arguments(arguments, tool_def.inputSchema)
+        try:
+            jsonschema.validate(instance=arguments, schema=tool_def.inputSchema)
+        except jsonschema.ValidationError as e:
+            return [TextContent(type="text", text=json.dumps(
+                {"error": f"Input validation error: {e.message}"}, indent=2
+            ))]
 
     try:
         if name == "index_repo":
