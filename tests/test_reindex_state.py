@@ -124,3 +124,21 @@ class TestFreshnessMode:
         # But will timeout after 50ms
         result = await_freshness_if_strict("test/repo", timeout_ms=50)
         assert result is True  # False would mean timed out
+
+
+class TestWaitForFreshResult:
+    def test_wait_returns_fresh_after_done(self):
+        mark_reindex_done("test/repo", {"symbol_count": 100})
+        result = wait_for_fresh_result("test/repo", timeout_ms=100)
+        assert result["status"] == "fresh"
+        assert result["result"]["symbol_count"] == 100
+
+    def test_wait_returns_error_after_failed(self):
+        mark_reindex_failed("test/repo", "disk full")
+        result = wait_for_fresh_result("test/repo", timeout_ms=100)
+        assert result["status"] == "error"
+        assert result["error"] == "disk full"
+
+    def test_wait_returns_stale_for_unknown_repo(self):
+        result = wait_for_fresh_result("never/seen", timeout_ms=100)
+        assert result["status"] == "stale"
