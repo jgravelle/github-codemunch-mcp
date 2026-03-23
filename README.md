@@ -13,6 +13,7 @@ Quickstart - https://github.com/jgravelle/jcodemunch-mcp/blob/main/QUICKSTART.md
 |-----|----------------|
 | [QUICKSTART.md](QUICKSTART.md) | Zero-to-indexed in three steps |
 | [USER_GUIDE.md](USER_GUIDE.md) | Full tool reference, workflows, and best practices |
+| [AGENT_HOOKS.md](AGENT_HOOKS.md) | Agent hooks and prompt policies |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Internal design, storage model, and extension points |
 | [LANGUAGE_SUPPORT.md](LANGUAGE_SUPPORT.md) | Supported languages and parsing details |
 | [CONTEXT_PROVIDERS.md](CONTEXT_PROVIDERS.md) | dbt, Git, and custom context provider docs |
@@ -205,6 +206,8 @@ A simple instruction like this helps:
 ```markdown
 Use jcodemunch-mcp for code lookup whenever available. Prefer symbol search, outlines, and targeted retrieval over reading full files.
 ```
+
+> **Note:** For a comprehensive guide on enforcing these rules through agent hooks and prompt policies, see [AGENT_HOOKS.md](AGENT_HOOKS.md).
 
 ---
 

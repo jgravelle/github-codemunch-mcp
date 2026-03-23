@@ -279,6 +279,8 @@ Installing the server makes the tools available.
 
 It does **not** guarantee your agent will stop opening giant files like a confused tourist with a flashlight.
 
+> **Note:** For a comprehensive guide on enforcing these rules through agent hooks and prompt policies, see [AGENT_HOOKS.md](AGENT_HOOKS.md).
+
 Give it an instruction like this:
 
 ```markdown
