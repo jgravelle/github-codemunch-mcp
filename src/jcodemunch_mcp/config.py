@@ -11,6 +11,33 @@ logger = logging.getLogger(__name__)
 # Global config storage
 _GLOBAL_CONFIG: dict[str, Any] = {}
 _PROJECT_CONFIGS: dict[str, dict[str, Any]] = {}  # repo -> merged config
+_DEPRECATED_ENV_VARS_LOGGED: set[str] = set()  # Track warned vars
+
+ENV_VAR_MAPPING = {
+    "JCODEMUNCH_USE_AI_SUMMARIES": "use_ai_summaries",
+    "JCODEMUNCH_MAX_FOLDER_FILES": "max_folder_files",
+    "JCODEMUNCH_MAX_INDEX_FILES": "max_index_files",
+    "JCODEMUNCH_STALENESS_DAYS": "staleness_days",
+    "JCODEMUNCH_MAX_RESULTS": "max_results",
+    "JCODEMUNCH_EXTRA_IGNORE_PATTERNS": "extra_ignore_patterns",
+    "JCODEMUNCH_EXTRA_EXTENSIONS": "extra_extensions",
+    "JCODEMUNCH_CONTEXT_PROVIDERS": "context_providers",
+    "JCODEMUNCH_REDACT_SOURCE_ROOT": "redact_source_root",
+    "JCODEMUNCH_STATS_FILE_INTERVAL": "stats_file_interval",
+    "JCODEMUNCH_SHARE_SAVINGS": "share_savings",
+    "JCODEMUNCH_SUMMARIZER_CONCURRENCY": "summarizer_concurrency",
+    "JCODEMUNCH_ALLOW_REMOTE_SUMMARIZER": "allow_remote_summarizer",
+    "JCODEMUNCH_RATE_LIMIT": "rate_limit",
+    "JCODEMUNCH_TRANSPORT": "transport",
+    "JCODEMUNCH_HOST": "host",
+    "JCODEMUNCH_PORT": "port",
+    "JCODEMUNCH_WATCH": "watch",
+    "JCODEMUNCH_WATCH_DEBOUNCE_MS": "watch_debounce_ms",
+    "JCODEMUNCH_FRESHNESS_MODE": "freshness_mode",
+    "JCODEMUNCH_CLAUDE_POLL_INTERVAL": "claude_poll_interval",
+    "JCODEMUNCH_LOG_LEVEL": "log_level",
+    "JCODEMUNCH_LOG_FILE": "log_file",
+}
 
 DEFAULTS = {
     "use_ai_summaries": True,
@@ -171,6 +198,58 @@ def load_config(storage_path: str | None = None) -> None:
             _GLOBAL_CONFIG = DEFAULTS.copy()
     else:
         _GLOBAL_CONFIG = DEFAULTS.copy()
+
+    # Apply env var fallback for keys not set in config
+    _apply_env_var_fallback()
+
+
+def _parse_env_value(value: str, expected_type: type | tuple) -> Any:
+    """Parse env var string to expected type."""
+    try:
+        if expected_type == bool:
+            return value.lower() in ("true", "1", "yes", "on")
+        elif expected_type == int:
+            return int(value)
+        elif expected_type == float:
+            return float(value)
+        elif expected_type == str:
+            return value
+        elif expected_type == list:
+            return json.loads(value)
+        elif expected_type == dict:
+            return json.loads(value)
+    except (ValueError, json.JSONDecodeError):
+        logger.warning(f"Failed to parse env var value: {value}")
+        return None
+    return value
+
+
+def _apply_env_var_fallback() -> None:
+    """Apply deprecated env var fallback for keys not in config."""
+    global _GLOBAL_CONFIG
+
+    for env_var, config_key in ENV_VAR_MAPPING.items():
+        # Skip if config key already set
+        if config_key in _GLOBAL_CONFIG:
+            continue
+
+        env_value = os.environ.get(env_var)
+        if env_value is not None:
+            # Log warning once per var
+            if env_var not in _DEPRECATED_ENV_VARS_LOGGED:
+                logger.warning(
+                    f"Deprecated: Using {env_var} environment variable. "
+                    f"This will be removed in v2.0. Use config.jsonc instead."
+                )
+                _DEPRECATED_ENV_VARS_LOGGED.add(env_var)
+
+            # Parse and apply value
+            expected_type = CONFIG_TYPES.get(config_key)
+            if expected_type is None:
+                continue
+            parsed = _parse_env_value(env_value, expected_type)  # type: ignore[arg-type]
+            if parsed is not None:
+                _GLOBAL_CONFIG[config_key] = parsed
 
 
 def get(key: str, default: Any = None, repo: str | None = None) -> Any:
