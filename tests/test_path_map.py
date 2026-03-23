@@ -66,10 +66,10 @@ import os
 from jcodemunch_mcp.path_map import remap
 
 
-def test_remap_empty_pairs_normalises_sep():
-    """No mapping set: path returned with os.sep normalisation."""
-    result = remap("/home/user/project/file.py", [])
-    assert result == str(os.path.join("/home", "user", "project", "file.py"))
+def test_remap_empty_pairs_returns_unchanged():
+    """No mapping set: path returned unchanged (no separator normalisation)."""
+    path = "/home/user/project/file.py"
+    assert remap(path, []) == path
 
 
 def test_remap_forward_replaces_prefix():

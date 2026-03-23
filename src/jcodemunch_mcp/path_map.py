@@ -51,11 +51,7 @@ def remap(path: str, pairs: list[tuple[str, str]], reverse: bool = False) -> str
                              up an index that was built on a different machine.
 
     Tries pairs in order; applies the first match.
-    Always outputs using os.sep.
-
-    Note: not a pure no-op when pairs is empty — separator normalisation
-    still applies. Callers that compare the return value to the original
-    input must account for this.
+    On match, outputs using os.sep.  On no-match, returns path unchanged.
     """
     # Normalise input separators to '/' for comparison
     path_norm = path.replace("\\", "/")
@@ -76,5 +72,5 @@ def remap(path: str, pairs: list[tuple[str, str]], reverse: bool = False) -> str
             # Output using OS native separator
             return remapped.replace("/", os.sep)
 
-    # No match — return with OS native separator
-    return path_norm.replace("/", os.sep)
+    # No match — return path unchanged
+    return path
