@@ -39,3 +39,42 @@ def parse_path_map() -> list[tuple[str, str]]:
             continue
         pairs.append((orig, new))
     return pairs
+
+
+def remap(path: str, pairs: list[tuple[str, str]], reverse: bool = False) -> str:
+    """Apply path prefix substitution with OS separator normalisation.
+
+    Forward (reverse=False): replaces original → replacement.
+                             Use when reading stored paths for display.
+    Reverse (reverse=True):  replaces replacement → original.
+                             Use before hashing a user-supplied path to look
+                             up an index that was built on a different machine.
+
+    Tries pairs in order; applies the first match.
+    Always outputs using os.sep.
+
+    Note: not a pure no-op when pairs is empty — separator normalisation
+    still applies. Callers that compare the return value to the original
+    input must account for this.
+    """
+    # Normalise input separators to '/' for comparison
+    path_norm = path.replace("\\", "/")
+
+    for orig, new in pairs:
+        if reverse:
+            src = new.replace("\\", "/")
+            dst = orig.replace("\\", "/")
+        else:
+            src = orig.replace("\\", "/")
+            dst = new.replace("\\", "/")
+
+        # Ensure prefix comparison works at directory boundaries
+        src_prefix = src.rstrip("/")
+        if path_norm == src_prefix or path_norm.startswith(src_prefix + "/"):
+            remainder = path_norm[len(src_prefix):]
+            remapped = dst.rstrip("/") + remainder
+            # Output using OS native separator
+            return remapped.replace("/", os.sep)
+
+    # No match — return with OS native separator
+    return path_norm.replace("/", os.sep)

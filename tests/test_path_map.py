@@ -60,3 +60,51 @@ def test_parse_whitespace_stripped(monkeypatch):
     """Leading/trailing whitespace in tokens is stripped."""
     monkeypatch.setenv(ENV_VAR, " /home/user = /mnt/user ")
     assert parse_path_map() == [("/home/user", "/mnt/user")]
+
+
+import os
+from jcodemunch_mcp.path_map import remap
+
+
+def test_remap_empty_pairs_normalises_sep():
+    """No mapping set: path returned with os.sep normalisation."""
+    result = remap("/home/user/project/file.py", [])
+    assert result == str(os.path.join("/home", "user", "project", "file.py"))
+
+
+def test_remap_forward_replaces_prefix():
+    pairs = [("/home/user", "C:\\Users\\user")]
+    result = remap("/home/user/project/file.py", pairs)
+    # Normalised with os.sep — on POSIX this is forward slash
+    assert result.replace("\\", "/") == "C:/Users/user/project/file.py"
+
+
+def test_remap_reverse_replaces_prefix():
+    pairs = [("/home/user", "C:\\Users\\user")]
+    result = remap("C:\\Users\\user\\project\\file.py", pairs, reverse=True)
+    assert result.replace("\\", "/") == "/home/user/project/file.py"
+
+
+def test_remap_no_match_returns_normalised():
+    pairs = [("/home/other", "/mnt/other")]
+    result = remap("/home/user/project", pairs)
+    assert result.replace("\\", "/") == "/home/user/project"
+
+
+def test_remap_first_pair_wins():
+    pairs = [("/home/user", "/first"), ("/home/user", "/second")]
+    result = remap("/home/user/file.py", pairs)
+    assert result.replace("\\", "/") == "/first/file.py"
+
+
+def test_remap_mixed_separators_in_input_match():
+    """D:/Users/user (forward slashes) matches stored prefix D:\\Users\\user."""
+    pairs = [("/home/user", "D:\\Users\\user")]
+    result = remap("D:/Users/user/project", pairs, reverse=True)
+    assert result.replace("\\", "/") == "/home/user/project"
+
+
+def test_remap_multiple_pairs_correct_one_matches():
+    pairs = [("/home/alice", "/mnt/alice"), ("/home/bob", "/mnt/bob")]
+    result = remap("/home/bob/work/file.py", pairs)
+    assert result.replace("\\", "/") == "/mnt/bob/work/file.py"
