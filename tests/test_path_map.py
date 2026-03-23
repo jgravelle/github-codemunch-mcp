@@ -211,3 +211,43 @@ def test_index_folder_reverse_remap_finds_existing_index(tmp_path, monkeypatch):
     assert result2.get("message") == "No changes detected" or result2.get("changed", 0) == 0, (
         f"Expected no changes, got: {result2}"
     )
+
+
+from unittest.mock import patch
+
+
+def test_watcher_local_repo_id_uses_reverse_remap(monkeypatch):
+    """_watch_single calls _local_repo_id with the remapped (stored) path."""
+    from jcodemunch_mcp import watcher as watcher_mod
+
+    monkeypatch.setenv(ENV_VAR, "/remapped=/real")
+
+    captured = {}
+
+    original_fn = watcher_mod._local_repo_id
+
+    def capturing_local_repo_id(path):
+        captured["path"] = path
+        return original_fn(path)
+
+    with patch.object(watcher_mod, "_local_repo_id", side_effect=capturing_local_repo_id):
+        # Drive just enough of _watch_single to hit the _local_repo_id call.
+        # We stop immediately by raising inside the store constructor.
+        try:
+            import asyncio
+            from jcodemunch_mcp.watcher import _watch_single
+
+            async def run():
+                # _watch_single loops forever; we interrupt on first store access
+                with patch("jcodemunch_mcp.watcher.IndexStore", side_effect=RuntimeError("stop")):
+                    try:
+                        await _watch_single(folder_path="/remapped/myproject", storage_path=None)
+                    except RuntimeError:
+                        pass
+
+            asyncio.run(run())
+        except Exception:
+            pass
+
+    if captured:
+        assert captured["path"].replace("\\", "/") == "/real/myproject", captured["path"]

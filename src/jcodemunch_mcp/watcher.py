@@ -26,6 +26,7 @@ from .reindex_state import (
 )
 from .storage import IndexStore
 from .storage.index_store import _file_hash
+from .path_map import parse_path_map, remap
 
 logger = logging.getLogger(__name__)
 
@@ -269,7 +270,8 @@ async def _watch_single(
     # Compute repo identifier for memory hash cache and reindex state.
     # _local_repo_id returns "local/name-hash" — the full identifier for reindex_state.
     # IndexStore.load_index(owner, name) requires the split components.
-    repo_id = _local_repo_id(folder_path)
+    _pairs = parse_path_map()
+    repo_id = _local_repo_id(remap(folder_path, _pairs, reverse=True))
     _repo_owner, _repo_store_name = repo_id.split("/", 1)
     store = IndexStore(base_path=storage_path)
 
@@ -745,7 +747,8 @@ async def watch_claude_worktrees(
                 await task
             except (asyncio.CancelledError, Exception):
                 pass
-        repo_id = _local_repo_id(folder)
+        _pairs = parse_path_map()
+        repo_id = _local_repo_id(remap(folder, _pairs, reverse=True))
         try:
             result = await asyncio.to_thread(
                 invalidate_cache, repo=repo_id, storage_path=storage_path,
