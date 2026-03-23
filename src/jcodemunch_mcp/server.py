@@ -20,6 +20,7 @@ from .tools.index_repo import index_repo
 from .tools.index_folder import index_folder
 from .tools.index_file import index_file
 from .tools.list_repos import list_repos
+from .tools.resolve_repo import resolve_repo
 from .tools.get_file_tree import get_file_tree
 from .tools.get_file_outline import get_file_outline
 from .tools.get_file_content import get_file_content
@@ -53,6 +54,7 @@ except ImportError:
 # Tools excluded from strict freshness mode (don't wait for reindex)
 _EXCLUDED_FROM_STRICT = frozenset({
     "list_repos",
+    "resolve_repo",
     "get_session_stats",
     "wait_for_fresh",
     "index_repo",
@@ -260,6 +262,20 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {}
+            }
+        ),
+        Tool(
+            name="resolve_repo",
+            description="Resolve a filesystem path to its indexed repo identifier. O(1) lookup — faster than list_repos for finding a single repo. Accepts repo root, worktree, subdirectory, or file path.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Absolute filesystem path (repo root, worktree, subdirectory, or file)"
+                    }
+                },
+                "required": ["path"]
             }
         ),
         Tool(
@@ -820,6 +836,14 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await asyncio.to_thread(
                 functools.partial(list_repos, storage_path=storage_path)
             )
+        elif name == "resolve_repo":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    resolve_repo,
+                    path=arguments["path"],
+                    storage_path=storage_path,
+                )
+            )
         elif name == "get_file_tree":
             result = await asyncio.to_thread(
                 functools.partial(
@@ -1062,7 +1086,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     # get_reindex_status returns spec fields: index_stale, reindex_in_progress,
                     # stale_since_ms, and conditionally reindex_error / reindex_failures.
                     _meta.update(get_reindex_status(repo_arg))
-                elif name not in ("list_repos", "get_session_stats", "index_repo", "index_folder"):
+                elif name not in ("list_repos", "resolve_repo", "get_session_stats", "index_repo", "index_folder"):
                     # For non-repo tools, report global reindex activity
                     from .reindex_state import is_any_reindex_in_progress
                     any_in_progress = is_any_reindex_in_progress()
