@@ -38,7 +38,7 @@ def extract_summary_from_docstring(docstring: str) -> str:
 
     # Truncate at first period if present
     if "." in first_line:
-        first_line = first_line[:first_line.index(".") + 1]
+        first_line = first_line[: first_line.index(".") + 1]
 
     return first_line[:120]
 
@@ -69,8 +69,11 @@ class BaseSummarizer:
 
     model: str = ""
     max_tokens_per_batch: int = 500
+    client: object = None
 
-    def summarize_batch(self, symbols: list[Symbol], batch_size: int = 10) -> list[Symbol]:
+    def summarize_batch(
+        self, symbols: list[Symbol], batch_size: int = 10
+    ) -> list[Symbol]:
         """Summarize a batch of symbols using AI.
 
         Only processes symbols that don't already have summaries.
@@ -90,14 +93,20 @@ class BaseSummarizer:
             return symbols
 
         max_workers = _config.get("summarizer_concurrency", 4)
-        batches = [to_summarize[i:i + batch_size] for i in range(0, len(to_summarize), batch_size)]
+        batches = [
+            to_summarize[i : i + batch_size]
+            for i in range(0, len(to_summarize), batch_size)
+        ]
 
         if max_workers <= 1 or len(batches) <= 1:
             for batch in batches:
                 self._summarize_one_batch(batch)
         else:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {executor.submit(self._summarize_one_batch, batch): batch for batch in batches}
+                futures = {
+                    executor.submit(self._summarize_one_batch, batch): batch
+                    for batch in batches
+                }
                 for future in as_completed(futures):
                     future.result()
 
@@ -130,13 +139,15 @@ class BaseSummarizer:
         for i, sym in enumerate(symbols, 1):
             lines.append(f"{i}. {sym.kind}: {sym.signature}")
 
-        lines.extend([
-            "",
-            "Output format: NUMBER. SUMMARY",
-            "Example: 1. Authenticates users with username and password.",
-            "",
-            "Summaries:",
-        ])
+        lines.extend(
+            [
+                "",
+                "Output format: NUMBER. SUMMARY",
+                "Example: 1. Authenticates users with username and password.",
+                "",
+                "Summaries:",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -177,6 +188,7 @@ class BatchSummarizer(BaseSummarizer):
         """Initialize Anthropic client if API key is available."""
         try:
             from anthropic import Anthropic
+
             api_key = os.environ.get("ANTHROPIC_API_KEY")
             if api_key:
                 self.model = os.environ.get("ANTHROPIC_MODEL", self.model)
@@ -196,6 +208,7 @@ class BatchSummarizer(BaseSummarizer):
         except ImportError:
             if os.environ.get("ANTHROPIC_API_KEY"):
                 import warnings
+
                 warnings.warn(
                     "ANTHROPIC_API_KEY is set but the 'anthropic' package is not installed. "
                     "Install it with: pip install jcodemunch-mcp[anthropic]",
@@ -212,7 +225,7 @@ class BatchSummarizer(BaseSummarizer):
                 model=self.model,
                 max_tokens=self.max_tokens_per_batch,
                 temperature=0.0,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
             )
 
             summaries = self._parse_response(response.content[0].text, len(batch))
@@ -244,6 +257,7 @@ class GeminiBatchSummarizer(BaseSummarizer):
         """Initialize Gemini client if API key is available."""
         try:
             import google.generativeai as genai
+
             api_key = os.environ.get("GOOGLE_API_KEY")
             if api_key:
                 self.model = os.environ.get("GOOGLE_MODEL", self.model)
@@ -252,6 +266,7 @@ class GeminiBatchSummarizer(BaseSummarizer):
         except ImportError:
             if os.environ.get("GOOGLE_API_KEY"):
                 import warnings
+
                 warnings.warn(
                     "GOOGLE_API_KEY is set but the 'google-generativeai' package is not installed. "
                     "Install it with: pip install jcodemunch-mcp[gemini]",
@@ -291,6 +306,9 @@ class OpenAIBatchSummarizer(BaseSummarizer):
 
     def __post_init__(self):
         self.client = None
+        self.wire_api = (
+            os.environ.get("OPENAI_WIRE_API", "chat").strip().lower() or "chat"
+        )
         self.api_base = os.environ.get("OPENAI_API_BASE")
         if self.api_base:
             # Strip trailing slash if present
@@ -311,6 +329,15 @@ class OpenAIBatchSummarizer(BaseSummarizer):
             )
             self._init_client()
 
+    @property
+    def wire_api(self) -> str:
+        return getattr(self, "_wire_api", "chat")
+
+    @wire_api.setter
+    def wire_api(self, value: str):
+        normalized = (value or "chat").strip().lower()
+        self._wire_api = normalized or "chat"
+
     def _init_client(self):
         """Initialize HTTP client for OpenAI requests."""
         try:
@@ -328,7 +355,9 @@ class OpenAIBatchSummarizer(BaseSummarizer):
         except ImportError:
             self.client = None
 
-    def summarize_batch(self, symbols: list[Symbol], batch_size: int = 10) -> list[Symbol]:
+    def summarize_batch(
+        self, symbols: list[Symbol], batch_size: int = 10
+    ) -> list[Symbol]:
         """Summarize a batch of symbols using OpenAI compatible endpoint."""
         if not self.client or not self.api_base:
             for sym in symbols:
@@ -343,32 +372,75 @@ class OpenAIBatchSummarizer(BaseSummarizer):
             return symbols
 
         max_workers = int(os.environ.get("OPENAI_CONCURRENCY", "1"))
-        batches = [to_summarize[i:i + batch_size] for i in range(0, len(to_summarize), batch_size)]
+        batches = [
+            to_summarize[i : i + batch_size]
+            for i in range(0, len(to_summarize), batch_size)
+        ]
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(self._summarize_one_batch, batch): batch for batch in batches}
+            futures = {
+                executor.submit(self._summarize_one_batch, batch): batch
+                for batch in batches
+            }
             for future in as_completed(futures):
                 future.result()
 
         return symbols
+
+    def _request_spec(self, prompt: str) -> tuple[str, dict]:
+        """Build request path and payload for the configured wire API."""
+        if self.wire_api == "responses":
+            return "/responses", {
+                "model": self.model,
+                "input": prompt,
+                "max_output_tokens": self.max_tokens_per_batch,
+                "temperature": 0.0,
+            }
+
+        if self.wire_api != "chat":
+            raise ValueError(f"Unsupported OPENAI_WIRE_API: {self.wire_api}")
+
+        return "/chat/completions", {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": self.max_tokens_per_batch,
+            "temperature": 0.0,
+        }
+
+    def _extract_response_text(self, data: dict) -> str:
+        """Extract response text for the configured wire API."""
+        if self.wire_api == "responses":
+            output_text = data.get("output_text")
+            if isinstance(output_text, str) and output_text.strip():
+                return output_text
+
+            text_parts = []
+            for output in data.get("output", []):
+                for content in output.get("content", []):
+                    if content.get("type") == "output_text":
+                        text = content.get("text", "")
+                        if text:
+                            text_parts.append(text)
+
+            if text_parts:
+                return "\n".join(text_parts)
+
+            raise KeyError("Responses API payload did not contain output text")
+
+        return data["choices"][0]["message"]["content"]
 
     def _summarize_one_batch(self, batch: list[Symbol]):
         """Summarize one batch of symbols via HTTP POST."""
         prompt = self._build_prompt(batch)
 
         try:
-            payload = {
-                "model": self.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": self.max_tokens_per_batch,
-                "temperature": 0.0,
-            }
+            path, payload = self._request_spec(prompt)
 
-            response = self.client.post(f"{self.api_base}/chat/completions", json=payload)
+            response = self.client.post(f"{self.api_base}{path}", json=payload)
             response.raise_for_status()
 
             data = response.json()
-            text = data["choices"][0]["message"]["content"]
+            text = self._extract_response_text(data)
             summaries = self._parse_response(text, len(batch))
 
             for sym, summary in zip(batch, summaries):
