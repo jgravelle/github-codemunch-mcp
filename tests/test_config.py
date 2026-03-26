@@ -745,6 +745,70 @@ class TestTrustedFoldersConfig:
             (project_root / "work").resolve()
         ]
 
+    def test_project_config_trusted_folders_reject_escape_from_project_root(
+        self, tmp_path
+    ):
+        """Project config './' trusted_folders must not escape the project root."""
+        from src.jcodemunch_mcp.config import (
+            load_config,
+            load_project_config,
+            get,
+            _GLOBAL_CONFIG,
+            _PROJECT_CONFIGS,
+            _PROJECT_CONFIG_HASHES,
+        )
+
+        _GLOBAL_CONFIG.clear()
+        _PROJECT_CONFIGS.clear()
+        _PROJECT_CONFIG_HASHES.clear()
+
+        global_config = tmp_path / "config.jsonc"
+        global_config.write_text("{}")
+        load_config(str(tmp_path))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        project_config = project_root / ".jcodemunch.jsonc"
+        project_config.write_text('{"trusted_folders": ["./../../outside"]}')
+
+        load_project_config(str(project_root))
+
+        repo_key = str(project_root.resolve())
+        assert get("trusted_folders", repo=repo_key) == []
+
+    def test_project_config_trusted_folders_allows_normalized_in_project_parent_segments(
+        self, tmp_path
+    ):
+        """Project config './' trusted_folders may use .. as long as the resolved path stays inside the project."""
+        from src.jcodemunch_mcp.config import (
+            load_config,
+            load_project_config,
+            get,
+            _GLOBAL_CONFIG,
+            _PROJECT_CONFIGS,
+            _PROJECT_CONFIG_HASHES,
+        )
+
+        _GLOBAL_CONFIG.clear()
+        _PROJECT_CONFIGS.clear()
+        _PROJECT_CONFIG_HASHES.clear()
+
+        global_config = tmp_path / "config.jsonc"
+        global_config.write_text("{}")
+        load_config(str(tmp_path))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        project_config = project_root / ".jcodemunch.jsonc"
+        project_config.write_text('{"trusted_folders": ["./subdir/../work"]}')
+
+        load_project_config(str(project_root))
+
+        repo_key = str(project_root.resolve())
+        assert get("trusted_folders", repo=repo_key) == [
+            (project_root / "work").resolve()
+        ]
+
     def test_load_config_raises_for_relative_trusted_folders(self, tmp_path):
         """Non-rooted trusted_folders entries should raise during config load."""
         from src.jcodemunch_mcp.config import load_config, get, _GLOBAL_CONFIG, DEFAULTS
@@ -757,6 +821,190 @@ class TestTrustedFoldersConfig:
         load_config(str(tmp_path))
 
         assert get("trusted_folders") == DEFAULTS["trusted_folders"]
+
+    def test_project_config_dot_resolves_to_project_root(self, tmp_path):
+        """Project config '.' should resolve to the project root itself."""
+        from src.jcodemunch_mcp.config import (
+            load_config,
+            load_project_config,
+            get,
+            _GLOBAL_CONFIG,
+            _PROJECT_CONFIGS,
+            _PROJECT_CONFIG_HASHES,
+        )
+
+        _GLOBAL_CONFIG.clear()
+        _PROJECT_CONFIGS.clear()
+        _PROJECT_CONFIG_HASHES.clear()
+
+        global_config = tmp_path / "config.jsonc"
+        global_config.write_text("{}")
+        load_config(str(tmp_path))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        project_config = project_root / ".jcodemunch.jsonc"
+        project_config.write_text('{"trusted_folders": ["."]}')
+
+        load_project_config(str(project_root))
+
+        repo_key = str(project_root.resolve())
+        assert get("trusted_folders", repo=repo_key) == [project_root.resolve()]
+
+    def test_project_config_implicit_relative_path_resolves(self, tmp_path):
+        """Project config 'work' (without ./ prefix) should resolve relative to project."""
+        from src.jcodemunch_mcp.config import (
+            load_config,
+            load_project_config,
+            get,
+            _GLOBAL_CONFIG,
+            _PROJECT_CONFIGS,
+            _PROJECT_CONFIG_HASHES,
+        )
+
+        _GLOBAL_CONFIG.clear()
+        _PROJECT_CONFIGS.clear()
+        _PROJECT_CONFIG_HASHES.clear()
+
+        global_config = tmp_path / "config.jsonc"
+        global_config.write_text("{}")
+        load_config(str(tmp_path))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        project_config = project_root / ".jcodemunch.jsonc"
+        project_config.write_text('{"trusted_folders": ["work"]}')
+
+        load_project_config(str(project_root))
+
+        repo_key = str(project_root.resolve())
+        assert get("trusted_folders", repo=repo_key) == [
+            (project_root / "work").resolve()
+        ]
+
+    def test_project_config_implicit_relative_escape_rejected(self, tmp_path):
+        """Project config '../outside' (without ./ prefix) should be rejected."""
+        from src.jcodemunch_mcp.config import (
+            load_config,
+            load_project_config,
+            get,
+            _GLOBAL_CONFIG,
+            _PROJECT_CONFIGS,
+            _PROJECT_CONFIG_HASHES,
+        )
+
+        _GLOBAL_CONFIG.clear()
+        _PROJECT_CONFIGS.clear()
+        _PROJECT_CONFIG_HASHES.clear()
+
+        global_config = tmp_path / "config.jsonc"
+        global_config.write_text("{}")
+        load_config(str(tmp_path))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        project_config = project_root / ".jcodemunch.jsonc"
+        project_config.write_text('{"trusted_folders": ["../outside"]}')
+
+        load_project_config(str(project_root))
+
+        repo_key = str(project_root.resolve())
+        assert get("trusted_folders", repo=repo_key) == []
+
+    def test_project_config_multiple_mixed_entries(self, tmp_path):
+        """Project config can have multiple entries of different types."""
+        from src.jcodemunch_mcp.config import (
+            load_config,
+            load_project_config,
+            get,
+            _GLOBAL_CONFIG,
+            _PROJECT_CONFIGS,
+            _PROJECT_CONFIG_HASHES,
+        )
+
+        _GLOBAL_CONFIG.clear()
+        _PROJECT_CONFIGS.clear()
+        _PROJECT_CONFIG_HASHES.clear()
+
+        global_config = tmp_path / "config.jsonc"
+        global_config.write_text("{}")
+        load_config(str(tmp_path))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        project_config = project_root / ".jcodemunch.jsonc"
+        project_config.write_text('{"trusted_folders": [".", "src", "/work", "./lib"]}')
+
+        load_project_config(str(project_root))
+
+        repo_key = str(project_root.resolve())
+        result = get("trusted_folders", repo=repo_key)
+        assert project_root.resolve() in result
+        assert (project_root / "src").resolve() in result
+        assert Path("/work").resolve() in result
+        assert (project_root / "lib").resolve() in result
+        assert len(result) == 4
+
+    def test_project_config_overrides_global_trusted_folders(self, tmp_path):
+        """Project trusted_folders should override global config, not merge."""
+        from src.jcodemunch_mcp.config import (
+            load_config,
+            load_project_config,
+            get,
+            _GLOBAL_CONFIG,
+            _PROJECT_CONFIGS,
+            _PROJECT_CONFIG_HASHES,
+        )
+
+        _GLOBAL_CONFIG.clear()
+        _PROJECT_CONFIGS.clear()
+        _PROJECT_CONFIG_HASHES.clear()
+
+        global_config = tmp_path / "config.jsonc"
+        global_config.write_text('{"trusted_folders": ["/global/trusted"]}')
+        load_config(str(tmp_path))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        project_config = project_root / ".jcodemunch.jsonc"
+        project_config.write_text('{"trusted_folders": ["."]}')
+
+        load_project_config(str(project_root))
+
+        repo_key = str(project_root.resolve())
+        # Global should still have its value
+        assert get("trusted_folders") == [Path("/global/trusted").resolve()]
+        # Project should have only its own value
+        assert get("trusted_folders", repo=repo_key) == [project_root.resolve()]
+
+    def test_project_config_empty_list_overrides_global(self, tmp_path):
+        """Empty project trusted_folders should clear the setting for that project."""
+        from src.jcodemunch_mcp.config import (
+            load_config,
+            load_project_config,
+            get,
+            _GLOBAL_CONFIG,
+            _PROJECT_CONFIGS,
+            _PROJECT_CONFIG_HASHES,
+        )
+
+        _GLOBAL_CONFIG.clear()
+        _PROJECT_CONFIGS.clear()
+        _PROJECT_CONFIG_HASHES.clear()
+
+        global_config = tmp_path / "config.jsonc"
+        global_config.write_text('{"trusted_folders": ["/global/trusted"]}')
+        load_config(str(tmp_path))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        project_config = project_root / ".jcodemunch.jsonc"
+        project_config.write_text('{"trusted_folders": []}')
+
+        load_project_config(str(project_root))
+
+        repo_key = str(project_root.resolve())
+        assert get("trusted_folders", repo=repo_key) == []
 
 
 # ── Config file validation ────────────────────────────────────────────────────
