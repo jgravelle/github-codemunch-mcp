@@ -39,6 +39,7 @@ from .tools.get_blast_radius import get_blast_radius
 from .tools.get_symbol_diff import get_symbol_diff
 from .tools.get_class_hierarchy import get_class_hierarchy
 from .tools.get_related_symbols import get_related_symbols
+from .tools.get_symbol_importance import get_symbol_importance
 from .tools.suggest_queries import suggest_queries
 from .tools.search_columns import search_columns
 from .tools.get_context_bundle import get_context_bundle
@@ -446,6 +447,12 @@ async def list_tools() -> list[Tool]:
                         "type": "integer",
                         "description": "Maximum Levenshtein distance for direct name matching (catches typos). Default 2.",
                         "default": 2
+                    },
+                    "sort_by": {
+                        "type": "string",
+                        "enum": ["relevance", "centrality", "combined"],
+                        "description": "Ranking strategy. 'relevance' (default) = BM25 text match. 'centrality' = filter by query, rank by PageRank. 'combined' = BM25 + PageRank weighted.",
+                        "default": "relevance"
                     }
                 },
                 "required": ["repo", "query"]
@@ -781,6 +788,30 @@ async def list_tools() -> list[Tool]:
                 "required": ["repo"],
             },
         ),
+        Tool(
+            name="get_symbol_importance",
+            description=(
+                "Return the most architecturally important symbols in a repo, ranked by "
+                "PageRank or in-degree centrality on the import graph. Useful for "
+                "orientation: surfaces the symbols that most of the codebase depends on. "
+                "New tool: use after indexing to understand repo architecture at a glance."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {"type": "string", "description": "Repository identifier (owner/repo or just repo name)"},
+                    "top_n": {"type": "integer", "description": "Number of top symbols to return (default 20, max 200)", "default": 20},
+                    "algorithm": {
+                        "type": "string",
+                        "enum": ["pagerank", "degree"],
+                        "description": "'pagerank' (default) = full PageRank on import graph; 'degree' = simple in-degree count (faster).",
+                        "default": "pagerank",
+                    },
+                    "scope": {"type": "string", "description": "Limit to a subdirectory prefix (e.g. 'src/core')"},
+                },
+                "required": ["repo"],
+            },
+        ),
     ]
     # Filter out disabled tools
     disabled = config_module.get("disabled_tools", [])
@@ -993,6 +1024,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                         fuzzy=arguments.get("fuzzy", False),
                         fuzzy_threshold=arguments.get("fuzzy_threshold", 0.4),
                         max_edit_distance=arguments.get("max_edit_distance", 2),
+                        sort_by=arguments.get("sort_by", "relevance"),
                         storage_path=storage_path,
                     )
                 )
@@ -1159,6 +1191,17 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 functools.partial(
                     check_freshness,
                     repo=arguments["repo"],
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "get_symbol_importance":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    get_symbol_importance,
+                    repo=arguments["repo"],
+                    top_n=arguments.get("top_n", 20),
+                    algorithm=arguments.get("algorithm", "pagerank"),
+                    scope=arguments.get("scope"),
                     storage_path=storage_path,
                 )
             )

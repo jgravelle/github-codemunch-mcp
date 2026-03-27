@@ -12,6 +12,7 @@ from ..storage import IndexStore, record_savings, estimate_savings, cost_avoided
 from ..storage.index_store import _get_git_head
 from ..parser.imports import resolve_specifier
 from ._utils import resolve_repo
+from .pagerank import compute_pagerank
 
 
 def get_repo_outline(
@@ -81,6 +82,35 @@ def get_repo_outline(
             if c > 1
         ]
 
+    # Most central symbols: top symbols by PageRank score on the import graph
+    most_central: list = []
+    if index.imports is not None:
+        try:
+            pr_scores, _ = compute_pagerank(index.imports, index.source_files, index.alias_map)
+            # Kind priority for picking the representative symbol per file
+            _KIND_PRIO = {"class": 0, "function": 1, "method": 2, "type": 3, "constant": 4}
+            file_to_best: dict = {}
+            for sym in index.symbols:
+                f = sym.get("file", "")
+                if not pr_scores.get(f):
+                    continue
+                kp = _KIND_PRIO.get(sym.get("kind", ""), 5)
+                bl = sym.get("byte_length", 0)
+                prev = file_to_best.get(f)
+                if prev is None or (kp, -bl) < (prev[0], prev[1]):
+                    file_to_best[f] = (kp, -bl, sym)
+            top_files = sorted(pr_scores.items(), key=lambda x: x[1], reverse=True)[:10]
+            for f, pr_score in top_files:
+                entry = file_to_best.get(f)
+                if entry and pr_score > 0:
+                    most_central.append({
+                        "symbol_id": entry[2]["id"],
+                        "score": round(pr_score, 6),
+                        "kind": entry[2].get("kind", ""),
+                    })
+        except Exception:
+            pass
+
     payload_content = {
         "repo": f"{owner}/{name}",
         "indexed_at": index.indexed_at,
@@ -92,6 +122,8 @@ def get_repo_outline(
     }
     if most_imported:
         payload_content["most_imported_files"] = most_imported
+    if most_central:
+        payload_content["most_central_symbols"] = most_central
     response_bytes = len(json.dumps(payload_content).encode("utf-8"))
     tokens_saved = estimate_savings(raw_bytes, response_bytes)
     total_saved = record_savings(tokens_saved, tool_name="get_repo_outline")

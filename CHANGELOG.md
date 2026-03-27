@@ -4,6 +4,11 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ## [Unreleased]
 
+## [1.11.12] - 2026-03-27
+
+### Added
+- **PageRank / centrality ranking** — new `get_symbol_importance` tool returns the most architecturally important symbols in a repo, ranked by full PageRank or simple in-degree on the import graph. Parameters: `top_n` (default 20), `algorithm` ("pagerank" or "degree"), `scope` (subdirectory filter). Response includes `symbol_id`, `rank`, `score`, `in_degree`, `out_degree`, `kind`, `iterations_to_converge`. New `sort_by` parameter on `search_symbols` ("relevance" | "centrality" | "combined") — "centrality" filters by BM25 query match but ranks by PageRank; "combined" adds PageRank as weighted boost to BM25 score; "relevance" (default) is unchanged (backward compatible). `get_repo_outline` now includes `most_central_symbols` (top 10 symbols by PageRank score, one representative per file, alongside the existing `most_imported_files`). PageRank implementation: damping=0.85, convergence threshold=1e-6, max 100 iterations, dangling-node correction, cached in `_bm25_cache` per `CodeIndex` load. 23 new tests.
+
 ## [1.11.11] - 2026-03-27
 
 ### Added

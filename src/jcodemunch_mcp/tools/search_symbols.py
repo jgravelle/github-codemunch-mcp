@@ -26,6 +26,9 @@ _FIELD_REPS = {"name": 3, "keywords": 2, "signature": 2, "summary": 1, "docstrin
 # Centrality: log-scaled bonus for symbols in frequently-imported files (tiebreaker only)
 _CENTRALITY_WEIGHT = 0.3
 
+# PageRank weight for sort_by="combined" (scales PR scores to be meaningful vs BM25 range)
+_PR_COMBINED_WEIGHT = 100.0
+
 # Pre-compiled regexes for _tokenize (called ~9000× on cold BM25 build)
 _CAMEL_RE = re.compile(r"([a-z])([A-Z])")
 _TOKEN_RE = re.compile(r"[a-zA-Z0-9]{2,}")
@@ -211,6 +214,7 @@ def search_symbols(
     fuzzy: bool = False,
     fuzzy_threshold: float = 0.4,
     max_edit_distance: int = 2,
+    sort_by: str = "relevance",
     storage_path: Optional[str] = None
 ) -> dict:
     """Search for symbols matching a query.
@@ -235,6 +239,9 @@ def search_symbols(
             candidates. Default 0.4.
         max_edit_distance: Maximum Levenshtein distance for direct name matching
             (catches typos even when trigrams don't match). Default 2.
+        sort_by: Ranking strategy. "relevance" (default) = BM25 + centrality tiebreaker.
+            "centrality" = filter by query match, rank by PageRank score.
+            "combined" = BM25 + PageRank weighted combination.
         storage_path: Custom storage path.
 
     Returns:
@@ -242,6 +249,9 @@ def search_symbols(
     """
     if detail_level not in ("compact", "standard", "full"):
         return {"error": f"Invalid detail_level '{detail_level}'. Must be 'compact', 'standard', or 'full'."}
+
+    if sort_by not in ("relevance", "centrality", "combined"):
+        return {"error": f"Invalid sort_by '{sort_by}'. Must be 'relevance', 'centrality', or 'combined'."}
 
     _MAX_QUERY_LEN = 500
     if len(query) > _MAX_QUERY_LEN:
@@ -272,6 +282,17 @@ def search_symbols(
     avgdl = cache["avgdl"]
     centrality = cache["centrality"]
     inverted = cache["inverted"]
+
+    # PageRank scores — computed and cached when sort_by requires it
+    pagerank: dict = {}
+    if sort_by in ("centrality", "combined"):
+        if "pagerank" not in cache:
+            from .pagerank import compute_pagerank
+            pr_scores, _ = compute_pagerank(
+                index.imports or {}, index.source_files, index.alias_map
+            )
+            cache["pagerank"] = pr_scores
+        pagerank = cache["pagerank"]
 
     # Narrow candidates using inverted index: only score symbols that
     # contain at least one query term (union of posting lists).
@@ -321,6 +342,14 @@ def search_symbols(
             max_bm25_score = score
         candidates_scored += 1
 
+        # Compute sort key based on sort_by strategy
+        if sort_by == "centrality":
+            heap_score = pagerank.get(sym.get("file", ""), 0.0)
+        elif sort_by == "combined":
+            heap_score = score + pagerank.get(sym.get("file", ""), 0.0) * _PR_COMBINED_WEIGHT
+        else:
+            heap_score = score
+
         if detail_level == "compact":
             entry = {
                 "id": sym["id"],
@@ -347,9 +376,9 @@ def search_symbols(
 
         # Bounded heap: O(N log K) instead of O(N log N)
         if len(heap) < effective_limit:
-            heapq.heappush(heap, (score, candidates_scored, entry))
-        elif score > heap[0][0]:
-            heapq.heapreplace(heap, (score, candidates_scored, entry))
+            heapq.heappush(heap, (heap_score, candidates_scored, entry))
+        elif heap_score > heap[0][0]:
+            heapq.heapreplace(heap, (heap_score, candidates_scored, entry))
 
     # Extract results sorted by score descending
     scored_results = [entry for _, _, entry in sorted(heap, key=lambda x: x[0], reverse=True)]

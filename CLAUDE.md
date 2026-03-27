@@ -1,9 +1,9 @@
 # jcodemunch-mcp — Project Brief
 
 ## Current State
-- **Version:** 1.11.11 (published to PyPI)
+- **Version:** 1.11.12 (published to PyPI)
 - **INDEX_VERSION:** 6
-- **Tests:** 1119 passed, 7 skipped
+- **Tests:** 1153 passed, 9 skipped
 - **Python:** >=3.10
 
 ## Key Files
@@ -224,6 +224,7 @@ Custom parsers (tree-sitter grammar lacks clean named fields):
 | 1.11.9 | Fix: Windows CI trusted_folders test paths use `.as_posix()` to avoid backslash JSON escape errors in config.jsonc |
 | 1.11.10 | Feat: blast radius depth scoring — `get_blast_radius` now always returns `direct_dependents_count` and `overall_risk_score` (0.0–1.0); new `include_depth_scores=true` param adds `impact_by_depth` (files by BFS layer with per-depth risk scores); backward compatible; 14 new tests |
 | 1.11.11 | Feat: fuzzy symbol search — `search_symbols` gains `fuzzy`, `fuzzy_threshold`, `max_edit_distance` params; trigram Jaccard + Levenshtein fallback; auto-triggers when BM25 confidence is low; `match_type` field on results; no new deps; 21 new tests |
+| 1.11.12 | Feat: PageRank / centrality ranking — new `get_symbol_importance` tool (PageRank or in-degree on import graph, top_n, algorithm, scope); `search_symbols` gains `sort_by` ("relevance"/"centrality"/"combined"); `get_repo_outline` adds `most_central_symbols` (top 10 by PageRank); PageRank: damping=0.85, dangling-node correction, cached per index load; 23 new tests |
 
 ## Maintenance Practices
 
