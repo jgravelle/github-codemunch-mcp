@@ -424,28 +424,31 @@ def index_folder(
     _MIN_PATH_PARTS = 3
     if len(folder_path.parts) < _MIN_PATH_PARTS:
         if not is_trusted:
-            return {
-                "success": False,
-                "error": (
-                    f"Resolved path '{folder_path}' is too broad to index safely "
-                    f"(fewer than {_MIN_PATH_PARTS} path components). "
-                    "Pass an absolute path to the specific project directory instead of a "
-                    "relative path like '.' — relative paths resolve against the MCP "
-                    "server's working directory, which may not be your project root."
-                ),
-            }
+            error_msg = (
+                f"Resolved path '{folder_path}' is too broad to index safely "
+                f"(fewer than {_MIN_PATH_PARTS} path components). "
+                "Pass an absolute path to the specific project directory instead of a "
+                "relative path like '.' — relative paths resolve against the MCP "
+                "server's working directory, which may not be your project root."
+            )
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
 
-        warnings.append(
+        warning_msg = (
             f"Resolved path '{folder_path}' would normally be rejected as too broad, "
             "but it matched trusted_folders and was allowed."
         )
+        logger.warning(warning_msg)
+        warnings.append(warning_msg)
 
     # Warn when a relative path was given so callers can see what it resolved to.
     if not Path(path).expanduser().is_absolute():
-        warnings.append(
+        warning_msg = (
             f"Relative path '{path}' resolved to '{folder_path}' (MCP server CWD). "
             "Prefer passing an absolute path to avoid unexpected behaviour."
         )
+        logger.warning(warning_msg)
+        warnings.append(warning_msg)
 
     # Redact absolute path from responses when redact_source_root is enabled
     _redact = _config.get("redact_source_root", False)
