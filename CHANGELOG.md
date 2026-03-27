@@ -9,6 +9,40 @@ All notable changes to jcodemunch-mcp are documented here.
 ### Fixed
 - **Windows CI: trusted_folders tests** — `_platform_path_str` was using `str(Path(...))` which on Windows returns backslash paths (`C:\work`). When embedded raw into f-string JSON literals in tests, the backslash produced invalid `\escape` sequences, causing `config.jsonc` parse failures across all 4 Windows matrix legs (6 tests failing). Fixed by switching to `.as_posix()`, which returns forward-slash paths (`C:/work`) that are valid in both JSON and Windows pathlib.
 
+## [1.11.8] - 2026-03-27
+
+### Added
+- **`trusted_folders` allowlist for `index_folder`** (PR #175, credit: @tmeckel) — new `trusted_folders` config key (plus `trusted_folders_whitelist_mode`) restricts or blocks indexing by path. Whitelist mode (default) allows only explicitly named roots; blacklist mode blocks specific paths while trusting all others. Path-aware matching (not string-prefix). Project config supports `.`, `./subdir`, and bare relative paths. Escape-attempt paths are rejected. Empty list preserves existing behavior (backward compatible). Env var fallback via `JCODEMUNCH_TRUSTED_FOLDERS`.
+
+## [1.11.7] - 2026-03-27
+
+### Added
+- **`check_freshness` tool** — compares the git HEAD SHA recorded at index time against the current HEAD for locally indexed repos. Returns `fresh` (bool), `indexed_sha`, `current_sha`, and `commits_behind`. GitHub repos return `is_local: false` with an explanatory message. `get_repo_outline` staleness check upgraded to SHA-based comparison (accurate) with time-based fallback for GitHub/no-git repos; `is_stale` added to `_meta`. 8 new tests.
+
+## [1.11.6] - 2026-03-27
+
+### Added
+- **Structured file-cap warnings** — `index_folder` and `index_repo` now surface `files_discovered`, `files_indexed`, and `files_skipped_cap` fields plus a human-readable `warning` when the file cap is hit. Previously a silent "note".
+- **`_meta` hint on single-symbol responses** — `search_symbols` and `get_symbol_source` single-symbol responses now include a `_meta` hint pointing to `get_context_bundle`.
+
+### Changed
+- **Benchmark docs** — `METHODOLOGY.md` expanded with a "Common Misreadings" section; reproducible results table added to README.
+
+## [1.11.5] - 2026-03-26
+
+### Fixed
+- **`tsconfig.json`/`jsconfig.json` parsed as JSONC** — previously `json.loads()` silently failed on commented tsconfigs (TypeScript projects commonly use `//` comments in tsconfig.json), leaving `alias_map` empty and causing `find_importers`/`get_blast_radius` to return 0 alias-based results. Now parsed with the same JSONC stripper used for `config.jsonc`. Also adds a test for nested layouts with specific `@/lib/*` overrides. Closes #170. 5 new tests.
+
+## [1.11.4] - 2026-03-25
+
+### Fixed
+- **TypeScript/SvelteKit path alias resolution** — `find_importers`, `get_blast_radius`, `get_dependency_graph`, and 5 other import-graph tools now resolve `@/*`, `$lib/*`, and other configured aliases by reading `compilerOptions.paths` from `tsconfig.json`/`jsconfig.json` at the project root. Also resolves TypeScript's ESM `.js`→`.ts` extension convention. `alias_map` is auto-loaded from `source_root` and cached at module level. Closes #169. 10 new tests.
+
+## [1.11.3] - 2026-03-25
+
+### Added
+- **Debug logging for silent skip paths** — all three skip paths (`skip_dir`, `skip_file`, `secret`) now emit debug-level log lines. `skip_dir` and `skip_file` counters added to the discovery summary. `exclude_secret_patterns` config option suppresses specific `SECRET_PATTERNS` entries (workaround for `*secret*` glob false-positives on full relative paths in Go monorepos). (PR #168, credit: @DrHayt) 6 new tests.
+
 ## [1.11.2] - 2026-03-25
 
 ### Fixed
