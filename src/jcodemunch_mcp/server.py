@@ -48,6 +48,7 @@ from .tools.get_context_bundle import get_context_bundle
 from .tools.get_ranked_context import get_ranked_context
 from .tools.embed_repo import embed_repo
 from .parser.symbols import VALID_KINDS
+from .summarizer import get_provider_name
 from .reindex_state import await_freshness_if_strict
 from .path_map import ENV_VAR as _PATH_MAP_ENV_VAR
 
@@ -185,7 +186,7 @@ async def list_tools() -> list[Tool]:
                     },
                     "use_ai_summaries": {
                         "type": "boolean",
-                        "description": "Use AI to generate symbol summaries (requires ANTHROPIC_API_KEY or GOOGLE_API_KEY). Anthropic takes priority if both are set. When false, uses docstrings or signature fallback.",
+                        "description": "Use AI to generate symbol summaries. Supports Anthropic, Gemini, OpenAI-compatible endpoints, MiniMax, and GLM-5 via env vars. When false, uses docstrings or signature fallback.",
                         "default": True
                     },
                     "extra_ignore_patterns": {
@@ -214,7 +215,7 @@ async def list_tools() -> list[Tool]:
                     },
                     "use_ai_summaries": {
                         "type": "boolean",
-                        "description": "Use AI to generate symbol summaries (requires ANTHROPIC_API_KEY or GOOGLE_API_KEY). Anthropic takes priority if both are set. When false, uses docstrings or signature fallback.",
+                        "description": "Use AI to generate symbol summaries. Supports Anthropic, Gemini, OpenAI-compatible endpoints, MiniMax, and GLM-5 via env vars. When false, uses docstrings or signature fallback.",
                         "default": True
                     },
                     "extra_ignore_patterns": {
@@ -248,7 +249,7 @@ async def list_tools() -> list[Tool]:
                     },
                     "use_ai_summaries": {
                         "type": "boolean",
-                        "description": "Use AI to generate symbol summaries",
+                        "description": "Use AI to generate symbol summaries. Supports Anthropic, Gemini, OpenAI-compatible endpoints, MiniMax, and GLM-5 via env vars. When false, uses docstrings or signature fallback.",
                         "default": True
                     },
                     "context_providers": {
@@ -677,7 +678,7 @@ async def list_tools() -> list[Tool]:
                         "type": "boolean",
                         "description": "When true, include a 'budget_report' field showing tokens used, symbols included/excluded, and strategy applied.",
                         "default": False
-                    },
+                    }
                 },
                 "required": ["repo"]
             }
@@ -1884,25 +1885,37 @@ def _run_config(check: bool = False, init: bool = False) -> None:
     use_ai_raw, use_ai_d = env("JCODEMUNCH_USE_AI_SUMMARIES", "true")
     use_ai = use_ai_raw.lower() not in ("false", "0", "no", "off")
     row("use_ai_summaries", str(use_ai).lower(), "env" if not use_ai_d else _detect_source("use_ai_summaries", True))
+    provider, provider_d = env("JCODEMUNCH_SUMMARIZER_PROVIDER", "")
+    row(
+        "summarizer_provider",
+        provider if provider else dim("(auto-detect)"),
+        "env" if not provider_d else "default",
+    )
 
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    google_key    = os.environ.get("GOOGLE_API_KEY", "")
-    openai_base   = os.environ.get("OPENAI_API_BASE", "")
+    google_key = os.environ.get("GOOGLE_API_KEY", "")
+    openai_base = os.environ.get("OPENAI_API_BASE", "")
+    provider_name = get_provider_name()
 
     if not use_ai:
         print(f"  {yellow('AI summaries disabled')} — signature fallback active")
-    elif anthropic_key:
-        print(f"  Active provider:  {green('Anthropic')}  (ANTHROPIC_API_KEY set)")
+    elif provider_name == "anthropic":
+        suffix = "JCODEMUNCH_SUMMARIZER_PROVIDER=anthropic" if provider == "anthropic" else "ANTHROPIC_API_KEY set"
+        print(f"  Active provider:  {green('Anthropic')}  ({suffix})")
         model, d = env("ANTHROPIC_MODEL", "claude-haiku-*")
         row("  ANTHROPIC_MODEL", model, "env" if not d else "default")
-    elif google_key:
-        print(f"  Active provider:  {green('Google Gemini')}  (GOOGLE_API_KEY set)")
+    elif provider_name == "gemini":
+        suffix = "JCODEMUNCH_SUMMARIZER_PROVIDER=gemini" if provider == "gemini" else "GOOGLE_API_KEY set"
+        print(f"  Active provider:  {green('Google Gemini')}  ({suffix})")
         model, d = env("GOOGLE_MODEL", "gemini-flash-*")
         row("  GOOGLE_MODEL", model, "env" if not d else "default")
-    elif openai_base:
-        print(f"  Active provider:  {green('Local LLM')}  (OPENAI_API_BASE set)")
-        row("  OPENAI_API_BASE", openai_base, "env")
-        model, d = env("OPENAI_MODEL", "qwen3-coder")
+    elif provider_name == "openai":
+        base_label = openai_base or "https://api.openai.com/v1"
+        suffix = "JCODEMUNCH_SUMMARIZER_PROVIDER=openai" if provider == "openai" else "OPENAI_API_BASE set"
+        print(f"  Active provider:  {green('OpenAI-compatible')}  ({suffix})")
+        row("  OPENAI_API_BASE", base_label, "env" if openai_base else "default")
+        model_default = "gpt-4o-mini" if provider == "openai" and not openai_base else "qwen3-coder"
+        model, d = env("OPENAI_MODEL", model_default)
         row("  OPENAI_MODEL", model, "env" if not d else "default")
         v, d = env("OPENAI_TIMEOUT", "60.0")
         row("  OPENAI_TIMEOUT", v, "env" if not d else "default")
@@ -1912,9 +1925,21 @@ def _run_config(check: bool = False, init: bool = False) -> None:
         row("  OPENAI_CONCURRENCY", v, "env" if not d else "default")
         v, d = env("OPENAI_MAX_TOKENS", "500")
         row("  OPENAI_MAX_TOKENS", v, "env" if not d else "default")
+    elif provider_name == "minimax":
+        suffix = "JCODEMUNCH_SUMMARIZER_PROVIDER=minimax" if provider == "minimax" else "MINIMAX_API_KEY set"
+        print(f"  Active provider:  {green('MiniMax')}  ({suffix})")
+        row("  OPENAI_API_BASE", "https://api.minimax.io/v1", "default")
+        row("  OPENAI_MODEL", "minimax-m2.7", "default")
+    elif provider_name == "glm":
+        suffix = "JCODEMUNCH_SUMMARIZER_PROVIDER=glm" if provider == "glm" else "ZHIPUAI_API_KEY set"
+        print(f"  Active provider:  {green('GLM-5')}  ({suffix})")
+        row("  OPENAI_API_BASE", "https://api.z.ai/api/paas/v4/", "default")
+        row("  OPENAI_MODEL", "glm-5", "default")
+    elif provider == "none":
+        print(f"  Active provider:  {yellow('none')} — explicitly disabled, signature fallback active")
     else:
         print(f"  Active provider:  {yellow('none')} — no API key set, signature fallback active")
-        print(f"  {dim('Set ANTHROPIC_API_KEY, GOOGLE_API_KEY, or OPENAI_API_BASE to enable')}")
+        print(f"  {dim('Set ANTHROPIC_API_KEY, GOOGLE_API_KEY, OPENAI_API_BASE, MINIMAX_API_KEY, or ZHIPUAI_API_KEY to enable')}")
 
     # ── Transport ──────────────────────────────────────────────────────────
     section("Transport")
@@ -1982,26 +2007,26 @@ def _run_config(check: bool = False, init: bool = False) -> None:
 
         # AI provider package installed?
         if use_ai:
-            if anthropic_key:
+            if provider_name == "anthropic":
                 try:
                     import anthropic as _a
                     print(f"  {green(CHECK)} anthropic package installed (v{_a.__version__})")
                 except ImportError:
                     print(f"  {red(CROSS)} anthropic not installed — run: pip install \"jcodemunch-mcp[anthropic]\"")
                     issues.append("anthropic")
-            elif google_key:
+            elif provider_name == "gemini":
                 try:
                     import google.generativeai  # noqa: F401
                     print(f"  {green(CHECK)} google-generativeai package installed")
                 except ImportError:
                     print(f"  {red(CROSS)} google-generativeai not installed — run: pip install \"jcodemunch-mcp[gemini]\"")
                     issues.append("gemini")
-            elif openai_base:
+            elif provider_name in {"openai", "minimax", "glm"}:
                 try:
                     import httpx  # noqa: F401
-                    print(f"  {green(CHECK)} httpx available for local LLM requests")
+                    print(f"  {green(CHECK)} httpx available for OpenAI-compatible requests")
                 except ImportError:
-                    print(f"  {red(CROSS)} httpx not installed (required for local LLM)")
+                    print(f"  {red(CROSS)} httpx not installed (required for OpenAI-compatible summarizer)")
                     issues.append("httpx")
             else:
                 print(f"  {yellow(WARN)} no AI provider configured — signature fallback will be used")
