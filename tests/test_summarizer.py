@@ -834,6 +834,13 @@ def test_get_model_name_strips_whitespace():
         assert get_model_name() == "claude-haiku"
 
 
+def test_get_model_name_returns_none_for_whitespace_only():
+    """get_model_name returns None for whitespace-only config value."""
+    from jcodemunch_mcp import config as _cfg_module
+    with patch.object(_cfg_module, "_GLOBAL_CONFIG", {"summarizer_model": "   "}):
+        assert get_model_name() is None
+
+
 def test_create_summarizer_disabled_when_false():
     """_create_summarizer() returns None when use_ai_summaries is False (bool)."""
     with patch(
@@ -843,11 +850,12 @@ def test_create_summarizer_disabled_when_false():
         assert _create_summarizer() is None
 
 
-def test_create_summarizer_disabled_when_string_false():
-    """_create_summarizer() returns None when use_ai_summaries is the string 'false'."""
+@pytest.mark.parametrize("falsy_val", ["false", "0", "no", "off"])
+def test_create_summarizer_disabled_when_string_false(falsy_val):
+    """_create_summarizer() returns None for each falsy string value of use_ai_summaries."""
     with patch(
         "jcodemunch_mcp.summarizer.batch_summarize._config.get",
-        side_effect=lambda k, d=None: "false" if k == "use_ai_summaries" else d,
+        side_effect=lambda k, d=None: falsy_val if k == "use_ai_summaries" else d,
     ):
         assert _create_summarizer() is None
 

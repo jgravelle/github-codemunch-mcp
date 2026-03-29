@@ -509,10 +509,17 @@ def _create_summarizer() -> Optional[BaseSummarizer]:
     if explicit_mode:
         # Use summarizer_provider from config; fall back to auto-detect if unset
         explicit_provider = (_config.get("summarizer_provider", "") or "").lower().strip()
-        if explicit_provider not in _VALID_PROVIDERS or explicit_provider == "":
+        if explicit_provider == "":
             logger.warning(
-                "use_ai_summaries is 'true' but summarizer_provider is not set; "
-                "falling back to auto-detect"
+                "use_ai_summaries is 'true' but summarizer_provider is not set; falling back to auto-detect"
+            )
+            name = get_provider_name()
+        elif explicit_provider not in _VALID_PROVIDERS:
+            logger.warning(
+                "summarizer_provider '%s' is not a valid provider; falling back to auto-detect. "
+                "Valid values: %s",
+                explicit_provider,
+                ", ".join(sorted(_VALID_PROVIDERS - {"none"})),
             )
             name = get_provider_name()
         else:
@@ -522,13 +529,9 @@ def _create_summarizer() -> Optional[BaseSummarizer]:
 
     if name == "anthropic":
         s = BatchSummarizer()
-        if model_override:
-            s.model = model_override
         return s if s.client else None
     if name == "gemini":
         s = GeminiBatchSummarizer()
-        if model_override:
-            s.model = model_override
         return s if s.client else None
     if name == "openai":
         s = _make_openai_compat(
