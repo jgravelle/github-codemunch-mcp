@@ -4,6 +4,19 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ## [Unreleased]
 
+## [1.12.8] - 2026-03-29
+
+### Added
+- **Adaptive language config** (PR #185 — contributed by MariusAdrian88) — New `languages_adaptive` config key that auto-manages the `languages` list in `.jcodemunch.jsonc` based on languages actually detected during `index_folder`. When enabled in the global config with no local config present, copies the global config to the project and restricts languages to those found. When enabled in the local config, surgically updates the languages array on every index_folder call (full and incremental): unused languages are commented out, detected ones are uncommented. Fast path (~0 ms) when languages are unchanged; surgical update path ~1–5 ms. Hook applied at all three index_folder return points (fast-path, incremental, full). 16 new tests (1341 total, 7 skipped).
+
+### Changed
+- **`meta_fields` default changed from `null` to `[]`** — The out-of-the-box default is now no metadata in responses (maximum token savings). Users who want all metadata fields can explicitly set `"meta_fields": null` in their config. Existing configs with an explicit `meta_fields` value are unaffected.
+
+### Fixed
+- **`test_db_mtime_ns_no_wal` false WAL creation** — Test was calling `store._connect()` which enables WAL mode, defeating the purpose of the no-WAL scenario. Fixed to use plain `sqlite3.connect()`.
+- **WAL path construction in 3 tests** — Standardised to `Path(str(db_path) + "-wal")` to match production code (previously used `db_path.with_suffix(".db-wal")` which incorrectly strips the `.db` suffix).
+- **`meta_fields` display source detection in `config` subcommand** — Source label now correctly reports `config` vs `default` for the `[]` case.
+
 ## [1.12.7] - 2026-03-29
 
 ### Added
