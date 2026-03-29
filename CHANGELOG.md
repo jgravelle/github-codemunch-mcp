@@ -4,6 +4,15 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ## [Unreleased]
 
+## [1.12.4] - 2026-03-29
+
+### Added
+- **Task-aware embedding for Gemini** (closes #181) — When `GOOGLE_EMBED_MODEL` is configured, `embed_repo` now passes `task_type="RETRIEVAL_DOCUMENT"` to `genai.embed_content` for document indexing, and `search_symbols` passes `task_type="CODE_RETRIEVAL_QUERY"` when embedding the search query. Models that support task types (e.g. `text-embedding-004`, Gemini Embedding 2) produce measurably better code retrieval results; models that do not simply ignore the parameter. Other providers (sentence-transformers, OpenAI) are unaffected.
+- **`GEMINI_EMBED_TASK_AWARE` env var** — Set to `0` / `false` / `no` / `off` to opt out of task-type routing (default: on). Useful if your Gemini model predates task-type support.
+- **`embed_task_type` stored in meta** — The task type used when building the embedding index is now persisted. If you toggle `GEMINI_EMBED_TASK_AWARE`, `embed_repo` detects the mismatch and automatically forces a re-embed so query and document embeddings always come from the same task-type space.
+- **`task_type` field in `embed_repo` response** — Present when a task type was applied; absent for providers that do not use one.
+- 7 new tests (1309 total): `_gemini_task_aware` default/opt-out, Gemini document task type in `embed_repo`, `CODE_RETRIEVAL_QUERY` routing in `search_symbols`, opt-out disables task types, task-type change triggers re-embed, `EmbeddingStore` task type round-trip.
+
 ## [1.12.3] - 2026-03-29
 
 ### Fixed

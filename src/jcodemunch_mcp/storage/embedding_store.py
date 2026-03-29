@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS symbol_embeddings (
 
 _EMBED_DIM_KEY = "embed_dimension"
 _EMBED_MODEL_KEY = "embed_model"
+_EMBED_TASK_TYPE_KEY = "embed_task_type"
 
 
 def _encode_embedding(vec: list[float]) -> bytes:
@@ -82,6 +83,40 @@ class EmbeddingStore:
                     "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
                     (_EMBED_MODEL_KEY, model),
                 )
+            conn.execute("COMMIT")
+        except Exception:
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            raise
+        finally:
+            conn.close()
+
+    def get_task_type(self) -> Optional[str]:
+        """Return stored embedding task type, or None if not set."""
+        try:
+            conn = self._connect()
+            try:
+                row = conn.execute(
+                    "SELECT value FROM meta WHERE key = ?", (_EMBED_TASK_TYPE_KEY,)
+                ).fetchone()
+                return row[0] if row else None
+            finally:
+                conn.close()
+        except Exception:
+            logger.debug("EmbeddingStore.get_task_type failed", exc_info=True)
+            return None
+
+    def set_task_type(self, task_type: str) -> None:
+        """Persist the embedding task type used when building the index."""
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN")
+            conn.execute(
+                "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                (_EMBED_TASK_TYPE_KEY, task_type),
+            )
             conn.execute("COMMIT")
         except Exception:
             try:

@@ -64,7 +64,16 @@ def _embed_sentence_transformers(texts: list[str], model_name: str) -> list[list
     return [list(map(float, e)) for e in raw]
 
 
-def _embed_gemini(texts: list[str], model_name: str) -> list[list[float]]:
+def _gemini_task_aware() -> bool:
+    """Return True unless the user has opted out via GEMINI_EMBED_TASK_AWARE=0."""
+    return os.environ.get("GEMINI_EMBED_TASK_AWARE", "1").strip() not in (
+        "0", "false", "no", "off"
+    )
+
+
+def _embed_gemini(
+    texts: list[str], model_name: str, task_type: Optional[str] = None
+) -> list[list[float]]:
     try:
         import google.generativeai as genai  # type: ignore[import]
     except ImportError as exc:
@@ -76,7 +85,10 @@ def _embed_gemini(texts: list[str], model_name: str) -> list[list[float]]:
     genai.configure(api_key=api_key)
     results = []
     for text in texts:
-        resp = genai.embed_content(model=model_name, content=text)
+        kwargs: dict = {}
+        if task_type:
+            kwargs["task_type"] = task_type
+        resp = genai.embed_content(model=model_name, content=text, **kwargs)
         results.append(list(map(float, resp["embedding"])))
     return results
 
@@ -93,16 +105,26 @@ def _embed_openai(texts: list[str], model_name: str) -> list[list[float]]:
     return [list(map(float, item.embedding)) for item in response.data]
 
 
-def embed_texts(texts: list[str], provider: str, model: str) -> list[list[float]]:
+def embed_texts(
+    texts: list[str],
+    provider: str,
+    model: str,
+    task_type: Optional[str] = None,
+) -> list[list[float]]:
     """Embed a list of texts using the named provider.
 
     Called by ``embed_repo`` and lazily from ``search_symbols`` when
     ``semantic=True`` and embeddings are missing from the store.
+
+    ``task_type`` is forwarded to providers that support it (currently Gemini).
+    Pass ``"RETRIEVAL_DOCUMENT"`` when embedding index documents and
+    ``"CODE_RETRIEVAL_QUERY"`` when embedding a search query.  Other providers
+    silently ignore the parameter.
     """
     if provider == "sentence_transformers":
         return _embed_sentence_transformers(texts, model)
     if provider == "gemini":
-        return _embed_gemini(texts, model)
+        return _embed_gemini(texts, model, task_type=task_type)
     if provider == "openai":
         return _embed_openai(texts, model)
     raise ValueError(f"Unknown embedding provider: {provider!r}")
@@ -159,6 +181,11 @@ def embed_repo(
         }
     provider, model = provider_info
 
+    # Determine document-side task type (Gemini only).
+    doc_task_type: Optional[str] = None
+    if provider == "gemini" and _gemini_task_aware():
+        doc_task_type = "RETRIEVAL_DOCUMENT"
+
     try:
         owner, name = resolve_repo(repo, storage_path)
     except ValueError as e:
@@ -175,6 +202,17 @@ def embed_repo(
 
     # Detect dimension mismatch — if the stored model differs, force a rebuild.
     stored_dim = emb_store.get_dimension()
+
+    # If the task type changed (e.g. Gemini task-awareness toggled), existing
+    # embeddings were built with a different task type and must be regenerated.
+    stored_task_type = emb_store.get_task_type()
+    if not force and stored_task_type != (doc_task_type or "") and emb_store.count() > 0:
+        logger.info(
+            "embed_repo: task_type changed (%r → %r); forcing re-embed",
+            stored_task_type,
+            doc_task_type,
+        )
+        force = True
 
     if force:
         emb_store.clear()
@@ -204,7 +242,7 @@ def embed_repo(
         batch = symbols_to_embed[i : i + batch_size]
         texts = [_sym_text(s) for s in batch]
         try:
-            vecs = embed_texts(texts, provider, model)
+            vecs = embed_texts(texts, provider, model, task_type=doc_task_type)
         except Exception as exc:
             logger.warning("embed_repo: batch %d failed: %s", i // batch_size, exc)
             error_count += len(batch)
@@ -213,12 +251,13 @@ def embed_repo(
         if dim is None and vecs:
             dim = len(vecs[0])
             emb_store.set_dimension(dim, model)
+            emb_store.set_task_type(doc_task_type or "")
 
         emb_store.set_many({batch[j]["id"]: vecs[j] for j in range(len(batch))})
         embedded_count += len(batch)
 
     elapsed = (time.perf_counter() - start) * 1000
-    return {
+    result: dict = {
         "repo": f"{owner}/{name}",
         "provider": provider,
         "model": model,
@@ -228,3 +267,6 @@ def embed_repo(
         "embedding_dimension": dim,
         "_meta": {"timing_ms": round(elapsed, 1)},
     }
+    if doc_task_type:
+        result["task_type"] = doc_task_type
+    return result

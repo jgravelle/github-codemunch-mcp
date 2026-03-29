@@ -616,15 +616,22 @@ def _search_symbols_semantic(
     When ``semantic_only=True`` the BM25 component is skipped entirely (w=1).
     When ``semantic_weight=0.0`` the result is identical to pure BM25.
     """
-    from .embed_repo import embed_texts, _sym_text, EMBED_BATCH_SIZE
+    from .embed_repo import embed_texts, _sym_text, EMBED_BATCH_SIZE, _gemini_task_aware
     from ..storage.embedding_store import EmbeddingStore
     import logging as _logging
 
     _logger = _logging.getLogger(__name__)
 
+    # Determine task types (Gemini only; no-op for other providers).
+    query_task_type: Optional[str] = None
+    doc_task_type: Optional[str] = None
+    if provider == "gemini" and _gemini_task_aware():
+        query_task_type = "CODE_RETRIEVAL_QUERY"
+        doc_task_type = "RETRIEVAL_DOCUMENT"
+
     # ── Get query embedding ────────────────────────────────────────────────
     try:
-        query_vec = embed_texts([query], provider, model)[0]
+        query_vec = embed_texts([query], provider, model, task_type=query_task_type)[0]
     except Exception as exc:
         return {"error": f"Failed to embed query: {exc}"}
 
@@ -639,7 +646,10 @@ def _search_symbols_semantic(
         for bi in range(0, len(missing), EMBED_BATCH_SIZE):
             batch = missing[bi : bi + EMBED_BATCH_SIZE]
             try:
-                vecs = embed_texts([_sym_text(s) for s in batch], provider, model)
+                vecs = embed_texts(
+                    [_sym_text(s) for s in batch], provider, model,
+                    task_type=doc_task_type,
+                )
                 for j, sym in enumerate(batch):
                     new_emb[sym["id"]] = vecs[j]
             except Exception as exc:
@@ -648,6 +658,7 @@ def _search_symbols_semantic(
             if emb_store.get_dimension() is None:
                 dim = len(next(iter(new_emb.values())))
                 emb_store.set_dimension(dim, model)
+                emb_store.set_task_type(doc_task_type or "")
             emb_store.set_many(new_emb)
             all_emb.update(new_emb)
 

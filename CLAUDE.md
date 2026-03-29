@@ -1,47 +1,35 @@
 # jcodemunch-mcp — Project Brief
 
 ## Current State
-- **Version:** 1.12.3 (published to PyPI)
+- **Version:** 1.12.4 (published to PyPI)
 - **INDEX_VERSION:** 6
-- **Tests:** 1302 passed, 7 skipped
+- **Tests:** 1309 passed, 7 skipped
 - **Python:** >=3.10
 
 ## Key Files
 ```
 src/jcodemunch_mcp/
-  server.py                    # MCP tool definitions + call_tool dispatcher (async); also hosts _run_config(), _make_auth_middleware(), _make_rate_limit_middleware(), and CLI subcommand dispatch
-  security.py                  # Path validation, skip patterns, get_max_folder_files(), get_max_index_files()
+  server.py            # MCP dispatcher (async); CLI subcommand dispatch, auth/rate-limit middleware
+  security.py          # Path validation, skip patterns, file caps
+  config.py            # JSONC config: global + per-project layering, env var fallback, language/tool gating
   parser/
-    languages.py               # LANGUAGE_REGISTRY, extension → language map, LanguageSpec
-    extractor.py               # parse_file() dispatch + custom parsers (_parse_erlang_symbols, _parse_fortran_symbols)
-    symbols.py                 # Symbol dataclass
-    hierarchy.py               # Parent/child relationship builder
-    imports.py                 # NEW v1.3.0 — regex-based import extraction; extract_imports(), resolve_specifier()
+    languages.py       # LANGUAGE_REGISTRY, extension → language map, LanguageSpec
+    extractor.py       # parse_file() dispatch; custom parsers for Erlang, Fortran, SQL, Razor
+    imports.py         # Regex import extraction (19 languages); extract_imports(), resolve_specifier()
   storage/
-    index_store.py             # CodeIndex dataclass, IndexStore.save/load/has_index/detect_changes/incremental_save
+    sqlite_store.py    # CodeIndex, save/load/incremental_save, WAL-aware LRU cache (_db_mtime_ns)
   summarizer/
-    batch_summarize.py         # 3-tier AI summarizer: Anthropic > Gemini > OpenAI-compat > signature fallback
-    file_summarize.py          # Heuristic file-level summaries (symbols only, no docstrings)
+    batch_summarize.py # 3-tier: Anthropic > Gemini > OpenAI-compat > signature fallback
   tools/
-    index_folder.py            # Local folder indexer (sync, run via asyncio.to_thread in server.py)
-    index_repo.py              # GitHub repo indexer (async)
-    get_file_tree.py
-    get_file_outline.py
-    get_file_content.py
-    get_symbol.py                # get_symbol_source — symbol_id→flat object or symbol_ids[]→{symbols,errors}
-    search_symbols.py
-    search_text.py
-    search_columns.py            # Search column metadata across dbt/SQLMesh models
-    get_repo_outline.py
-    get_context_bundle.py        # Symbol source + file imports in one call; token_budget/budget_strategy/include_budget_report
-    get_ranked_context.py        # NEW v1.11.16 — query-driven token-budgeted context assembler
-    list_repos.py
-    resolve_repo.py              # O(1) path-to-repo-ID lookup; avoids full list_repos scan
-    invalidate_cache.py
-  config.py                      # Centralized JSONC config: global + per-project layering, env var fallback, language/tool gating
-    find_importers.py            # NEW v1.3.0 — find all files that import a given file
-    find_references.py           # NEW v1.3.0 — find all files that reference a given identifier
-    _utils.py
+    index_folder.py    # Local indexer (sync → asyncio.to_thread in server.py)
+    index_repo.py      # GitHub indexer (async, httpx)
+    get_symbol.py      # get_symbol_source: shape-follows-input (id→flat, ids[]→{symbols,errors})
+    search_columns.py  # Column search across dbt/SQLMesh models
+    get_context_bundle.py   # Symbol + imports bundle; token_budget/budget_strategy
+    get_ranked_context.py   # Query-driven budgeted context (BM25 + PageRank)
+    resolve_repo.py    # O(1) path→repo-ID lookup
+    find_importers.py  # Files that import a given file (import graph)
+    find_references.py # Files that reference a given identifier
 ```
 
 ## CLI Subcommands
@@ -56,23 +44,17 @@ src/jcodemunch_mcp/
 | `config --check` | Also validate prerequisites (storage writable, AI pkg installed, HTTP pkgs present) |
 
 ## Architecture Notes
-- `index_folder` is **synchronous** — dispatched via `asyncio.to_thread()` in server.py to avoid blocking the event loop (bug fixed in v1.1.4; was root cause of MCP timeouts)
+- `index_folder` is **synchronous** — dispatched via `asyncio.to_thread()` in server.py to avoid blocking the event loop
 - `index_repo` is **async** (uses httpx for GitHub API)
-- `has_index()` distinguishes "no file on disk" from "file exists but version rejected" — used to surface version-mismatch warnings
-- `get_max_folder_files()` defaults to 2,000 (separate from `get_max_index_files()` which defaults to 10,000)
+- `has_index()` distinguishes "no file on disk" from "file exists but version rejected"
 - Symbol lookup is O(1) via `__post_init__` id dict in `CodeIndex`
 
-## Languages Supported (25+)
-Python, JavaScript, TypeScript, Java, C, C++, C#, Go, Rust, Ruby, PHP, Swift,
-Kotlin, Scala, R, Julia, Haskell, Lua, Bash, CSS, SQL, TOML, Erlang, Fortran, ...
-
-SQL has a custom parser (`_parse_sql_symbols`) with a companion `sql_preprocessor.py`
-that strips Jinja templating (dbt models) before tree-sitter parsing and extracts
-dbt directives (macro/test/snapshot/materialization) as first-class symbols.
-
-Custom parsers (tree-sitter grammar lacks clean named fields):
-- **Erlang** (`_parse_erlang_symbols`): multi-clause function merging by (name, arity), arity-qualified names (e.g. `add/2`), type/record/define
-- **Fortran** (`_parse_fortran_symbols`): module-as-container, qualified names (`math_utils::multiply`), parameter constants
+## Custom Parsers
+Tree-sitter grammar lacks clean named fields for these — custom regex extractors:
+- **Erlang**: multi-clause function merging by (name, arity); arity-qualified names (e.g. `add/2`)
+- **Fortran**: module-as-container, qualified names (`math_utils::multiply`), parameter constants
+- **SQL**: `_parse_sql_symbols` + `sql_preprocessor.py` strips Jinja (dbt); macro/test/snapshot/materialization as symbols
+- **Razor/Blazor** (.cshtml/.razor): `@functions/@code` → C#, `@page`/`@inject` → constants, HTML ids
 
 ## Env Vars
 | Var | Default | Purpose |
@@ -80,169 +62,34 @@ Custom parsers (tree-sitter grammar lacks clean named fields):
 | `CODE_INDEX_PATH` | `~/.code-index/` | Index storage location |
 | `JCODEMUNCH_MAX_INDEX_FILES` | 10,000 | File cap for repo indexing |
 | `JCODEMUNCH_MAX_FOLDER_FILES` | 2,000 | File cap for folder indexing |
+| `JCODEMUNCH_FILE_TREE_MAX_FILES` | 500 | Cap for get_file_tree results |
+| `JCODEMUNCH_GITIGNORE_WARN_THRESHOLD` | 500 | Missing-.gitignore warning threshold (0 = disable) |
 | `JCODEMUNCH_USE_AI_SUMMARIES` | true | Set false/0/no/off to disable AI summaries globally |
-| `JCODEMUNCH_TRUSTED_FOLDERS` | — | Broad roots trusted to bypass the `index_folder` breadth safeguard, e.g. `/work` in a container |
-| `JCODEMUNCH_EXTRA_IGNORE_PATTERNS` | — | Always-on gitignore patterns (comma-sep or JSON array); merged with per-call extra_ignore_patterns |
-| `JCODEMUNCH_PATH_MAP` | — | Remap stored path prefixes at retrieval time; format: `orig1=new1,orig2=new2`. Allows an index built on one machine (e.g. Linux `/home/user`) to be used on another (e.g. Windows `D:\Users\user`) without re-indexing |
+| `JCODEMUNCH_TRUSTED_FOLDERS` | — | Roots trusted for index_folder; whitelist mode by default |
+| `JCODEMUNCH_EXTRA_IGNORE_PATTERNS` | — | Always-on gitignore patterns (comma-sep or JSON array) |
+| `JCODEMUNCH_PATH_MAP` | — | Cross-platform path remapping; format: `orig1=new1,orig2=new2` |
 | `JCODEMUNCH_STALENESS_DAYS` | 7 | Days before get_repo_outline emits a staleness_warning |
 | `JCODEMUNCH_MAX_RESULTS` | 500 | Hard cap on search_columns result count |
-| `JCODEMUNCH_SHARE_SAVINGS` | 1 | Set 0 to disable anonymous token savings telemetry |
-| `JCODEMUNCH_STATS_FILE_INTERVAL` | 3 | Calls between session_stats.json writes; set 0 to disable (reduces NVMe writes) |
-| `ANTHROPIC_API_KEY` | — | Enables Claude Haiku summaries (install `[anthropic]` extra) |
-| `ANTHROPIC_MODEL` | claude-haiku-* | Override Anthropic model |
-| `GOOGLE_API_KEY` | — | Enables Gemini Flash summaries (install `[gemini]` extra) |
-| `GOOGLE_MODEL` | gemini-flash-* | Override Gemini model |
-| `OPENAI_API_BASE` | — | Local LLM endpoint (Ollama, LM Studio) |
-| `OPENAI_MODEL` | qwen3-coder | Local LLM model name |
-| `OPENAI_API_KEY` | local-llm | Local LLM key (placeholder) |
-| `OPENAI_TIMEOUT` | 60.0 | Local LLM request timeout |
-| `OPENAI_BATCH_SIZE` | 10 | Symbols per summarization request |
-| `OPENAI_CONCURRENCY` | 1 | Parallel batch requests to local LLM |
-| `OPENAI_MAX_TOKENS` | 500 | Max output tokens per batch |
 | `JCODEMUNCH_HTTP_TOKEN` | — | Bearer token for HTTP transport auth (opt-in) |
-| `JCODEMUNCH_RATE_LIMIT` | 0 | Max requests per minute per client IP in HTTP transport (0 = disabled) |
+| `JCODEMUNCH_RATE_LIMIT` | 0 | Max requests/minute per client IP in HTTP transport (0 = disabled) |
 | `JCODEMUNCH_REDACT_SOURCE_ROOT` | 0 | Set 1 to replace source_root with display_name in responses |
-
-## Summarizer Priority
-1. `ANTHROPIC_API_KEY` → Claude Haiku (`pip install jcodemunch-mcp[anthropic]`)
-2. `GOOGLE_API_KEY` → Gemini Flash (`pip install jcodemunch-mcp[gemini]`)
-3. `OPENAI_API_BASE` → local LLM via OpenAI-compatible endpoint
-4. Signature fallback (always available, no deps)
+| `JCODEMUNCH_SHARE_SAVINGS` | 1 | Set 0 to disable anonymous token savings telemetry |
+| `JCODEMUNCH_STATS_FILE_INTERVAL` | 3 | Calls between session_stats.json writes; 0 = disable |
+| `ANTHROPIC_API_KEY` | — | Enables Claude Haiku summaries (`pip install jcodemunch-mcp[anthropic]`) |
+| `GOOGLE_API_KEY` | — | Enables Gemini Flash summaries (`pip install jcodemunch-mcp[gemini]`) |
+| `OPENAI_API_BASE` | — | Local LLM endpoint (Ollama, LM Studio) |
+| `OPENAI_WIRE_API` | — | Set `responses` to use OpenAI Responses API instead of chat/completions |
+| `GEMINI_EMBED_TASK_AWARE` | 1 | Set `0`/`false`/`no`/`off` to disable task-type hints (`RETRIEVAL_DOCUMENT` / `CODE_RETRIEVAL_QUERY`) when using Gemini embeddings |
 
 ## PR / Issue History
-
-### Merged / Closed
-| # | Author | What |
-|---|--------|------|
-| #7 | eresende | Recommend uvx — incorporated into README manually |
-| #8 | eresende | Local LLM summarization via OpenAI-compatible endpoints |
-| #12 | josh-stephens | resolve_repo() deduplication, input validation, CI coverage |
-| #13 | josh-stephens | anthropic as optional dep — applied manually |
-| #15 | josh-stephens | Incremental indexing (`incremental=` param) |
-| #61 | snafu4 | Token-stats CLI — reviewed, deferred (out of scope for MCP server) |
-| #69 | (community) | Erlang support request → implemented in v1.1.3, issue closed |
-| #70 | (community) | Fortran support request → implemented in v1.1.3, issue closed |
-| #71 | zrk02 | Concurrent batch summarization + local LLM tuning docs → merged |
-| #75 | Clubbers | JCODEMUNCH_EXTRA_IGNORE_PATTERNS env var → shipped v1.2.2 |
-| #76 | oderwat | Secret filter false positives on doc files → fixed v1.2.3 |
-| #80 | briepace | Folder indexing speedup: prune dirnames[:] at os.walk level → merged v1.2.8 |
-| #82 | paperlinguist | SQL language support with dbt Jinja preprocessing → merged v1.2.6 |
-| #109 | DrHayt | Fix SKIP_DIRS_REGEX missing `$` anchor — prevented prefix-match pruning (e.g. `proto` eating `protoc-gen-*`) → merged |
-| #158 | iEdgir01 | JCODEMUNCH_PATH_MAP — cross-platform path prefix remapping; merged v1.10.18 |
-| #160 | DrHayt | resolve_repo tool — O(1) path-to-repo-ID lookup; merged v1.10.19 |
-| #162 | MariusAdrian88 | Centralized JSONC config: language filtering, tool gating, meta control, per-project overrides; merged v1.10.20 |
-| #163 | MariusAdrian88 | Merge get_symbol+get_symbols into get_symbol_source; batch verify+context_lines; config comma fix; merged v1.11.0 |
-| #165 | tmeckel | OpenAI Responses API support (OPENAI_WIRE_API=responses); merged v1.11.1 |
-| #168 | DrHayt | Debug logging for skip paths + exclude_secret_patterns config; merged v1.11.3 |
-| #182 | drax1222 | `.razor` (Blazor) file support — extension mapping + `@page`/`@inject` symbols; merged v1.12.2 |
-| #180 | MariusAdrian88 | Cross-process LRU cache invalidation (WAL mtime), max_files bug fix, config template cleanup; merged v1.12.3 |
-
-
-## Roadmap / Backlog
-| Priority | Item |
-|----------|------|
-| ~~P0~~ | ~~Add find_importers + find_references tools~~ — done v1.3.0 |
-| ~~P0~~ | ~~Wrap all sync read tools in asyncio.to_thread()~~ — done v1.1.8 |
-| ~~P0~~ | ~~Move `import functools` out of call_tool hot path to module top~~ — done v1.1.5 |
-| ~~P1~~ | ~~Merge PR #62 (Swift parsing + Xcode ignores)~~ — done v1.1.9 |
-| ~~P1~~ | ~~Close PR #61 (token-stats CLI)~~ — closed, suggested jcodemunch-cli as separate package |
-| ~~P2~~ | ~~Add structured logging (server startup, index events, version mismatches)~~ — done v1.2.0 |
-| ~~P2~~ | ~~Promote SKIP_PATTERNS to named frozenset at module top in security.py~~ — done v1.2.1 |
-| ~~P2~~ | ~~Fix search_symbols language enum in MCP schema~~ — done v1.1.5 |
-| ~~P3~~ | ~~Add duration_seconds to index result dicts for user visibility~~ — done (unpublished) |
-| ~~P3~~ | ~~Mention JCODEMUNCH_USE_AI_SUMMARIES in index_folder/index_repo tool descriptions~~ — done (unpublished) |
-| ~~P3~~ | ~~Integration test for asyncio.to_thread dispatch in call_tool~~ — done (unpublished) |
-| ~~P4~~ | ~~Docker image~~ — dropped; pip/uvx install story is already frictionless, Docker adds perception risk with no meaningful gain |
-| ~~P4~~ | ~~Index staleness warning in get_repo_outline if index is N days old~~ — done (unpublished) |
-
-## Version History
-| Version | What |
-|---------|------|
-| 0.2.x | Pre-stable iterations |
-| 1.0.0 | Stable release |
-| 1.0.1 | Lua language support |
-| 1.1.0 | Repo identity, full-file indexing, get_file_content, search_text context |
-| 1.1.1 | Minor fixes |
-| 1.1.2 | Version mismatch detection (has_index()), lower folder file cap (2,000), version mismatch warnings |
-| 1.1.3 | Erlang + Fortran language support |
-| 1.1.4 | Fix asyncio blocking bug in index_folder; add JCODEMUNCH_USE_AI_SUMMARIES env var |
-| 1.1.5 | Nested .gitignore support; complete search_symbols language enum; housekeeping |
-| 1.1.6 | Full Vue SFC support: Composition API (ref/computed/defineProps/etc.) + Options API (methods/computed/props) |
-| 1.1.7 | Fix index_folder hang on Windows: stdin=DEVNULL for git subprocess; os.walk(followlinks=False) replaces rglob |
-| 1.1.8 | Wrap all sync read tools in asyncio.to_thread() — prevents event loop blocking on every query call |
-| 1.1.9 | Improved Swift parsing (typealias, deinit, property_declaration); Xcode project ignore rules; 2 new Swift tests |
-| 1.2.0 | Structured logging: startup, per-call, index lifecycle, version mismatch warnings |
-| 1.2.1 | SKIP_PATTERNS promoted to named frozenset at module top in security.py |
-| 1.2.2 | JCODEMUNCH_EXTRA_IGNORE_PATTERNS env var — closes #75 |
-| 1.2.3 | Fix *secret* false positives on doc files (.md, .rst, etc.) — closes #76 |
-| 1.2.4 | duration_seconds in index results; JCODEMUNCH_USE_AI_SUMMARIES in tool descriptions; asyncio.to_thread integration test |
-| 1.2.5 | staleness_warning in get_repo_outline when index >= JCODEMUNCH_STALENESS_DAYS old (default 7) |
-| 1.2.6 | SQL language support: DDL symbols, CTEs, dbt Jinja preprocessing, dbt directives (macro/test/snapshot/materialization) |
-| 1.2.7 | Perf fix: token tracker in-memory accumulator; eliminated per-call disk read/write + per-call thread spawn |
-| 1.2.8 | Folder indexing speedup: prune dirnames[:] before os.walk descent; SKIP_FILES_REGEX .search() fix; re.escape on file patterns |
-| 1.2.9–1.2.12 | Various fixes (see git log) |
-| 1.3.0 | find_importers + find_references tools: regex import extraction for 19 languages, import graph persisted in index, resolve_specifier for relative path resolution |
-| 1.3.1 | HTTP transport modes: --transport sse/streamable-http, --host, --port; also JCODEMUNCH_TRANSPORT/HOST/PORT env vars; default 127.0.0.1:8901 |
-| 1.3.2 | search_text: is_regex=true for full regex (alternation, patterns); improved context_lines description (grep -C analogy); get_file_outline accepts 'file' alias for 'file_path' |
-| 1.4.2 | XML: extract name/key identity attributes as symbols (alongside id); qualified_name encodes tag::value (e.g. block::foundationConcrete) — closes #102 |
-| 1.4.3 | Fix cross-process savings loss: token_tracker _flush_locked now writes additive delta instead of overwriting with in-process total — reported in PR #103 |
-| 1.4.4 | Assembly language support (WLA-DX, NASM, GAS, CA65): labels, sections, macros, constants, structs, enums, .proc, imports — contributed by astrobleem (PR #105) |
-| 1.5.0 | Hardening release: ReDoS protection, symlink-safe temp files, cross-process file locking, bounded heap search, metadata sidecars, LRU index cache, SSRF prevention, streaming file indexing, consolidated skip patterns, BaseSummarizer dedup, exception logging, search_columns + get_context_bundle tests |
-| 1.9.1 | (see git log) |
-| 1.9.2 | session_stats.json: token_tracker now writes ~/.code-index/session_stats.json (with last_updated timestamp) on every flush and on explicit get_session_stats calls — enables VS Code status bar extensions and other external stat consumers (closes #140) |
-| 1.10.0 | Restore in-memory LRU cache (regression from WAL PR #141) + schema v5: promote 6 JSON data fields to real columns (eliminates json.loads per row on cold reads); mmap_size=256MB + temp_store=MEMORY pragmas; v4→v5 auto-migration; warm reads now 0ms (cache hit), cold reads -26% — contributed by MariusAdrian88 (PR #148) |
-| 1.10.1 | JCODEMUNCH_STATS_FILE_INTERVAL env var: configurable session_stats.json write frequency (default 3, 0 = disable) — reduces NVMe writes for users who don't use the VS Code extension (closes #140 follow-up from MariusAdrian88) |
-| 1.10.2 | Razor (.cshtml) language support: dedicated CshtmlExtractor handling @functions/@code blocks, @model/@using/@inject directives, HTML ID extraction, and embedded script/style blocks — contributed by outoftheblue9 (PR #150) |
-| 1.10.3 | Perf: search_symbols (filtered) up to 25x faster via inverted index; find_references 14x faster via lazy import-name inverted index; watcher reindex 30x faster (3s → 96ms) via changed_paths fast path; safe_name cache key bug fix (permanent cache misses for repos with special chars); BM25 internal keys no longer leak into API responses; carry forward token bags across incremental reindex — contributed by MariusAdrian88 (PR #152) |
-| 1.10.4 | Security hardening: timing-safe bearer token comparison (hmac.compare_digest); GitHub URL hostname validation blocking SSRF + token leakage; sanitized call_tool exception responses (full trace to server log, generic message to client); 500-char query length limit on search_symbols and search_text |
-| 1.10.5 | Perf + security: folder_path redacted in all index_folder responses when JCODEMUNCH_REDACT_SOURCE_ROOT=1 (S6); bounded heap in token_budget search mode O(N log K) instead of O(N log N) (P1); incremental_save in-memory patch path — O(delta) instead of O(total rows) on cache hit, eliminates SELECT * FROM symbols on every watcher cycle (P6) |
-| 1.10.6 | Perf + security: search_text uses readlines() instead of f.read()+split (P4, avoids large intermediate string on big files); _is_gitignored_fast uses os.path.normcase for case-insensitive prefix matching on Windows (S7); 3 new T5 tests for normcase behaviour |
-| 1.10.7 | Perf: bare-name repo lookup cache in resolve_repo (P5) — mtime-gated module-level dict avoids O(N) list_repos() scan on every tool call; cost when warm is one stat() per call |
-| 1.10.8 | Perf: token_tracker telemetry now uses a single daemon worker thread + queue.Queue (P11) — eliminates per-flush thread creation; _share_savings enqueues work instead of spawning Thread |
-| 1.10.9 | Perf: discover_local_files merges two os.walk passes into one (P8) — .gitignore specs loaded incrementally during file enumeration, eliminating redundant full-tree walk |
-| 1.10.10 | Security: optional per-IP rate-limiting middleware for HTTP transport (S9) — set JCODEMUNCH_RATE_LIMIT=N to cap N requests/minute per client IP; disabled by default |
-| 1.10.11 | UX: `jcodemunch-mcp config` subcommand — prints effective configuration grouped by concern; `--check` validates storage path, AI provider package, and HTTP transport packages |
-| 1.10.12 | UX: `get_repo_outline` now includes `most_imported_files` (top 10 by import in-degree, requires import graph); `get_symbol_diff` MCP description now includes step-by-step branch diff workflow |
-| 1.10.13 | Perf: remove 4-model cost table from per-tool _meta (cost_avoided now returns {}); trim 6 verbose tool descriptions — reduces schema tokens ~249/turn and _meta overhead ~71 tokens/call (×9 tools, compounding) |
-| 1.10.14 | Watcher backpressure + index freshness: memory hash cache (~57ms savings/tick), watcher fast path (~3s → ~50ms on Windows), deferred AI summarization (index queryable immediately), per-repo reindex state with threading.Event signaling, _meta staleness fields on all query responses, wait_for_fresh tool, --freshness-mode=strict CLI flag; 78 regression tests — contributed by MariusAdrian88 (PR #154) |
-| 1.10.15 | Perf: suppress_meta param on all 25 tools — add suppress_meta=true to strip _meta envelope (~100-200 tokens/call savings); injected at list_tools() time via single property dict, stripped in call_tool dispatcher; 3 new tests — requested by Mharbulous (#142) |
-| 1.10.16 | Docs: expand tool reference in USER_GUIDE.md, QUICKSTART.md, and README.md with new tools; add AGENT_HOOKS.md cross-links (PR #155 by gokhanozdemir) |
-| 1.10.17 | CLI: `index-file <path>` subcommand — re-index a single file from the shell; enables PostToolUse hooks for automatic index freshness after agent edits (PR #156 by gokhanozdemir) |
-| 1.10.18 | Feat: JCODEMUNCH_PATH_MAP env var — cross-platform path prefix remapping so an index built on one machine (e.g. Linux /home/user) can be reused on another (e.g. Windows C:\Users\user) without re-indexing; directory-boundary-aware matching, mixed-separator support, =signs in paths; 22 tests — contributed by iEdgir01 (PR #158); fix: remap() returns path unchanged on no-match (prevented Windows separator regression) |
-| 1.10.19 | Feat: resolve_repo tool — O(1) path-to-repo-ID lookup; accepts repo root, worktree, subdirectory, or file path; computes deterministic hash ID and checks index existence directly; returns full metadata when indexed or hint to call index_folder when not; ~200 tokens vs potentially thousands from list_repos; 8 tests — contributed by DrHayt (PR #160) |
-| 1.10.20 | Feat: centralized JSONC config system — global ~/.code-index/config.jsonc + per-project .jcodemunch.jsonc; language filtering (skip parsers for unlisted languages); tool gating (disabled_tools removes from schema); meta_fields allowlist replaces suppress_meta in schema; description overrides; env vars deprecated as fallback-only; hash-based project config cache; config --init CLI; 110 new tests (1101 total) — contributed by MariusAdrian88 (PR #162) |
-| 1.10.21 | Perf: token efficiency pass — remove `powered_by` string from default `_meta` (~20 tokens/call), remove `repo`/`query`/`is_regex`/`context_lines` echo from search responses (~15 tokens/call), move BM25 `score` field to debug-only mode (~30 tokens/search); combined ~65 tokens saved per search call |
-| 1.10.22 | Perf: filesystem overhead reduction — `_VERIFIED_PATHS` cache skips redundant mkdir syscalls on every tool call; `list_repos` fast-exits before legacy JSON glob passes when no `.json` files exist (~5-20ms saved); `_hash_file` caches read content for reuse in parse step (eliminates double-read of changed files during incremental index); `_safe_content_path` caches `content_dir.resolve()` result (eliminates repeated resolve() syscalls in search_text/search_symbols) |
-| 1.10.23 | Perf: INDEX_VERSION 6 — add `size_bytes` column to `files` table; eliminates `os.path.getsize()` stat calls in search_symbols, search_text, and get_file_content (replaced with `index.file_sizes.get()`); auto-migration from v5; `file_sizes` dict propagated through `_patch_index_from_delta` for O(delta) incremental updates |
-| 1.10.24 | Perf: pipeline optimization — cache `get_language_for_path()` result in parse loop and reuse for import extraction (eliminates 2× call per file across all 3 pipeline functions); add `source_bytes` param to `parse_file` and pass pre-encoded bytes from full-index loop (eliminates redundant `content.encode('utf-8')` on every indexed file); add `_file_hash_bytes` helper for bytes-based hashing |
-| 1.11.0 | Breaking: merge get_symbol+get_symbols into get_symbol_source — shape-follows-input (symbol_id→flat object, symbol_ids[]→{symbols,errors}); batch mode gains verify+context_lines; mutual exclusion enforced; config template comma bug fixed; disabled_tools template uses inline commented entries — contributed by MariusAdrian88 (PR #163) |
-| 1.11.1 | Feat: OpenAI Responses API support — set OPENAI_WIRE_API=responses to use /responses endpoint instead of /chat/completions; supports output_text shortcut and output[].content[] traversal; graceful fallback to signature on parse error; 7 new tests — contributed by tmeckel (PR #165) |
-| 1.11.2 | (pre-bumped, no new content shipped) |
-| 1.11.3 | Fix: debug logging for all three silent skip paths (skip_dir, skip_file, secret) + skip_dir/skip_file counters in discovery summary; add exclude_secret_patterns config option to suppress specific SECRET_PATTERNS entries (workaround for *secret* glob false-positives on full relative paths in Go monorepos); 6 new tests — contributed by DrHayt (PR #168) |
-| 1.11.4 | Fix: import-graph tools (find_importers, get_blast_radius, get_dependency_graph, and 5 others) now resolve TypeScript/SvelteKit path aliases (@/*, $lib/*) by reading compilerOptions.paths from tsconfig.json/jsconfig.json at the project root; also resolves TypeScript ESM .js→.ts extension convention; alias_map auto-loaded from source_root and module-level cached; 10 new tests — closes #169 |
-| 1.11.5 | Fix: tsconfig.json/jsconfig.json are now parsed as JSONC (strips // and /* */ comments and trailing commas) — previously json.loads() silently failed on commented tsconfigs, leaving alias_map empty and causing find_importers/get_blast_radius to return 0 alias-based results; also adds test for nested layout with specific @/lib/* overrides; 5 new tests — closes #170 |
-| 1.11.6 | UX: structured file-cap warnings — index_folder and index_repo now surface files_discovered, files_indexed, and files_skipped_cap fields plus a human-readable warning when the file cap is hit (previously a silent "note"); search_symbols and get_symbol_source single-symbol responses now include a _meta hint pointing to get_context_bundle; benchmark docs expanded with "Common Misreadings" section in METHODOLOGY.md and reproducible results table added to README |
-| 1.11.7 | Feat: check_freshness tool — compares git HEAD SHA at index time to current HEAD for locally indexed repos; returns fresh (bool), indexed_sha, current_sha, commits_behind; GitHub repos return is_local=False with clear message. get_repo_outline staleness check upgraded to SHA-based (accurate) with time-based fallback for GitHub/no-git repos; is_stale added to _meta; 8 new tests |
-| 1.11.8 | Feat: trusted_folders allowlist for index_folder() — new config key `trusted_folders` (+ `trusted_folders_whitelist_mode`) with env var fallbacks; whitelist mode (default) restricts indexing to named roots; blacklist mode blocks specific paths while trusting all others; path-aware matching (not string-prefix); project config supports `.`, `./subdir`, and bare relative paths; escape-attempt rejection; backward compatible (empty list = unchanged behavior) — contributed by tmeckel (PR #175) |
-| 1.11.9 | Fix: Windows CI trusted_folders test paths use `.as_posix()` to avoid backslash JSON escape errors in config.jsonc |
-| 1.11.10 | Feat: blast radius depth scoring — `get_blast_radius` now always returns `direct_dependents_count` and `overall_risk_score` (0.0–1.0); new `include_depth_scores=true` param adds `impact_by_depth` (files by BFS layer with per-depth risk scores); backward compatible; 14 new tests |
-| 1.11.11 | Feat: fuzzy symbol search — `search_symbols` gains `fuzzy`, `fuzzy_threshold`, `max_edit_distance` params; trigram Jaccard + Levenshtein fallback; auto-triggers when BM25 confidence is low; `match_type` field on results; no new deps; 21 new tests |
-| 1.11.12 | Feat: PageRank / centrality ranking — new `get_symbol_importance` tool (PageRank or in-degree on import graph, top_n, algorithm, scope); `search_symbols` gains `sort_by` ("relevance"/"centrality"/"combined"); `get_repo_outline` adds `most_central_symbols` (top 10 by PageRank); PageRank: damping=0.85, dangling-node correction, cached per index load; 23 new tests |
-| 1.11.13 | Fix: manifest watcher reliability — replaced watchfiles.awatch() with 0.5s polling loop; fixes silent missed events on Windows |
-| 1.11.14 | Feat: `find_dead_code` tool — finds files/symbols with zero importers and no entry-point role; confidence scoring (1.0/0.9/0.7); entry points auto-detected by filename, __init__.py, __main__ guard; granularity/min_confidence/include_tests/entry_point_patterns params; no new deps; 13 new tests |
-| 1.11.16 | Feat: token-budgeted context assembly — `get_context_bundle` gains `token_budget`/`budget_strategy`/`include_budget_report`; new `get_ranked_context` tool (query + budget → best-fit symbols with source); BM25 + PageRank ranking; no new deps; 19 new tests |
-| 1.11.15 | Feat: `get_changed_symbols` tool — maps git diff to affected symbols (added/removed/modified/renamed) between two commits; defaults to index-time SHA vs HEAD; optional blast radius per changed symbol; filters index-storage files from diff; requires local repo + git on PATH; no new deps; 12 new tests |
-| 1.12.0 | Breaking: remove `check_freshness` + `wait_for_fresh` tools (~400 schema tokens/call saved); remove `_meta` staleness fields (`index_stale`, `reindex_in_progress`, `stale_since_ms`); fix watcher config layering (config.jsonc "watch" key was silently ignored); fix hash-cache miss reindex skip (`__cache_miss__` sentinel); fix flaky Windows tests (autouse conftest cache/config fixtures); new config-driven watcher params: `watch_paths`, `watch_extra_ignore`, `watch_follow_symlinks`, `watch_idle_timeout`, `watch_log`; net -880 lines, +25 tests — contributed by MariusAdrian88 (PR #179) |
-| 1.12.1 | Fix: `get_file_tree` token overflow on bloated indexes — results capped at `max_files` (default 500, exposed as tool param); truncated response includes `total_file_count` + hint to use `path_prefix`; `index_folder` warns when no root `.gitignore` found and ≥500 files indexed; 10 new tests — closes #178 |
-| 1.12.2 | Feat: `.razor` (Blazor component) file support — single-line extension mapping in languages.py; `_parse_razor_symbols` extended to emit `@page` routes and `@inject` directives as constant symbols; `Counter.razor` fixture + 8 new tests — contributed by drax1222 (PR #182) |
-| 1.12.3 | Fix: cross-process LRU cache invalidation — `_db_mtime_ns()` checks `max(db, db-wal)` mtime so WAL writes from watcher process are detected by MCP server's cache; `os.utime()` after save/incremental_save as belt-and-suspenders; fix `max_files` silently dropped in `call_tool` dispatch for `get_file_tree`; `file_tree_max_files` + `gitignore_warn_threshold` as first-class config keys; config template cleanup (remove stale tools, sort lists, add inline docs, add all missing keys); 5 new tests — contributed by MariusAdrian88 (PR #180) |
+See `git log` and CHANGELOG.md. Active contributors: MariusAdrian88, DrHayt, tmeckel, drax1222.
 
 ## Maintenance Practices
 
 1. **Document every tool before shipping.** Any PR adding a new tool to `server.py`
    must simultaneously update: README.md (tool reference), CLAUDE.md (Key Files),
-   version history, and at least one test.
+   CHANGELOG.md, and at least one test.
 2. **Log every silent exception.** Every `except Exception:` block must emit at
    minimum `logger.debug("...", exc_info=True)`. For user-facing fallbacks (AI
    summarizer, index load), use `logger.warning(...)`.
-3. **Version history goes at the bottom** in ascending order (oldest first, newest last).
+3. **CHANGELOG.md** is the authoritative version history — update it with every release.

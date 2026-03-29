@@ -207,7 +207,7 @@ def test_semantic_hybrid_surfaces_missed_bm25_symbol(tmp_path, monkeypatch):
         "s3": _make_vec(2.0),    # distant
     }
 
-    def _mock_embed(texts, provider, model):
+    def _mock_embed(texts, provider, model, task_type=None):
         if len(texts) == 1 and texts[0].startswith("database"):
             return [query_vec]
         # Called for symbol texts — map by index into sym order
@@ -243,7 +243,7 @@ def test_semantic_weight_zero_equals_pure_bm25(tmp_path, monkeypatch):
 
     dummy_vec = _make_vec(1.0)
 
-    def _mock_embed(texts, provider, model):
+    def _mock_embed(texts, provider, model, task_type=None):
         return [dummy_vec for _ in texts]
 
     monkeypatch.setenv("JCODEMUNCH_EMBED_MODEL", "all-MiniLM-L6-v2")
@@ -272,7 +272,7 @@ def test_semantic_only_skips_bm25(tmp_path, monkeypatch):
     query_vec = _make_vec(0.0)
     sym_vecs = {"s1": _make_vec(0.01), "s2": _make_vec(3.0)}
 
-    def _mock_embed(texts, provider, model):
+    def _mock_embed(texts, provider, model, task_type=None):
         if len(texts) == 1:
             return [query_vec]
         return [sym_vecs.get(f"s{i+1}", _make_vec(i)) for i in range(len(texts))]
@@ -301,7 +301,7 @@ def test_embed_repo_caches_and_skips_on_second_call(tmp_path, monkeypatch):
 
     call_count = {"n": 0}
 
-    def _mock_embed(texts, provider, model):
+    def _mock_embed(texts, provider, model, task_type=None):
         call_count["n"] += len(texts)
         return [_make_vec(i) for i in range(len(texts))]
 
@@ -324,7 +324,7 @@ def test_embed_repo_force_recomputes(tmp_path, monkeypatch):
 
     call_count = {"n": 0}
 
-    def _mock_embed(texts, provider, model):
+    def _mock_embed(texts, provider, model, task_type=None):
         call_count["n"] += len(texts)
         return [_make_vec(i) for i in range(len(texts))]
 
@@ -342,7 +342,7 @@ def test_embed_repo_returns_stats(tmp_path, monkeypatch):
     symbols = [_make_symbol("s1", "foo"), _make_symbol("s2", "bar")]
     _seed(tmp_path, symbols)
 
-    def _mock_embed(texts, provider, model):
+    def _mock_embed(texts, provider, model, task_type=None):
         return [_make_vec(i, dim=4) for i in range(len(texts))]
 
     monkeypatch.setenv("JCODEMUNCH_EMBED_MODEL", "all-MiniLM-L6-v2")
@@ -398,3 +398,161 @@ def test_embedding_store_delete_many(tmp_path):
     assert es.count() == 1
     assert es.get("s1") is None
     assert es.get("s2") is not None
+
+
+# ── Unit: task-type helpers ───────────────────────────────────────────────────
+
+def test_gemini_task_aware_default_is_on(monkeypatch):
+    """Task-type support is enabled by default (no env var set)."""
+    from jcodemunch_mcp.tools.embed_repo import _gemini_task_aware
+    monkeypatch.delenv("GEMINI_EMBED_TASK_AWARE", raising=False)
+    assert _gemini_task_aware() is True
+
+
+def test_gemini_task_aware_opt_out(monkeypatch):
+    """GEMINI_EMBED_TASK_AWARE=0 disables task types."""
+    from jcodemunch_mcp.tools.embed_repo import _gemini_task_aware
+    for val in ("0", "false", "no", "off"):
+        monkeypatch.setenv("GEMINI_EMBED_TASK_AWARE", val)
+        assert _gemini_task_aware() is False, f"should be False for {val!r}"
+
+
+# ── Integration: Gemini task-type routing ─────────────────────────────────────
+
+def test_embed_repo_passes_retrieval_document_for_gemini(tmp_path, monkeypatch):
+    """embed_repo must pass task_type='RETRIEVAL_DOCUMENT' when using Gemini."""
+    symbols = [_make_symbol("s1", "foo")]
+    _seed(tmp_path, symbols)
+
+    received_task_types: list = []
+
+    def _mock_embed(texts, provider, model, task_type=None):
+        received_task_types.append(task_type)
+        return [_make_vec(0)]
+
+    monkeypatch.delenv("JCODEMUNCH_EMBED_MODEL", raising=False)
+    monkeypatch.setenv("GOOGLE_API_KEY", "fake-key")
+    monkeypatch.setenv("GOOGLE_EMBED_MODEL", "models/text-embedding-004")
+    monkeypatch.delenv("GEMINI_EMBED_TASK_AWARE", raising=False)
+
+    with patch("jcodemunch_mcp.tools.embed_repo.embed_texts", side_effect=_mock_embed):
+        result = embed_repo("test/semantic", storage_path=str(tmp_path))
+
+    assert result.get("error") is None, result
+    assert all(tt == "RETRIEVAL_DOCUMENT" for tt in received_task_types), received_task_types
+    assert result.get("task_type") == "RETRIEVAL_DOCUMENT"
+
+
+def test_search_symbols_passes_code_retrieval_query_for_gemini(tmp_path, monkeypatch):
+    """semantic search must use CODE_RETRIEVAL_QUERY for the query and
+    RETRIEVAL_DOCUMENT for lazy symbol embedding when using Gemini."""
+    symbols = [_make_symbol("s1", "authenticate_user", summary="handles auth")]
+    _seed(tmp_path, symbols)
+
+    calls: list[dict] = []
+    query_vec = _make_vec(0.0)
+    sym_vec = _make_vec(0.01)
+
+    def _mock_embed(texts, provider, model, task_type=None):
+        calls.append({"texts": texts, "task_type": task_type})
+        # First call is the query; subsequent calls are symbol batches
+        if len(texts) == 1 and texts[0] == "authenticate user":
+            return [query_vec]
+        return [sym_vec for _ in texts]
+
+    monkeypatch.delenv("JCODEMUNCH_EMBED_MODEL", raising=False)
+    monkeypatch.setenv("GOOGLE_API_KEY", "fake-key")
+    monkeypatch.setenv("GOOGLE_EMBED_MODEL", "models/text-embedding-004")
+    monkeypatch.delenv("GEMINI_EMBED_TASK_AWARE", raising=False)
+
+    with patch("jcodemunch_mcp.tools.embed_repo.embed_texts", side_effect=_mock_embed):
+        result = search_symbols(
+            "test/semantic", "authenticate user",
+            semantic=True, storage_path=str(tmp_path),
+        )
+
+    assert result.get("error") is None, result
+    query_calls = [c for c in calls if c["texts"] == ["authenticate user"]]
+    symbol_calls = [c for c in calls if c["texts"] != ["authenticate user"]]
+    assert query_calls, "expected at least one query embedding call"
+    assert all(c["task_type"] == "CODE_RETRIEVAL_QUERY" for c in query_calls)
+    assert all(c["task_type"] == "RETRIEVAL_DOCUMENT" for c in symbol_calls)
+
+
+def test_task_type_opt_out_disables_task_types(tmp_path, monkeypatch):
+    """GEMINI_EMBED_TASK_AWARE=0 must result in no task_type being passed."""
+    symbols = [_make_symbol("s1", "foo")]
+    _seed(tmp_path, symbols)
+
+    received: list = []
+
+    def _mock_embed(texts, provider, model, task_type=None):
+        received.append(task_type)
+        return [_make_vec(0)]
+
+    monkeypatch.delenv("JCODEMUNCH_EMBED_MODEL", raising=False)
+    monkeypatch.setenv("GOOGLE_API_KEY", "fake-key")
+    monkeypatch.setenv("GOOGLE_EMBED_MODEL", "models/text-embedding-004")
+    monkeypatch.setenv("GEMINI_EMBED_TASK_AWARE", "0")
+
+    with patch("jcodemunch_mcp.tools.embed_repo.embed_texts", side_effect=_mock_embed):
+        result = embed_repo("test/semantic", storage_path=str(tmp_path))
+
+    assert result.get("error") is None, result
+    assert all(tt is None for tt in received), received
+    assert "task_type" not in result
+
+
+def test_task_type_change_triggers_reembed(tmp_path, monkeypatch):
+    """Toggling GEMINI_EMBED_TASK_AWARE must invalidate existing embeddings."""
+    symbols = [_make_symbol("s1", "foo")]
+    _seed(tmp_path, symbols)
+
+    call_count = {"n": 0}
+
+    def _mock_embed(texts, provider, model, task_type=None):
+        call_count["n"] += len(texts)
+        return [_make_vec(0)]
+
+    monkeypatch.delenv("JCODEMUNCH_EMBED_MODEL", raising=False)
+    monkeypatch.setenv("GOOGLE_API_KEY", "fake-key")
+    monkeypatch.setenv("GOOGLE_EMBED_MODEL", "models/text-embedding-004")
+
+    with patch("jcodemunch_mcp.tools.embed_repo.embed_texts", side_effect=_mock_embed):
+        # First run: task-type aware (RETRIEVAL_DOCUMENT stored)
+        monkeypatch.delenv("GEMINI_EMBED_TASK_AWARE", raising=False)
+        embed_repo("test/semantic", storage_path=str(tmp_path))
+        assert call_count["n"] == 1
+
+        # Second run: same settings — should skip (all embedded)
+        embed_repo("test/semantic", storage_path=str(tmp_path))
+        assert call_count["n"] == 1  # no new calls
+
+        # Third run: opt-out — task_type changed → must re-embed
+        monkeypatch.setenv("GEMINI_EMBED_TASK_AWARE", "0")
+        r = embed_repo("test/semantic", storage_path=str(tmp_path))
+        assert r["symbols_embedded"] == 1
+        assert call_count["n"] == 2
+
+
+# ── Integration: EmbeddingStore task type persistence ─────────────────────────
+
+def test_embedding_store_task_type_persist_and_retrieve(tmp_path):
+    """set_task_type / get_task_type must round-trip through SQLite."""
+    from jcodemunch_mcp.storage.embedding_store import EmbeddingStore
+
+    symbols = [_make_symbol("s1", "foo")]
+    store, _ = _seed(tmp_path, symbols)
+    db_path = store._sqlite._db_path("test", "semantic")
+
+    es1 = EmbeddingStore(db_path)
+    assert es1.get_task_type() is None  # not set yet
+
+    es1.set_task_type("RETRIEVAL_DOCUMENT")
+
+    es2 = EmbeddingStore(db_path)  # new instance simulates new process
+    assert es2.get_task_type() == "RETRIEVAL_DOCUMENT"
+
+    es2.set_task_type("")  # clearing
+    es3 = EmbeddingStore(db_path)
+    assert es3.get_task_type() == ""
