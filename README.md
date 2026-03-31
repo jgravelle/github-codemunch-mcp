@@ -225,6 +225,27 @@ If you’re using Claude Code:
 claude mcp add jcodemunch uvx jcodemunch-mcp
 ```
 
+If you’re using **Paperclip** (the multi-agent orchestration platform), add a `.mcp.json` to your workspace root:
+
+```json
+{
+  "mcpServers": {
+    "jcodemunch": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["jcodemunch-mcp"]
+    },
+    "jdocmunch": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["jdocmunch-mcp"]
+    }
+  }
+}
+```
+
+Paperclip’s Claude Code agents auto-detect `.mcp.json` at startup. Add both servers to give your agents symbol search + doc navigation without blowing the token budget.
+
 ### 3. Tell your agent to actually use it
 
 This matters more than people think.
