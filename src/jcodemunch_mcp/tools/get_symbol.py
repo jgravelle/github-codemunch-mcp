@@ -30,6 +30,9 @@ def get_symbol_source(
     Pass symbol_ids (array) for batch — returns {symbols, errors}.
     Both modes support verify and context_lines.
     """
+    # Normalize: some MCP clients send symbol_ids=[] alongside symbol_id when they mean singular mode
+    if symbol_id is not None and symbol_ids is not None and len(symbol_ids) == 0:
+        symbol_ids = None
     if symbol_id is None and symbol_ids is None:
         return {"error": "Provide symbol_id (string) or symbol_ids (array)."}
     if symbol_id is not None and symbol_ids is not None:

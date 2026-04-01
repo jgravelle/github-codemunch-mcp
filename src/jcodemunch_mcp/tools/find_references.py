@@ -241,6 +241,9 @@ def find_references(
     Raises:
         ValueError: if neither or both of identifier and identifiers are provided.
     """
+    # Normalize: some MCP clients send identifiers=[] alongside identifier when they mean singular mode
+    if identifier is not None and identifiers is not None and len(identifiers) == 0:
+        identifiers = None
     if (identifier is None and identifiers is None) or (identifier is not None and identifiers is not None):
         raise ValueError("Provide exactly one of 'identifier' or 'identifiers', not both and not neither.")
 

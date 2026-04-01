@@ -4,6 +4,11 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ## [Unreleased]
 
+## [1.15.1] - 2026-04-01
+
+### Fixed
+- **Empty-array false positive in singular/batch mode detection** — `get_symbol_source`, `find_references`, `check_references`, `find_importers`, and `get_file_outline` each support a singular param (e.g. `symbol_id`) and a batch param (e.g. `symbol_ids`). Some MCP clients (observed with OpenCode + GPT codex) pass the batch param as an empty array `[]` even when invoking singular mode. Since `[] is not None` is `True`, the mutual-exclusivity guard fired and returned `"Provide symbol_id or symbol_ids, not both."` / `"Internal error processing find_references"`. Fixed by normalizing empty lists to `None` before the guard check in all five tools. Reported by razorree in issue #189.
+
 ## [1.15.0] - 2026-04-01
 
 ### Added

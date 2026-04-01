@@ -222,6 +222,9 @@ def find_importers(
     Raises:
         ValueError: if neither or both of file_path and file_paths are provided.
     """
+    # Normalize: some MCP clients send file_paths=[] alongside file_path when they mean singular mode
+    if file_path is not None and file_paths is not None and len(file_paths) == 0:
+        file_paths = None
     if (file_path is None and file_paths is None) or (file_path is not None and file_paths is not None):
         raise ValueError("Provide exactly one of 'file_path' or 'file_paths', not both and not neither.")
 
