@@ -890,6 +890,176 @@ def validate_config(config_path: str) -> list[str]:
     return issues
 
 
+def _extract_template_keys(template: str) -> list[str]:
+    """Return top-level key names that appear in the template (active or commented-out).
+
+    Only matches keys at the top level of the JSONC object (exactly 2 spaces of
+    indentation), not nested keys inside objects like "descriptions".
+    Returns them in order of first appearance.
+    """
+    import re
+    seen: set[str] = set()
+    result: list[str] = []
+    # Match lines with exactly 2 leading spaces (top-level in the outer {})
+    # Handles both active keys and commented-out keys.
+    for m in re.finditer(r'^  (?:// *)?\"(\w+)\" *:', template, re.MULTILINE):
+        key = m.group(1)
+        if key not in seen:
+            seen.add(key)
+            result.append(key)
+    return result
+
+
+def _extract_section_for_key(template: str, key: str) -> str | None:
+    """Extract the comment block + key entry for a given key from the template.
+
+    Returns the block of text (including preceding comment lines) as it appears
+    in the template, ready to be appended to an existing config. Returns None if
+    the key is not found.
+    """
+    import re
+    lines = template.splitlines()
+
+    # Find the line index where this key appears (active or commented-out)
+    key_pattern = re.compile(r'^\s*(?://\s*)?"' + re.escape(key) + r'"\s*:')
+    key_line_idx: int | None = None
+    for i, line in enumerate(lines):
+        if key_pattern.match(line):
+            key_line_idx = i
+            break
+
+    if key_line_idx is None:
+        return None
+
+    # Walk backwards to find the start of the preceding comment block.
+    # Stop at blank lines or section-header comments (=== ... ===).
+    start_idx = key_line_idx
+    for i in range(key_line_idx - 1, -1, -1):
+        stripped = lines[i].strip()
+        if not stripped:
+            break
+        if stripped.startswith("//"):
+            start_idx = i
+        else:
+            break
+
+    # Walk forwards to capture multi-line values (arrays/objects) or
+    # consecutive comment lines after the key.
+    end_idx = key_line_idx
+    depth = 0
+    for i in range(key_line_idx, len(lines)):
+        line = lines[i]
+        depth += line.count("{") + line.count("[")
+        depth -= line.count("}") + line.count("]")
+        end_idx = i
+        if i >= key_line_idx and depth <= 0:
+            break
+
+    block = "\n".join(lines[start_idx : end_idx + 1])
+    return block
+
+
+def upgrade_config(config_path: "Path") -> tuple[list[str], list[str]]:
+    """Add missing keys from the current template into an existing config.jsonc.
+
+    Preserves all user values. Only appends keys that are entirely absent
+    (neither active nor commented-out) from the existing config.
+
+    Returns:
+        (added_keys, warnings) — keys that were injected; warnings if any.
+    """
+    from . import __version__
+
+    existing_content = config_path.read_text(encoding="utf-8")
+    template = generate_template()
+
+    # Determine which keys exist in user's config (active or commented-out)
+    existing_keys = set(_extract_template_keys(existing_content))
+
+    # Determine full ordered key list from template
+    template_keys = _extract_template_keys(template)
+
+    # Keys to inject: in template but absent from user's config
+    missing_keys = [k for k in template_keys if k not in existing_keys]
+
+    added: list[str] = []
+    warnings: list[str] = []
+
+    if not missing_keys:
+        # Still update version field if present
+        _update_version_field(existing_content, __version__, config_path)
+        return [], []
+
+    # Collect blocks to append
+    blocks_to_append: list[str] = []
+    for key in missing_keys:
+        block = _extract_section_for_key(template, key)
+        if block:
+            blocks_to_append.append(block)
+            added.append(key)
+        else:
+            warnings.append(f"Could not extract block for key '{key}' from template")
+
+    if blocks_to_append:
+        # Insert before the closing }
+        new_content = _inject_blocks_before_closing_brace(
+            existing_content, blocks_to_append
+        )
+        new_content = _update_version_field(new_content, __version__, config_path=None)
+        config_path.write_text(new_content, encoding="utf-8")
+    else:
+        _update_version_field(existing_content, __version__, config_path)
+
+    return added, warnings
+
+
+def _update_version_field(content: str, version: str, config_path: "Path | None") -> str:
+    """Update the version field in config content. Writes to disk if config_path given."""
+    import re
+    updated = re.sub(
+        r'("version"\s*:\s*)"[^"]*"',
+        rf'\g<1>"{version}"',
+        content,
+    )
+    if config_path is not None:
+        config_path.write_text(updated, encoding="utf-8")
+    return updated
+
+
+def _inject_blocks_before_closing_brace(content: str, blocks: list[str]) -> str:
+    """Insert text blocks before the final closing } of a JSONC file.
+
+    Ensures a trailing comma is added after the last existing JSON value so the
+    result remains valid JSONC when active-value blocks are appended.
+    """
+    last_brace = content.rfind("}")
+    if last_brace == -1:
+        return content + "\n\n" + "\n\n".join(blocks) + "\n"
+
+    before = content[:last_brace]
+
+    # Ensure the last non-blank, non-comment line ends with a comma so the
+    # injected blocks (which may contain active keys) form valid JSONC.
+    lines = before.splitlines()
+    for i in range(len(lines) - 1, -1, -1):
+        stripped = lines[i].strip()
+        if not stripped or stripped.startswith("//"):
+            continue
+        # This is the last substantive line — add a comma if missing
+        if not stripped.endswith(","):
+            lines[i] = lines[i].rstrip() + ","
+        break
+    before = "\n".join(lines)
+
+    separator = "\n\n  // === Added by config --upgrade ===\n"
+    injection = separator + "\n\n".join(
+        "\n".join("  " + line if line and not line.startswith("  ") else line
+                  for line in block.splitlines())
+        for block in blocks
+    )
+    return before + injection + "\n" + content[last_brace:]
+
+
 def generate_template() -> str:
     """Return default config.jsonc content."""
     from . import __version__

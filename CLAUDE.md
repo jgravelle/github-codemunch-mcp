@@ -1,7 +1,7 @@
 # jcodemunch-mcp — Project Brief
 
 ## Current State
-- **Version:** 1.15.0 (published to PyPI)
+- **Version:** 1.15.3 (published to PyPI)
 - **INDEX_VERSION:** 6
 - **Tests:** 1527 passed, 9 skipped
 - **Python:** >=3.10
@@ -48,6 +48,7 @@ src/jcodemunch_mcp/
 | `index-file <path>` | Re-index a single file within an existing indexed folder (used by PostToolUse hooks) |
 | `config` | Print effective configuration grouped by concern |
 | `config --check` | Also validate prerequisites (storage writable, AI pkg installed, HTTP pkgs present) |
+| `config --upgrade` | Add missing keys from current template to existing config.jsonc, preserving user values |
 
 ## Architecture Notes
 - `index_folder` is **synchronous** — dispatched via `asyncio.to_thread()` in server.py to avoid blocking the event loop

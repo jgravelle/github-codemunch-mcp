@@ -2043,9 +2043,31 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _run_config(check: bool = False, init: bool = False) -> None:
+def _run_config(check: bool = False, init: bool = False, upgrade: bool = False) -> None:
     """Print the current effective configuration to stdout, or initialize config file."""
     from . import config as _cfg
+    from . import __version__
+
+    # Handle --upgrade
+    if upgrade:
+        storage_path = os.environ.get("CODE_INDEX_PATH", str(Path.home() / ".code-index"))
+        config_path = Path(storage_path) / "config.jsonc"
+
+        if not config_path.exists():
+            print(f"No config file found at: {config_path}")
+            print("Run `config --init` first to create one.")
+            return
+
+        added, warnings = _cfg.upgrade_config(config_path)
+        if not added:
+            print(f"Config is already up to date (version bumped to {__version__}).")
+        else:
+            print(f"Upgraded config to {__version__}. Added {len(added)} missing key(s):")
+            for key in added:
+                print(f"  + {key}")
+        for w in warnings:
+            print(f"  warning: {w}")
+        return
 
     # Handle --init
     if init:
@@ -2525,6 +2547,11 @@ def main(argv: Optional[list[str]] = None):
         action="store_true",
         help="Generate a template config.jsonc file in CODE_INDEX_PATH",
     )
+    config_parser.add_argument(
+        "--upgrade",
+        action="store_true",
+        help="Add missing keys from the current template to an existing config.jsonc, preserving user values",
+    )
 
     # --- index-file ---
     index_file_parser = subparsers.add_parser(
@@ -2613,6 +2640,7 @@ def main(argv: Optional[list[str]] = None):
         _run_config(
             check=getattr(args, "check", False),
             init=getattr(args, "init", False),
+            upgrade=getattr(args, "upgrade", False),
         )
         return
 

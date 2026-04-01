@@ -4,6 +4,11 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ## [Unreleased]
 
+## [1.15.3] - 2026-04-01
+
+### Added
+- **`config --upgrade`** — new CLI flag that adds missing keys from the current version's template into an existing `config.jsonc`, preserving all user-set values. Useful after upgrading jcodemunch-mcp to a newer version that introduces new config keys. Updates the `"version"` field automatically and reports which keys were injected. Addresses the gap implied by the `"version"` field / "additive migrations" comment in `config.jsonc`. Requested by nikolai-vysotskyi in issue #191.
+
 ## [1.15.2] - 2026-04-01
 
 ### Added
