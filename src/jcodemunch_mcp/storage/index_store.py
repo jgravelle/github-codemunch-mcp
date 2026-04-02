@@ -21,7 +21,7 @@ from .sqlite_store import SQLiteIndexStore, _VERIFIED_PATHS
 logger = logging.getLogger(__name__)
 
 # Bump this when the index schema changes in an incompatible way.
-INDEX_VERSION = 6
+INDEX_VERSION = 7
 
 
 @functools.lru_cache(maxsize=16)
@@ -810,6 +810,9 @@ class IndexStore:
             "byte_offset": symbol.byte_offset,
             "byte_length": symbol.byte_length,
             "content_hash": symbol.content_hash,
+            "cyclomatic": getattr(symbol, "cyclomatic", 0) or 0,
+            "max_nesting": getattr(symbol, "max_nesting", 0) or 0,
+            "param_count": getattr(symbol, "param_count", 0) or 0,
         }
 
     def _index_to_dict(self, index: CodeIndex) -> dict:

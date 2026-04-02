@@ -21,7 +21,7 @@ async def test_server_lists_all_tools():
     try:
         tools = await list_tools()
 
-        assert len(tools) == 37
+        assert len(tools) == 40
 
         names = {t.name for t in tools}
         expected = {
@@ -36,6 +36,7 @@ async def test_server_lists_all_tools():
             "get_cross_repo_map",
             "get_call_hierarchy", "get_impact_preview",
             "get_dependency_cycles", "get_coupling_metrics", "get_layer_violations",
+            "check_rename_safe", "get_dead_code_v2", "get_extraction_candidates",
         }
         assert names == expected
         assert "test_summarizer" not in names  # disabled by default in DEFAULTS
@@ -652,8 +653,8 @@ async def test_disabled_tools_filtered_from_schema(monkeypatch):
         assert "index_repo" not in tool_names
         assert "search_columns" not in tool_names
         assert "get_file_tree" in tool_names  # Not disabled
-        # 38 total tools - 2 explicitly disabled = 36
-        assert len(tools) == 36
+        # 41 total tools - 2 explicitly disabled = 39
+        assert len(tools) == 39
     finally:
         config_module._GLOBAL_CONFIG.clear()
         config_module._GLOBAL_CONFIG.update(orig_config)
@@ -671,7 +672,7 @@ async def test_disabled_tools_empty_all_tools_present(monkeypatch):
         config_module._GLOBAL_CONFIG["disabled_tools"] = []
 
         tools = await list_tools()
-        assert len(tools) == 38
+        assert len(tools) == 41
     finally:
         config_module._GLOBAL_CONFIG.clear()
         config_module._GLOBAL_CONFIG.update(orig_config)

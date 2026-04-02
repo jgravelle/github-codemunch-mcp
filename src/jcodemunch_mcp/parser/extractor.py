@@ -6,6 +6,7 @@ from tree_sitter_language_pack import get_parser
 
 from .symbols import Symbol, make_symbol_id, compute_content_hash
 from .languages import LanguageSpec, LANGUAGE_REGISTRY
+from .complexity import compute_complexity
 
 
 def parse_file(content: str, filename: str, language: str, source_bytes: Optional[bytes] = None, repo: Optional[str] = None) -> list[Symbol]:
@@ -97,6 +98,13 @@ def parse_file(content: str, filename: str, language: str, source_bytes: Optiona
 
     # Disambiguate overloaded symbols (same ID)
     symbols = _disambiguate_overloads(symbols)
+
+    # Compute complexity metrics for callable symbols
+    _CALLABLE_KINDS = frozenset({"function", "method"})
+    for sym in symbols:
+        if sym.kind in _CALLABLE_KINDS and sym.byte_length > 0:
+            body = source_bytes[sym.byte_offset:sym.byte_offset + sym.byte_length].decode("utf-8", errors="replace")
+            sym.cyclomatic, sym.max_nesting, sym.param_count = compute_complexity(body, sym.signature)
 
     return symbols
 

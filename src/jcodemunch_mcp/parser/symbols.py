@@ -26,6 +26,9 @@ class Symbol:
     byte_length: int = 0           # Byte length of full source
     content_hash: str = ""         # SHA-256 of symbol source bytes (for drift detection)
     ecosystem_context: str = ""    # Optional context from ecosystem (e.g., dbt model metadata)
+    cyclomatic: int = 0            # McCabe cyclomatic complexity (branch count + 1)
+    max_nesting: int = 0           # Max bracket-nesting depth relative to opening brace
+    param_count: int = 0           # Number of parameters in the signature
 
 
 

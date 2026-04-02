@@ -53,7 +53,10 @@ CREATE TABLE IF NOT EXISTS symbols (
     keywords          TEXT,
     content_hash      TEXT,
     ecosystem_context TEXT,
-    data              TEXT
+    data              TEXT,
+    cyclomatic        INTEGER,
+    max_nesting       INTEGER,
+    param_count       INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file);
@@ -229,6 +232,19 @@ def _migrate_v5_to_v6(conn: sqlite3.Connection) -> None:
     logger.info("Migrated files table from v5 to v6 (added size_bytes column)")
 
 
+def _migrate_v6_to_v7(conn: sqlite3.Connection) -> None:
+    """Migrate a v6 database to v7: add complexity columns to symbols table."""
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(symbols)").fetchall()}
+    for col_name in ("cyclomatic", "max_nesting", "param_count"):
+        if col_name not in existing:
+            conn.execute(f"ALTER TABLE symbols ADD COLUMN {col_name} INTEGER")
+    conn.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+        ("index_version", "7"),
+    )
+    logger.info("Migrated symbols table from v6 to v7 (added complexity columns)")
+
+
 class SQLiteIndexStore:
     """Storage backend using SQLite WAL for code indexes.
 
@@ -289,6 +305,8 @@ class SQLiteIndexStore:
                     _migrate_v4_to_v5(conn)
                 if stored_version < 6:
                     _migrate_v5_to_v6(conn)
+                if stored_version < 7:
+                    _migrate_v6_to_v7(conn)
 
             SQLiteIndexStore._initialized_dbs.add(db_key)
 
@@ -446,8 +464,8 @@ class SQLiteIndexStore:
                 "INSERT INTO symbols (id, file, name, kind, signature, summary, "
                 "docstring, line, end_line, byte_offset, byte_length, parent, "
                 "qualified_name, language, decorators, keywords, content_hash, "
-                "ecosystem_context, data) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "ecosystem_context, data, cyclomatic, max_nesting, param_count) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [self._symbol_to_row(s) for s in symbols],
             )
 
@@ -611,8 +629,8 @@ class SQLiteIndexStore:
                     "INSERT OR REPLACE INTO symbols (id, file, name, kind, signature, summary, "
                     "docstring, line, end_line, byte_offset, byte_length, parent, "
                     "qualified_name, language, decorators, keywords, content_hash, "
-                    "ecosystem_context, data) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "ecosystem_context, data, cyclomatic, max_nesting, param_count) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [self._symbol_to_row(s) for s in new_symbols],
                 )
 
@@ -1028,7 +1046,7 @@ class SQLiteIndexStore:
     # ── Internal helpers ────────────────────────────────────────────
 
     def _symbol_to_row(self, symbol: Symbol) -> tuple:
-        """Convert a Symbol to a row tuple for INSERT (v5 schema)."""
+        """Convert a Symbol to a row tuple for INSERT (v7 schema)."""
         return (
             symbol.id, symbol.file, symbol.name, symbol.kind,
             symbol.signature, symbol.summary, symbol.docstring,
@@ -1042,10 +1060,13 @@ class SQLiteIndexStore:
             symbol.content_hash,
             getattr(symbol, "ecosystem_context", ""),
             None,  # data column — no longer used in v5
+            getattr(symbol, "cyclomatic", 0) or None,
+            getattr(symbol, "max_nesting", 0) or None,
+            getattr(symbol, "param_count", 0) or None,
         )
 
     def _symbol_dict_to_row(self, d: dict) -> tuple:
-        """Convert a serialized symbol dict to a row tuple for INSERT (v5 schema)."""
+        """Convert a serialized symbol dict to a row tuple for INSERT (v7 schema)."""
         decorators = d.get("decorators", [])
         keywords = d.get("keywords", [])
         return (
@@ -1061,6 +1082,9 @@ class SQLiteIndexStore:
             d.get("content_hash", ""),
             d.get("ecosystem_context", ""),
             None,  # data column — no longer used in v5
+            d.get("cyclomatic") or None,
+            d.get("max_nesting") or None,
+            d.get("param_count") or None,
         )
 
     def _row_to_symbol_dict(self, row: sqlite3.Row) -> dict:
@@ -1104,6 +1128,9 @@ class SQLiteIndexStore:
             "byte_length": row["byte_length"] or 0,
             "content_hash": content_hash,
             "ecosystem_context": ecosystem_context,
+            "cyclomatic": row["cyclomatic"] or 0,
+            "max_nesting": row["max_nesting"] or 0,
+            "param_count": row["param_count"] or 0,
         }
 
     def _symbol_to_dict(self, symbol: "Symbol") -> dict:
@@ -1131,6 +1158,9 @@ class SQLiteIndexStore:
             "byte_length": symbol.byte_length or 0,
             "content_hash": symbol.content_hash or "",
             "ecosystem_context": getattr(symbol, "ecosystem_context", "") or "",
+            "cyclomatic": getattr(symbol, "cyclomatic", 0) or 0,
+            "max_nesting": getattr(symbol, "max_nesting", 0) or 0,
+            "param_count": getattr(symbol, "param_count", 0) or 0,
         }
 
     def _patch_index_from_delta(
@@ -1471,8 +1501,8 @@ class SQLiteIndexStore:
                     "INSERT OR REPLACE INTO symbols (id, file, name, kind, signature, summary, "
                     "docstring, line, end_line, byte_offset, byte_length, parent, "
                     "qualified_name, language, decorators, keywords, content_hash, "
-                    "ecosystem_context, data) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "ecosystem_context, data, cyclomatic, max_nesting, param_count) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [self._symbol_dict_to_row(s) for s in symbols],
                 )
 

@@ -43,6 +43,9 @@ from .tools.get_coupling_metrics import get_coupling_metrics
 from .tools.get_layer_violations import get_layer_violations
 from .tools.get_call_hierarchy import get_call_hierarchy
 from .tools.get_impact_preview import get_impact_preview
+from .tools.check_rename_safe import check_rename_safe
+from .tools.get_dead_code_v2 import get_dead_code_v2
+from .tools.get_extraction_candidates import get_extraction_candidates
 from .tools.get_symbol_diff import get_symbol_diff
 from .tools.get_class_hierarchy import get_class_hierarchy
 from .tools.get_related_symbols import get_related_symbols
@@ -1010,6 +1013,103 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="check_rename_safe",
+            description=(
+                "Check whether renaming a symbol to a new name would cause name collisions. "
+                "Scans the symbol's own file and every file that imports it, "
+                "looking for an existing symbol with the proposed new name. "
+                "Returns safe=true when no collisions are found. "
+                "Run this before any rename/refactor to avoid silent breakage."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Repository identifier (owner/repo or just repo name)",
+                    },
+                    "symbol_id": {
+                        "type": "string",
+                        "description": (
+                            "Symbol ID to rename (e.g. 'src/utils.py::helper#function'). "
+                            "Bare name accepted when unambiguous."
+                        ),
+                    },
+                    "new_name": {
+                        "type": "string",
+                        "description": "Proposed new symbol name (not a full ID, just the name).",
+                    },
+                },
+                "required": ["repo", "symbol_id", "new_name"],
+            },
+        ),
+        Tool(
+            name="get_dead_code_v2",
+            description=(
+                "Find likely-dead functions and methods using three independent evidence signals: "
+                "(1) the symbol's file is not reachable from any entry point via the import graph, "
+                "(2) no indexed symbol calls this symbol in the call graph, "
+                "(3) the symbol name is not re-exported from any __init__ or barrel file. "
+                "Each result includes a confidence score (0.33 = 1 signal, 0.67 = 2 signals, 1.0 = all 3). "
+                "More reliable than single-signal dead-code detection. "
+                "Use min_confidence=0.67 for high-confidence results only."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Repository identifier (owner/repo or just repo name)",
+                    },
+                    "min_confidence": {
+                        "type": "number",
+                        "description": "Minimum confidence threshold 0.0–1.0 (default 0.5 = at least 2/3 signals).",
+                        "default": 0.5,
+                    },
+                    "include_tests": {
+                        "type": "boolean",
+                        "description": "Include test files in analysis (default false).",
+                        "default": False,
+                    },
+                },
+                "required": ["repo"],
+            },
+        ),
+        Tool(
+            name="get_extraction_candidates",
+            description=(
+                "Identify functions in a file that are good candidates for extraction to a shared module. "
+                "A candidate must have high cyclomatic complexity (doing a lot) AND "
+                "be called from multiple other files (already implicitly shared). "
+                "Results are ranked by score = complexity × caller_file_count. "
+                "Requires re-indexing with jcodemunch-mcp >= 1.16 to populate complexity data."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Repository identifier (owner/repo or just repo name)",
+                    },
+                    "file_path": {
+                        "type": "string",
+                        "description": "Relative file path within the repo (e.g. 'src/utils.py').",
+                    },
+                    "min_complexity": {
+                        "type": "integer",
+                        "description": "Minimum cyclomatic complexity threshold (default 5).",
+                        "default": 5,
+                    },
+                    "min_callers": {
+                        "type": "integer",
+                        "description": "Minimum number of distinct caller files (default 2).",
+                        "default": 2,
+                    },
+                },
+                "required": ["repo", "file_path"],
+            },
+        ),
+        Tool(
             name="get_symbol_importance",
             description=(
                 "Return the most architecturally important symbols in a repo, ranked by "
@@ -1613,6 +1713,37 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     get_layer_violations,
                     repo=arguments["repo"],
                     rules=arguments.get("rules"),
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "check_rename_safe":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    check_rename_safe,
+                    repo=arguments["repo"],
+                    symbol_id=arguments["symbol_id"],
+                    new_name=arguments["new_name"],
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "get_dead_code_v2":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    get_dead_code_v2,
+                    repo=arguments["repo"],
+                    min_confidence=arguments.get("min_confidence", 0.5),
+                    include_tests=arguments.get("include_tests", False),
+                    storage_path=storage_path,
+                )
+            )
+        elif name == "get_extraction_candidates":
+            result = await asyncio.to_thread(
+                functools.partial(
+                    get_extraction_candidates,
+                    repo=arguments["repo"],
+                    file_path=arguments["file_path"],
+                    min_complexity=arguments.get("min_complexity", 5),
+                    min_callers=arguments.get("min_callers", 2),
                     storage_path=storage_path,
                 )
             )
