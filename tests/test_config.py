@@ -1357,6 +1357,16 @@ class TestServerConfigCheck:
 
             monkeypatch.setenv("CODE_INDEX_PATH", tmpdir)
 
+            # Provide a CLAUDE.md that mentions all canonical tools so the
+            # drift check passes without flagging the test as an issue.
+            from src.jcodemunch_mcp.server import _CANONICAL_TOOL_NAMES
+            claude_dir = Path(tmpdir) / ".claude"
+            claude_dir.mkdir()
+            (claude_dir / "CLAUDE.md").write_text(
+                "\n".join(_CANONICAL_TOOL_NAMES), encoding="utf-8"
+            )
+            monkeypatch.setattr(Path, "home", classmethod(lambda cls: Path(tmpdir)))
+
             from src.jcodemunch_mcp.server import _run_config
             _run_config(check=True)
 
@@ -1364,6 +1374,131 @@ class TestServerConfigCheck:
             # Should NOT mention config errors
             assert "config error" not in captured.lower()
             assert "parse error" not in captured.lower()
+
+
+class TestClaudeMdDriftCheck:
+    """config --check: CLAUDE.md drift detection."""
+
+    def _run_check(self, monkeypatch, tmpdir, claude_md_content=None):
+        """Helper: set up temp dir and run config --check."""
+        from src.jcodemunch_mcp.config import _GLOBAL_CONFIG
+        _GLOBAL_CONFIG.clear()
+
+        config_path = Path(tmpdir) / "config.jsonc"
+        config_path.write_text("{}")
+        monkeypatch.setenv("CODE_INDEX_PATH", tmpdir)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: Path(tmpdir)))
+
+        claude_dir = Path(tmpdir) / ".claude"
+        claude_dir.mkdir(exist_ok=True)
+        if claude_md_content is not None:
+            (claude_dir / "CLAUDE.md").write_text(claude_md_content, encoding="utf-8")
+
+        from src.jcodemunch_mcp.server import _run_config
+        return _run_config
+
+    def test_check_passes_when_all_tools_present(self, capsys, monkeypatch):
+        """check should pass when CLAUDE.md mentions all canonical tools."""
+        from src.jcodemunch_mcp.server import _CANONICAL_TOOL_NAMES
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fn = self._run_check(monkeypatch, tmpdir,
+                                 claude_md_content="\n".join(_CANONICAL_TOOL_NAMES))
+            fn(check=True)
+            out = capsys.readouterr().out
+            assert "All checks passed" in out
+            assert "not mentioned in CLAUDE.md" not in out
+
+    def test_check_warns_when_tools_missing(self, capsys, monkeypatch):
+        """check should warn and exit 1 when CLAUDE.md is missing tools."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fn = self._run_check(monkeypatch, tmpdir,
+                                 claude_md_content="list_repos search_symbols")
+            with pytest.raises(SystemExit) as exc:
+                fn(check=True)
+            assert exc.value.code == 1
+            out = capsys.readouterr().out
+            assert "not mentioned in CLAUDE.md" in out
+            assert "claude-md --generate" in out
+
+    def test_check_warns_when_claude_md_absent(self, capsys, monkeypatch):
+        """check should warn (not error) when CLAUDE.md is not found."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # No CLAUDE.md created — only config
+            fn = self._run_check(monkeypatch, tmpdir, claude_md_content=None)
+            # No sys.exit raised for missing file (just a warning)
+            out_lines: list[str] = []
+            try:
+                fn(check=True)
+                out_lines = capsys.readouterr().out.splitlines()
+            except SystemExit:
+                out_lines = capsys.readouterr().out.splitlines()
+            assert any("CLAUDE.md not found" in l or "not mentioned" in l for l in out_lines)
+
+
+class TestClaudeMdGenerate:
+    """claude-md --generate subcommand."""
+
+    def test_generate_full_snippet(self, capsys, monkeypatch):
+        """--generate outputs all canonical tool names."""
+        from src.jcodemunch_mcp.server import _run_claude_md, _CANONICAL_TOOL_NAMES
+        _run_claude_md(generate=True, fmt="full")
+        out = capsys.readouterr().out
+        for tool in _CANONICAL_TOOL_NAMES:
+            assert tool in out, f"Expected tool {tool!r} in snippet"
+
+    def test_generate_append_reports_missing(self, monkeypatch, tmp_path, capsys):
+        """--format=append outputs only tools absent from the existing CLAUDE.md."""
+        from src.jcodemunch_mcp.server import _run_claude_md, _CANONICAL_TOOL_NAMES
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        (claude_dir / "CLAUDE.md").write_text("list_repos search_symbols", encoding="utf-8")
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+
+        _run_claude_md(generate=True, fmt="append")
+        out = capsys.readouterr().out
+        # Should include tools not in the existing file
+        assert "index_repo" in out
+        # Should NOT include tools already present
+        assert "list_repos" not in out
+        assert "search_symbols" not in out
+
+    def test_generate_append_silent_when_current(self, monkeypatch, tmp_path, capsys):
+        """--format=append prints nothing to stdout when CLAUDE.md is up to date."""
+        from src.jcodemunch_mcp.server import _run_claude_md, _CANONICAL_TOOL_NAMES
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        (claude_dir / "CLAUDE.md").write_text(
+            "\n".join(_CANONICAL_TOOL_NAMES), encoding="utf-8"
+        )
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+
+        _run_claude_md(generate=True, fmt="append")
+        out = capsys.readouterr().out
+        assert out == ""
+
+    def test_canonical_list_matches_build_tools_list(self, monkeypatch):
+        """_CANONICAL_TOOL_NAMES must include every tool _build_tools_list() can emit.
+
+        We clear disabled_tools so the full unfiltered list is returned, then
+        verify the canonical tuple is a superset of what the builder produces.
+        Tools can appear in _CANONICAL_TOOL_NAMES but not in the live list
+        (e.g. test_summarizer, which is disabled by default) — that's fine.
+        The reverse (a built tool absent from the canonical list) is the error.
+        """
+        import src.jcodemunch_mcp.config as cfg_mod
+        monkeypatch.setattr(cfg_mod, "get", lambda key, default=None: (
+            [] if key == "disabled_tools" else
+            None if key in ("languages", "meta_fields", "descriptions") else
+            default
+        ))
+        from src.jcodemunch_mcp.server import _CANONICAL_TOOL_NAMES, _build_tools_list
+        built_names = {t.name for t in _build_tools_list()}
+        canonical = set(_CANONICAL_TOOL_NAMES)
+        missing_from_canonical = built_names - canonical
+        assert not missing_from_canonical, (
+            f"Tools in _build_tools_list() but missing from _CANONICAL_TOOL_NAMES: "
+            f"{missing_from_canonical}"
+        )
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")

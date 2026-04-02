@@ -34,6 +34,38 @@ except ImportError:
     WatcherError = type("WatcherError", (Exception,), {})  # type: ignore[assignment, misc]
 
 
+# Canonical list of all registered tool names (unfiltered).
+# Keep in sync with _build_tools_list(). Used by `config --check` and
+# `claude-md --generate` to detect CLAUDE.md / hook-script drift.
+_CANONICAL_TOOL_NAMES: tuple[str, ...] = (
+    # Indexing
+    "index_repo", "index_folder", "summarize_repo", "index_file",
+    # Discovery
+    "list_repos", "resolve_repo", "suggest_queries",
+    "get_repo_outline", "get_file_tree", "get_file_outline",
+    # Search & Retrieval
+    "search_symbols", "get_symbol_source", "get_context_bundle",
+    "get_file_content", "search_text", "search_columns", "get_ranked_context",
+    # Relationships
+    "find_importers", "find_references", "check_references",
+    "get_dependency_graph", "get_class_hierarchy", "get_related_symbols",
+    "get_call_hierarchy",
+    # Impact & Safety
+    "get_blast_radius", "check_rename_safe", "get_impact_preview",
+    "get_changed_symbols",
+    # Architecture
+    "get_dependency_cycles", "get_coupling_metrics", "get_layer_violations",
+    "get_extraction_candidates", "get_cross_repo_map",
+    # Quality & Metrics
+    "get_symbol_complexity", "get_churn_rate", "get_hotspots",
+    "get_repo_health", "get_symbol_importance", "find_dead_code",
+    "get_dead_code_v2",
+    # Diffs & Embeddings
+    "get_symbol_diff", "embed_repo",
+    # Utilities
+    "get_session_stats", "invalidate_cache", "test_summarizer",
+)
+
 # Tools excluded from strict freshness mode (don't wait for reindex)
 _EXCLUDED_FROM_STRICT = frozenset({
     "list_repos",
@@ -2398,6 +2430,85 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _generate_claude_md_snippet(missing_only: bool = False) -> str:
+    """Return the recommended CLAUDE.md prompt-policy snippet.
+
+    When *missing_only* is True, reads ~/.claude/CLAUDE.md and returns only
+    the tools not yet mentioned in it (as a minimal addendum block).
+    Returns an empty string when the file is already fully up to date.
+    """
+    all_tools = list(_CANONICAL_TOOL_NAMES)
+
+    if missing_only:
+        claude_md = Path.home() / ".claude" / "CLAUDE.md"
+        if claude_md.exists():
+            content = claude_md.read_text(encoding="utf-8", errors="replace")
+            missing = [t for t in all_tools if t not in content]
+            if not missing:
+                return ""
+            tool_lines = "\n".join(f"- {t}" for t in missing)
+            return (
+                f"<!-- jcodemunch-mcp: add these new tools to your existing snippet -->\n"
+                f"{tool_lines}\n"
+            )
+        # Fall through to full generation if CLAUDE.md doesn't exist yet
+
+    # Group tools by category for readability
+    categories = [
+        ("Indexing", ["index_repo", "index_folder", "summarize_repo", "index_file"]),
+        ("Discovery", ["list_repos", "resolve_repo", "suggest_queries",
+                       "get_repo_outline", "get_file_tree", "get_file_outline"]),
+        ("Search & Retrieval", ["search_symbols", "get_symbol_source", "get_context_bundle",
+                                 "get_file_content", "search_text", "search_columns",
+                                 "get_ranked_context"]),
+        ("Relationships", ["find_importers", "find_references", "check_references",
+                           "get_dependency_graph", "get_class_hierarchy",
+                           "get_related_symbols", "get_call_hierarchy"]),
+        ("Impact & Safety", ["get_blast_radius", "check_rename_safe",
+                              "get_impact_preview", "get_changed_symbols"]),
+        ("Architecture", ["get_dependency_cycles", "get_coupling_metrics",
+                          "get_layer_violations", "get_extraction_candidates",
+                          "get_cross_repo_map"]),
+        ("Quality & Metrics", ["get_symbol_complexity", "get_churn_rate", "get_hotspots",
+                                "get_repo_health", "get_symbol_importance",
+                                "find_dead_code", "get_dead_code_v2"]),
+        ("Diffs & Embeddings", ["get_symbol_diff", "embed_repo"]),
+        ("Utilities", ["get_session_stats", "invalidate_cache", "test_summarizer"]),
+    ]
+    from . import __version__ as _ver
+    lines = [
+        f"## jcodemunch-mcp (v{_ver})",
+        "",
+        "Use jcodemunch-mcp tools instead of Grep/Read/Glob for any indexed repository.",
+        "",
+        "### Quick start",
+        "1. `list_repos` — check if the project is indexed.",
+        "   If not: `index_folder` (local) or `index_repo` (GitHub URL).",
+        "2. `search_symbols` — find functions/classes by name or description.",
+        "3. `get_context_bundle` — symbol source + imports in one call.",
+        "4. `search_text` — full-text/regex search for literals and comments.",
+        "",
+        "### All tools",
+    ]
+    for cat, tools in categories:
+        lines.append(f"**{cat}:** " + ", ".join(f"`{t}`" for t in tools))
+    lines.append("")
+    lines.append("Never fall back to Grep, Read, or Glob for indexed repos.")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _run_claude_md(generate: bool = False, fmt: str = "full") -> None:
+    """Output the recommended CLAUDE.md snippet for the current tool set."""
+    missing_only = fmt == "append"
+    snippet = _generate_claude_md_snippet(missing_only=missing_only)
+    if missing_only and not snippet:
+        import sys as _sys
+        print("CLAUDE.md is already up to date — no new tools to add.", file=_sys.stderr)
+        return
+    print(snippet, end="")
+
+
 def _run_config(check: bool = False, init: bool = False, upgrade: bool = False) -> None:
     """Print the current effective configuration to stdout, or initialize config file."""
     from . import config as _cfg
@@ -2730,6 +2841,63 @@ def _run_config(check: bool = False, init: bool = False, upgrade: bool = False) 
             else:
                 print(f"  {green(CHECK)} HTTP transport packages installed (uvicorn, starlette, anyio)")
 
+        # ── CLAUDE.md drift check ────────────────────────────────────────────
+        section("CLAUDE.md check")
+        claude_md_path = Path.home() / ".claude" / "CLAUDE.md"
+        canonical_tools = list(_CANONICAL_TOOL_NAMES)
+        if claude_md_path.exists():
+            try:
+                cm_content = claude_md_path.read_text(encoding="utf-8", errors="replace")
+                missing_in_cm = [t for t in canonical_tools if t not in cm_content]
+                if missing_in_cm:
+                    # Wrap into ~60-char lines for readability
+                    _wrapped = _wrap_names(missing_in_cm)
+                    print(f"  {yellow(WARN)} {len(missing_in_cm)} tool(s) not mentioned in CLAUDE.md:")
+                    for _line in _wrapped:
+                        print(f"       {dim(_line)}")
+                    print(f"  {dim('  Run: jcodemunch-mcp claude-md --generate  (or --format=append for delta only)')}")
+                    issues.append("claude_md")
+                else:
+                    print(f"  {green(CHECK)} All {len(canonical_tools)} tools mentioned in CLAUDE.md")
+            except Exception as _e:
+                print(f"  {yellow(WARN)} Could not read CLAUDE.md: {_e}")
+        else:
+            print(f"  {yellow(WARN)} CLAUDE.md not found: {claude_md_path}")
+            print(f"  {dim('  Run: jcodemunch-mcp claude-md --generate > /path/to/CLAUDE.md')}")
+
+        # ── Hook-script drift check ───────────────────────────────────────────
+        section("Hook scripts check")
+        hooks_dir = Path.home() / ".claude" / "hooks"
+        if hooks_dir.exists():
+            read_guards = (
+                list(hooks_dir.glob("jcodemunch_read_guard.sh"))
+                + list(hooks_dir.glob("jcodemunch_read_guard.ps1"))
+            )
+            if read_guards:
+                for _script in sorted(read_guards):
+                    try:
+                        _sc = _script.read_text(encoding="utf-8", errors="replace")
+                        _missing_h = [t for t in canonical_tools if t not in _sc]
+                        if _missing_h:
+                            _wrapped_h = _wrap_names(_missing_h)
+                            print(f"  {yellow(WARN)} {_script.name}: {len(_missing_h)} tool(s) absent from feedback message:")
+                            for _line in _wrapped_h:
+                                print(f"       {dim(_line)}")
+                        else:
+                            print(f"  {green(CHECK)} {_script.name} is current")
+                    except Exception as _e:
+                        print(f"  {yellow(WARN)} {_script.name}: could not read ({_e})")
+            else:
+                print(f"  {dim('(no jcodemunch_read_guard.* hook scripts found)')}")
+            other_hooks = (
+                list(hooks_dir.glob("jcodemunch_edit_guard.*"))
+                + list(hooks_dir.glob("jcodemunch_index_hook.*"))
+            )
+            for _script in sorted(other_hooks):
+                print(f"  {green(CHECK)} {_script.name} present")
+        else:
+            print(f"  {dim('(~/.claude/hooks/ not found — hooks not installed)')}")
+
         print()
         if issues:
             print(yellow(f"  {len(issues)} issue(s) found — see above."))
@@ -2737,6 +2905,22 @@ def _run_config(check: bool = False, init: bool = False, upgrade: bool = False) 
         else:
             print(green("  All checks passed."))
     print()
+
+
+def _wrap_names(names: list[str], width: int = 72) -> list[str]:
+    """Wrap a flat list of names into lines no longer than *width* chars."""
+    lines: list[str] = []
+    current = ""
+    for name in names:
+        piece = (", " if current else "") + name
+        if current and len(current) + len(piece) > width:
+            lines.append(current)
+            current = name
+        else:
+            current += piece
+    if current:
+        lines.append(current)
+    return lines
 
 
 def _can_import(module: str) -> bool:
@@ -2908,6 +3092,24 @@ def main(argv: Optional[list[str]] = None):
         help="Add missing keys from the current template to an existing config.jsonc, preserving user values",
     )
 
+    # --- claude-md ---
+    claude_md_parser = subparsers.add_parser(
+        "claude-md",
+        help="Generate a CLAUDE.md prompt-policy snippet for the current tool set",
+    )
+    claude_md_parser.add_argument(
+        "--generate",
+        action="store_true",
+        help="Output the recommended CLAUDE.md snippet to stdout",
+    )
+    claude_md_parser.add_argument(
+        "--format",
+        choices=["full", "append"],
+        default="full",
+        dest="fmt",
+        help="'full' (default) — complete snippet; 'append' — only tools not yet in your CLAUDE.md",
+    )
+
     # --- index-file ---
     index_file_parser = subparsers.add_parser(
         "index-file",
@@ -2985,7 +3187,7 @@ def main(argv: Optional[list[str]] = None):
     if any(arg in top_level_flags for arg in raw_argv):
         args = parser.parse_args(raw_argv)
     else:
-        known_commands = {"serve", "watch", "hook-event", "watch-claude", "config", "index-file"}
+        known_commands = {"serve", "watch", "hook-event", "watch-claude", "config", "index-file", "claude-md"}
         has_subcommand = any(arg in known_commands for arg in raw_argv if not arg.startswith("-"))
         if not has_subcommand:
             raw_argv = ["serve"] + list(raw_argv)
@@ -2996,6 +3198,13 @@ def main(argv: Optional[list[str]] = None):
             check=getattr(args, "check", False),
             init=getattr(args, "init", False),
             upgrade=getattr(args, "upgrade", False),
+        )
+        return
+
+    if args.command == "claude-md":
+        _run_claude_md(
+            generate=getattr(args, "generate", False),
+            fmt=getattr(args, "fmt", "full"),
         )
         return
 

@@ -4,6 +4,13 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ## [Unreleased]
 
+## [1.21.11] - 2026-04-02
+
+### Added
+- **`config --check` now detects CLAUDE.md and hook-script drift (issue #200)** — the existing check command gains two new sections. *CLAUDE.md check* reads `~/.claude/CLAUDE.md` and reports any canonical tool names absent from the file, pointing to `jcodemunch-mcp claude-md --generate` to fix them. *Hook scripts check* scans `~/.claude/hooks/jcodemunch_read_guard.*` and lists any tool names missing from the guard's feedback message.
+- **`jcodemunch-mcp claude-md --generate`** — new subcommand that prints a ready-to-paste CLAUDE.md prompt-policy snippet listing all 45 tools in logical categories. `--format=append` outputs only the tools not yet mentioned in the existing `~/.claude/CLAUDE.md`, making it easy to diff-and-merge without rewriting the whole file.
+- **`_CANONICAL_TOOL_NAMES` module-level tuple** — authoritative ordered list of every registered tool name, used by both the drift-detection checks and the snippet generator. Validated by a test that asserts no tool produced by `_build_tools_list()` is absent from the tuple.
+
 ## [1.21.10] - 2026-04-02
 
 ### Fixed
