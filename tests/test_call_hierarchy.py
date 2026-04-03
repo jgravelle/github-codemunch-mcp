@@ -205,10 +205,10 @@ class TestGetCallHierarchy:
         result = get_call_hierarchy(repo=repo, symbol_id="nonexistent_xyz", storage_path=store)
         assert "error" in result
 
-    def test_meta_source_is_ast(self, tmp_path):
+    def test_meta_source_is_text_heuristic(self, tmp_path):
         repo, store = _build_repo(tmp_path)
         result = get_call_hierarchy(repo=repo, symbol_id="helper", storage_path=store)
-        assert result["_meta"]["source"] == "ast"
+        assert result["_meta"]["source"] == "text_heuristic"
 
     def test_leaf_symbol_has_no_callers(self, tmp_path):
         """run() is the top-level caller — nothing calls it in our test repo."""
@@ -268,6 +268,11 @@ class TestGetImpactPreview:
             # Chain starts from helper's ID
             target_id = result["symbol"]["id"]
             assert chain_entry["chain"][0] == target_id
+
+    def test_meta_source_is_text_heuristic(self, tmp_path):
+        repo, store = _build_repo(tmp_path)
+        result = get_impact_preview(repo=repo, symbol_id="helper", storage_path=store)
+        assert result["_meta"]["source"] == "text_heuristic"
 
     def test_call_chain_ends_at_caller(self, tmp_path):
         repo, store = _build_repo(tmp_path)

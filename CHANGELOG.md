@@ -4,6 +4,12 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ## [Unreleased]
 
+## [1.21.2] - 2026-04-02
+
+### Fixed
+- **`truncated` flag now correct when `token_budget` packing drops results** — in the BM25 search path, the flag was computed using `candidates_scored > len(scored_results)` after the fuzzy augmentation pass, meaning fuzzy results appended after budget packing could mask dropped BM25 results and produce `truncated=False` incorrectly. Now tracked as a separate `budget_truncated` boolean computed immediately after packing; the final flag is `candidates_scored > heap_count or budget_truncated`. The semantic search path was already correct.
+- **Call graph `"source"` label corrected** — `get_call_hierarchy` and `get_impact_preview` both returned `"source": "ast"` in `_meta`, implying type-resolved AST analysis. The implementation is word-token regex matching on raw file text. Label changed to `"source": "text_heuristic"` with updated tip text to accurately describe the approach and its limitations (false positives for common names, no dynamic dispatch).
+
 ## [1.21.1] - 2026-04-02
 
 ### Fixed

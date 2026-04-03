@@ -154,9 +154,10 @@ def get_impact_preview(
         ],
         "_meta": {
             "timing_ms": round(elapsed, 1),
-            "source": "ast",
+            "source": "text_heuristic",
             "tip": (
-                "Shows every symbol that transitively calls this one. "
+                "Text-heuristic: shows every symbol that transitively calls this one "
+                "via word-token matching. May have false positives for common names. "
                 "call_chain = [target_id, intermediate..., caller_id]. "
                 "Use get_call_hierarchy for a structured caller/callee tree."
             ),

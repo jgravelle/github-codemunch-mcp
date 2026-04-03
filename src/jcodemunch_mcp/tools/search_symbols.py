@@ -458,7 +458,9 @@ def search_symbols(
 
     # Extract results sorted by score descending
     scored_results = [entry for _, _, entry in sorted(heap, key=lambda x: x[0], reverse=True)]
+    heap_count = len(scored_results)  # save before budget packing
 
+    budget_truncated = False
     if token_budget is not None:
         packed, used_bytes = [], 0
         for entry in scored_results:
@@ -466,6 +468,7 @@ def search_symbols(
             if used_bytes + b <= budget_bytes:
                 packed.append(entry)
                 used_bytes += b
+        budget_truncated = len(packed) < heap_count
         scored_results = packed
 
     # Fuzzy pass: runs when explicitly requested OR when BM25 found nothing useful
@@ -557,7 +560,7 @@ def search_symbols(
     meta = {
         "timing_ms": round(elapsed, 1),
         "total_symbols": len(index.symbols),
-        "truncated": candidates_scored > len(scored_results),
+        "truncated": candidates_scored > heap_count or budget_truncated,
         "tokens_saved": tokens_saved,
         "total_tokens_saved": total_saved,
         **cost_avoided(tokens_saved, total_saved),

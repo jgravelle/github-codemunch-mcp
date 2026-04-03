@@ -112,12 +112,12 @@ def get_call_hierarchy(
         "callees": callees,
         "_meta": {
             "timing_ms": round(elapsed, 1),
-            "source": "ast",
+            "source": "text_heuristic",
             "tip": (
-                "AST-derived: callers = symbols in importing files that mention this "
-                "name; callees = imported symbols mentioned in this symbol's body. "
-                "May have false positives for aliased names or dynamic dispatch. "
-                "Use get_impact_preview for a transitive 'what breaks?' view."
+                "Text-heuristic: callers = symbols in importing files that mention this "
+                "name as a word token; callees = imported symbols mentioned in this "
+                "symbol's body. May have false positives for common names or dynamic "
+                "dispatch. Use get_impact_preview for a transitive 'what breaks?' view."
             ),
         },
     }
