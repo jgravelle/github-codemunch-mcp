@@ -4,6 +4,12 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ## [Unreleased]
 
+## [1.21.17] - 2026-04-02
+
+### Fixed
+- **BM25 `avgdl` inflation corrected (T10)** — `_sym_tokens` computed `_dl` (document length) as `len(tokens)` where `tokens` is the weighted repeated bag (field-repetition multipliers make the name appear 3× in the bag, signature 2×, etc.). This inflated `_dl` and therefore `avgdl`, distorting the BM25 length-normalisation term `K`. Fixed by using `len(set(tokens))` — the unique-token count — consistent with how document-frequency (`df`) is already computed via `for t in set(toks)`. Symbols with overlap across name/signature/summary fields (the common case) were previously penalised as "long documents" when they are not.
+- **BM25 rebuild canonical `_dl` enforcement (T11)** — `_compute_bm25` now overwrites `sym["_dl"]` with `len(unique_toks)` on every corpus rebuild. Previously the function used the cached `_dl` from `_sym_tokens`, meaning retained symbols carrying a pre-T10 `_dl` value (the inflated bag length) would make `avgdl` inconsistent with the new formula. The forced rewrite ensures the corpus and all scoring are internally consistent even when the BM25 cache is rebuilt over a mix of freshly computed and carried-forward symbols (e.g., after deferred AI summarisation). 11 new correctness tests added (`tests/test_bm25_correctness.py`).
+
 ## [1.21.16] - 2026-04-02
 
 ### Fixed
