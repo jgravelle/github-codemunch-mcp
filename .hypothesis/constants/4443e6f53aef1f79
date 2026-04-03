@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\annotated_types\__init__.py
+# hypothesis_version: 6.151.10
+
+['0.7.0', '<lambda>', 'BaseMetadata', 'DocInfo', 'Ge', 'GroupedMetadata', 'Gt', 'Interval', 'IsDigits', 'IsFinite', 'IsInfinite', 'IsNan', 'IsNotFinite', 'IsNotInfinite', 'IsNotNan', 'Le', 'Len', 'LowerCase', 'Lt', 'MaxLen', 'MinLen', 'MultipleOf', 'Predicate', 'T', 'Timezone', 'UpperCase', '_NumericType', '_StrType', '__name__', '__version__', 'doc', 'kw_only', 'slots']

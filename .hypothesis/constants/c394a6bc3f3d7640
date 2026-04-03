@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\embed_repo.py
+# hypothesis_version: 6.151.10
+
+[200, 1000, '0', '1', 'CODE_RETRIEVAL_QUERY', 'GOOGLE_API_KEY', 'GOOGLE_EMBED_MODEL', 'OPENAI_API_KEY', 'OPENAI_EMBED_MODEL', 'RETRIEVAL_DOCUMENT', 'RETRIEVAL_QUERY', '_meta', 'cached', 'embed_model', 'embedding', 'embedding_dimension', 'error', 'false', 'gemini', 'id', 'message', 'model', 'name', 'no', 'off', 'openai', 'provider', 'repo', 'signature', 'summary', 'symbols_embedded', 'symbols_total', 'task_type', 'timing_ms']

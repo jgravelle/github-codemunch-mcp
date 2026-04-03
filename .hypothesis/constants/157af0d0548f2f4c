@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\rich\style.py
+# hypothesis_version: 6.151.10
+
+[0.5, 128, 256, 496, 512, 1024, 2048, 4096, 7680, '1', '2', '21', '3', '4', '5', '51', '52', '53', '6', '7', '8', '9', ';', '; ', 'Style', '_ansi', '_attributes', '_bgcolor', '_color', '_hash', '_link', '_link_id', '_meta', '_null', '_set_attributes', '_stack', '_style_definition', 'b', 'bgcolor', 'bit', 'blink', 'blink2', 'bold', 'c', 'color', 'conceal', 'd', 'dim', 'encircle', 'font-style: italic', 'font-weight: bold', 'frame', 'i', 'italic', 'link', 'meta', 'none', 'not', 'not blink', 'not blink2', 'not bold', 'not conceal', 'not dim', 'not encircle', 'not frame', 'not italic', 'not overline', 'not reverse', 'not strike', 'not underline', 'not underline2', 'o', 'on', 'overline', 'r', 'reverse', 's', 'strike', 'u', 'underline', 'underline2', 'uu']

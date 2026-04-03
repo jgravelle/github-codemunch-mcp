@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_dead_code_v2.py
+# hypothesis_version: 6.151.10
+
+[0.5, 3.0, 1000, '/', '/test/', '/tests/', 'Makefile', '\\', '\\b([A-Za-z_]\\w*)\\b', '__init__.py', '__main__.py', '_meta', '_test.py', 'alias_map', 'app.py', 'asgi.py', 'celery.py', 'cli.py', 'confidence', 'confidence_level', 'conftest.py', 'dead_symbols', 'decorators', 'error', 'file', 'framework_warning', 'function', 'id', 'index.js', 'index.jsx', 'index.ts', 'index.tsx', 'kind', 'line', 'main.py', 'manage.py', 'medium', 'method', 'methodology', 'min_confidence', 'mod.rs', 'multi_signal', 'name', 'no_callers', 'not_barrel_exported', 'psr4_map', 'repo', 'run.py', 'setup.py', 'signals', 'specifier', 'test_', 'timing_ms', 'total_analysed', 'unreachable_file', 'wsgi.py']

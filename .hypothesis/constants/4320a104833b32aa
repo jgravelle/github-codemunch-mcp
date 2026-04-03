@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anyio\_core\_subprocesses.py
+# hypothesis_version: 6.151.10
+
+['PathLike[bytes]', 'PathLike[str]', 'extra_groups', 'group', 'umask', 'user']

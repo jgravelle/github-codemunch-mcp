@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\uvicorn\config.py
+# hypothesis_version: 6.151.10
+
+[b'server', b'uvicorn', 0.25, 20.0, 438, 1024, 2048, 8000, '%s', '%s://%s:%d', '%s://[%s]:%d', '()', '.*', '.json', '.yaml', '.yml', '127.0.0.1', '2.0', '3.0', ':', 'FORWARDED_ALLOW_IPS', 'INFO', 'TLSv1', 'TRACE', 'Uvicorn running on ', 'WEB_CONCURRENCY', '__await__', '__call__', 'access', 'asgi2', 'asgi3', 'asyncio', 'auto', 'class', 'color_message', 'critical', 'debug', 'default', 'error', 'ext://sys.stderr', 'ext://sys.stdout', 'fmt', 'formatter', 'formatters', 'h11', 'handlers', 'http', 'https', 'httptools', 'info', 'latin1', 'level', 'loggers', 'none', 'off', 'on', 'propagate', 'stream', 'trace', 'use_colors', 'uvicorn', 'uvicorn.access', 'uvicorn.asgi', 'uvicorn.error', 'uvloop', 'version', 'warning', 'websockets', 'websockets-sansio', 'wsgi', 'wsproto']

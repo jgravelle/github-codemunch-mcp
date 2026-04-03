@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_ranked_context.py
+# hypothesis_version: 6.151.10
+
+[0.0, 0.5, 1.0, 100.0, 500, 1000, 4000, '_meta', 'avgdl', 'bm25', 'budget_tokens', 'byte_length', 'centrality', 'centrality_score', 'combined', 'combined_score', 'context_items', 'error', 'file', 'get_ranked_context', 'id', 'idf', 'inverted', 'items_considered', 'items_included', 'kind', 'pagerank', 'psr4_map', 'relevance_score', 'source', 'symbol_id', 'timing_ms', 'tokens', 'tokens_saved', 'total_tokens', 'total_tokens_saved']

@@ -259,6 +259,16 @@ def _extract_haskell_imports(content: str) -> list[dict]:
     return [{"specifier": m.group(1), "names": []} for m in _HASKELL_IMPORT.finditer(content)]
 
 
+# Dart: import 'package:flutter/material.dart' / import 'dart:async' / import './foo.dart'
+_DART_IMPORT = re.compile(
+    r"""^\s*(?:import|export)\s+['"]([^'"]+)['"]""", re.MULTILINE
+)
+
+
+def _extract_dart_imports(content: str) -> list[dict]:
+    return [{"specifier": m.group(1), "names": []} for m in _DART_IMPORT.finditer(content)]
+
+
 # SQL/dbt: {{ ref('model_name') }} and {{ source('source', 'table') }}
 _DBT_REF = re.compile(
     r"""\{\{[\s-]*ref\s*\(\s*['"]([^'"]+)['"]\s*(?:,\s*v\s*=\s*\d+\s*)?\)\s*[\s-]*\}\}"""
@@ -314,6 +324,7 @@ _LANGUAGE_EXTRACTORS = {
     "swift": _extract_swift_imports,
     "scala": _extract_scala_imports,
     "haskell": _extract_haskell_imports,
+    "dart": _extract_dart_imports,
     "sql": _extract_sql_dbt_imports,
     "asm": _extract_asm_imports,
 }

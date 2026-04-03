@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\_streaming.py
+# hypothesis_version: 6.151.10
+
+[b'\n\n', b'\r\n\r\n', b'\r\r', '\x00', ':', '_T', 'completion', 'content_block_delta', 'content_block_start', 'content_block_stop', 'data', 'error', 'event', 'id', 'message_delta', 'message_start', 'message_stop', 'ping', 'retry', 'tuple[type, ...]', 'type', 'utf-8']

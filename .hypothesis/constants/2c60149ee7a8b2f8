@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\lib\streaming\_messages.py
+# hypothesis_version: 6.151.10
+
+['__json_buf', 'citation', 'citations_delta', 'content_block_delta', 'content_block_start', 'content_block_stop', 'input_json', 'input_json_delta', 'message_delta', 'message_start', 'message_stop', 'request-id', 'signature', 'signature_delta', 'text', 'text_delta', 'thinking', 'thinking_delta', 'tool_use', 'utf-8']

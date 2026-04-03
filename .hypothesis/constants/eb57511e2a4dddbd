@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\search_columns.py
+# hypothesis_version: 6.151.10
+
+[500, 1000, '.', '.sql', '/', '_columns', '_meta', 'column', 'description', 'error', 'file', 'max_results', 'model', 'query', 'repo', 'result_count', 'results', 'score', 'search_columns', 'source', 'sources', 'timing_ms', 'tokens_saved', 'total_columns', 'total_models', 'total_tokens_saved', 'truncated']

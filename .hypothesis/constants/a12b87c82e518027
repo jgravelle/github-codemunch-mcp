@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\nodes.py
+# hypothesis_version: 6.151.10
+
+[', ', '.', '/', '::', '::()', '<{} {}>', 'Node', '_NodeType', '_T', '__dict__', '__init__', '_nodeid', '_store', 'abstract', 'auto', 'config', 'fulltrace', 'location', 'long', 'name', 'obj', 'parent', 'path', 'session', 'short', 'showlocals', 'tbstyle', 'unknown location', 'value', 'verbose']

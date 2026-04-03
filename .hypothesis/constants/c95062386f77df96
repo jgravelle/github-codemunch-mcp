@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\docstring_parser\common.py
+# hypothesis_version: 6.151.10
+
+[255, 'arg', 'argument', 'attribute', 'deprecated', 'deprecation', 'example', 'examples', 'except', 'exception', 'key', 'keyword', 'param', 'parameter', 'raise', 'raises', 'return', 'returns', 'yield', 'yields']

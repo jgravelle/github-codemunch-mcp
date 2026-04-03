@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\attr\__init__.py
+# hypothesis_version: 6.151.10
+
+['Attribute', 'AttrsInstance', 'Converter', 'Factory', 'NOTHING', 'NothingType', '__version__', '__version_info__', 'asdict', 'assoc', 'astuple', 'attr', 'attrib', 'attributes', 'attrs', 'cmp_using', 'converters', 'define', 'evolve', 'exceptions', 'field', 'fields', 'fields_dict', 'filters', 'frozen', 'get_run_validators', 'has', 'ib', 'make_class', 'mutable', 'resolve_types', 's', 'set_run_validators', 'setters', 'validate', 'validators', 'version']

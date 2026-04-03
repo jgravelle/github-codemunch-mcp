@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_file_outline.py
+# hypothesis_version: 6.151.10
+
+[1000, 'Symbol', '_meta', 'byte_length', 'byte_offset', 'children', 'content_hash', 'decorators', 'docstring', 'end_line', 'error', 'file', 'file_summary', 'get_file_outline', 'id', 'keywords', 'kind', 'language', 'line', 'name', 'parent', 'qualified_name', 'repo', 'results', 'signature', 'summary', 'symbol_count', 'symbols', 'timing_ms', 'tip', 'tokens_saved', 'total_tokens_saved', 'utf-8']

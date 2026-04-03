@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_layer_violations.py
+# hypothesis_version: 6.151.10
+
+[1000, '/', '\\', '_meta', 'alias_map', 'architecture', 'error', 'file', 'file_layer', 'import_target', 'layer_count', 'layers', 'may_not_import', 'name', 'note', 'paths', 'psr4_map', 'repo', 'rule_violated', 'source_root', 'target_layer', 'timing_ms', 'violation_count', 'violations']

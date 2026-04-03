@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\index_file.py
+# hypothesis_version: 6.151.10
+
+['/', 'File unchanged', 'context_providers', 'dbt', 'duration_seconds', 'error', 'file', 'indexed_at', 'is_new', 'message', 'r', 'replace', 'repo', 'source_root', 'sql', 'success', 'symbol_count', 'utf-8', 'warnings']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\starlette\requests.py
+# hypothesis_version: 6.151.10
+
+[b'application/x-www-form-urlencoded', b'multipart/form-data', 400, 1000, 1024, '/', ';', '=', 'Content-Type', 'StateT', 'Stream consumed', '_base_url', '_body', '_cookies', '_headers', '_json', '_query_params', '_state', '_url', 'accept', 'accept-encoding', 'accept-language', 'app', 'app_root_path', 'auth', 'body', 'cache-control', 'client', 'cookie', 'extensions', 'headers', 'http', 'http.disconnect', 'http.request', 'http.response.push', 'latin-1', 'method', 'more_body', 'path', 'path_params', 'query_string', 'root_path', 'router', 'session', 'state', 'type', 'user', 'user-agent', 'websocket']

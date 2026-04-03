@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_coupling_metrics.py
+# hypothesis_version: 6.151.10
+
+[0.3, 0.7, 1000, '_meta', 'alias_map', 'assessment', 'ca', 'ce', 'dependencies', 'error', 'importers', 'instability', 'isolated', 'module', 'neutral', 'psr4_map', 'repo', 'stable', 'timing_ms', 'unstable']

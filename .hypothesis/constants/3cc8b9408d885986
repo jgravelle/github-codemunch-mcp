@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\parser\context\git_blame.py
+# hypothesis_version: 6.151.10
+
+['--', '--diff-filter=AM', '--name-only', '--no-merges', '--show-toplevel', '.git', 'COMMIT ', 'author', 'date', 'files_with_blame', 'git', 'git_blame', 'last_author', 'last_modified', 'log', 'rev-parse', '|']

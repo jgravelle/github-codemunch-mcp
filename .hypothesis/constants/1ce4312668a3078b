@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_hotspots.py
+# hypothesis_version: 6.151.10
+
+[128, 1000, '--format=', '--git-dir', '--name-only', '/', '\\', '_meta', 'assessment', 'churn', 'complexity_x_churn', 'confidence_level', 'cyclomatic', 'days', 'error', 'file', 'function', 'git', 'git_available', 'high', 'hotspot_score', 'hotspots', 'id', 'kind', 'line', 'log', 'low', 'max_nesting', 'medium', 'method', 'methodology', 'name', 'note', 'param_count', 'repo', 'rev-parse', 'symbol_id', 'timing_ms', 'top_n']

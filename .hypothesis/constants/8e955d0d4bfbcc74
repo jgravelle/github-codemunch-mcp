@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\lib\tools\_beta_functions.py
+# hypothesis_version: 6.151.10
+
+['AsyncFunctionT', 'FunctionT', 'defer_loading', 'description', 'input_schema', 'mcp_server_name', 'name', 'object', 'properties', 'type']

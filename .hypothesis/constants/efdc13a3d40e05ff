@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\mcp\shared\_httpx_utils.py
+# hypothesis_version: 6.151.10
+
+[30.0, 300.0, 'MCP_DEFAULT_TIMEOUT', 'auth', 'follow_redirects', 'headers', 'timeout']

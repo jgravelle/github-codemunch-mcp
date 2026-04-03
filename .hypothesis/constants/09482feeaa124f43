@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\main.py
+# hypothesis_version: 6.151.10
+
+[', ', 'BaseModel', 'IncEx', 'ModelT', '_', '__annotations__', '__delete__', '__dict__', '__doc__', '__get__', '__module__', '__name__', '__orig_bases__', '__parameters__', '__pydantic_extra__', '__pydantic_fields__', '__pydantic_private__', '__qualname__', '__root__', '__set__', 'allow', 'any_of', 'args', 'cached_property', 'create_model', 'error', 'extra', 'extra_known', 'from_attributes', 'frozen', 'frozen_field', 'frozen_instance', 'input', 'json', 'loc', 'model_config', 'model_field', 'model_post_init', 'none', 'origin', 'parameters', 'primitive_type_array', 'private', 'python', 'serializer', 'type', 'type[ModelT]', 'type_error', 'utf8', 'validate_assignment', 'validation', 'validator', 'value_error', 'warn']

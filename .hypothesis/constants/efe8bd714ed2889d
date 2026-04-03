@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\assertion\util.py
+# hypothesis_version: 6.151.10
+
+[' != ', ' +', '!=', '+ ', '- ', '<', '<=', '<string>', '==', '>', '>=', 'BUILD_NUMBER', 'Both sets are equal', 'CI', 'Common items:', 'Differing items:', 'Full diff:', 'Left', 'Matching attributes:', 'NFD', 'Right', 'Skipping', '\\n', '__attrs_attrs__', '__code__', '__dataclass_fields__', '_fields', 'and   ', 'attrs generated eq', 'co_filename', 'diff', 'eq', 'left', 'not in', 'python', 'right', 's', 'where ', '{', '}', '~']

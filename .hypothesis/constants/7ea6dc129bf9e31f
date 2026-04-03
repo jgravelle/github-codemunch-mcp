@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\jsonpointer.py
+# hypothesis_version: 6.151.10
+
+['(~[^01]|~$)', ')', '-', '/', '0|[1-9][0-9]*$', '2.4', 'Invalid suffix', 'JsonPointer(', 'Modified BSD License', '__getitem__', 'raw_unicode_escape', '{cls}({lst})', '~', '~0', '~1']

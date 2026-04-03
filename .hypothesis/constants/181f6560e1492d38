@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_extraction_candidates.py
+# hypothesis_version: 6.151.10
+
+[1000, '/', '\\', '_meta', 'alias_map', 'caller_count', 'caller_files', 'candidates', 'candidates_paths', 'cyclomatic', 'error', 'file', 'function', 'id', 'kind', 'line', 'max_nesting', 'method', 'min_callers', 'min_complexity', 'name', 'note', 'param_count', 'psr4_map', 'repo', 'score', 'specifier', 'timing_ms']

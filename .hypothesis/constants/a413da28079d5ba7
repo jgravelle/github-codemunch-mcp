@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\types\web_search_tool_result_error_code.py
+# hypothesis_version: 6.151.10
+
+['invalid_tool_input', 'max_uses_exceeded', 'query_too_long', 'request_too_large', 'too_many_requests', 'unavailable']

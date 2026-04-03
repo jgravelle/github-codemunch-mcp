@@ -1,7 +1,8 @@
 """Tests for T17 (missing_extractors / parse_warnings) and T18 (framework_warning).
 
 T17: index_folder reports missing_extractors when a language has symbol extraction
-     but no import extraction. Ship gate: Dart indexing produces missing_extractors: ["dart"].
+     but no import extraction. Example: Elixir has symbols but no import extractor.
+     (Dart had this gap in Phase 5 and was fixed in Phase 6 via T19.)
 
 T18: get_dead_code_v2 emits framework_warning when no standard entry points are found.
 """
@@ -18,27 +19,31 @@ from jcodemunch_mcp.tools.get_dead_code_v2 import get_dead_code_v2
 
 class TestMissingExtractors:
 
-    def test_dart_produces_missing_extractors(self, tmp_path):
-        """Indexing a Dart file should report missing_extractors: ['dart']."""
+    def test_elixir_produces_missing_extractors(self, tmp_path):
+        """Indexing an Elixir file should report missing_extractors: ['elixir'].
+
+        Elixir has tree-sitter symbol extraction but no import extractor in
+        _LANGUAGE_EXTRACTORS. Dart had this gap in Phase 5; it was closed in
+        Phase 6 via T19. Elixir remains a representative example.
+        """
         src = tmp_path / "src"
         store = tmp_path / "store"
         src.mkdir()
         store.mkdir()
 
-        (src / "main.dart").write_text(
-            "void main() {\n  print('hello');\n}\n\n"
-            "class Greeter {\n  String greet(String name) => 'Hello, $name';\n}\n"
+        (src / "app.ex").write_text(
+            "defmodule MyApp do\n  def hello(name) do\n    name\n  end\nend\n"
         )
 
         r = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
         assert r["success"] is True, f"index_folder failed: {r}"
 
-        # Dart has symbol extraction but no import extractor
+        # Elixir has symbol extraction but no import extractor
         assert "missing_extractors" in r, (
             f"Expected 'missing_extractors' in result. Got: {list(r.keys())}"
         )
-        assert "dart" in r["missing_extractors"], (
-            f"Expected 'dart' in missing_extractors, got: {r['missing_extractors']}"
+        assert "elixir" in r["missing_extractors"], (
+            f"Expected 'elixir' in missing_extractors, got: {r['missing_extractors']}"
         )
 
     def test_missing_extractors_not_present_for_python_only(self, tmp_path):
@@ -66,19 +71,19 @@ class TestMissingExtractors:
         src.mkdir()
         store.mkdir()
 
-        (src / "app.dart").write_text(
-            "class App {\n  void run() {}\n}\n"
+        (src / "app.ex").write_text(
+            "defmodule App do\n  def run(), do: :ok\nend\n"
         )
 
         r = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
         assert r["success"] is True
 
         if "missing_extractors" not in r:
-            pytest.skip("Dart symbols not extracted in this environment")
+            pytest.skip("Elixir symbols not extracted in this environment")
 
         assert "parse_warnings" in r
-        assert any("dart" in w.lower() for w in r["parse_warnings"]), (
-            f"Expected dart mention in parse_warnings: {r['parse_warnings']}"
+        assert any("elixir" in w.lower() for w in r["parse_warnings"]), (
+            f"Expected elixir mention in parse_warnings: {r['parse_warnings']}"
         )
 
     def test_missing_extractors_is_sorted_list(self, tmp_path):
@@ -88,13 +93,15 @@ class TestMissingExtractors:
         src.mkdir()
         store.mkdir()
 
-        (src / "main.dart").write_text("void main() {}\n")
+        (src / "app.ex").write_text(
+            "defmodule App do\n  def run(), do: :ok\nend\n"
+        )
 
         r = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
         assert r["success"] is True
 
         if "missing_extractors" not in r:
-            pytest.skip("Dart symbols not extracted in this environment")
+            pytest.skip("Elixir symbols not extracted in this environment")
 
         extractors = r["missing_extractors"]
         assert isinstance(extractors, list)

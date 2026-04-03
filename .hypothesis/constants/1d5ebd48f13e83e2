@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\fixtures.py
+# hypothesis_version: 6.151.10
+
+['%s:%d', ', ', '-', '--fixtures', '--fixtures-per-test', '--funcargs', '.', '...', 'FixtureFunction', 'FixtureValue', '_', '_V', '__self__', '_fixtureinfo', '_pytest', '_pytest.', 'argnames', 'args', 'class', 'conftest.py', 'def', 'funcmanage', 'function', 'general', 'indirect', 'initialnames', 'instance', 'module', 'name2fixturedefs', 'names_closure', 'nofuncargs', 'package', 'param', 'parametrize', 'pytestmark', 'request', 'session', 'showfixtures', 'store_true', 'usefixtures', 'verbose']

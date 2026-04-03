@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_related_symbols.py
+# hypothesis_version: 6.151.10
+
+[0.0, 0.5, 1.5, 3.0, 1000, '([a-z])([A-Z])', '[a-zA-Z0-9]+', '\\1_\\2', '_meta', 'error', 'file', 'id', 'kind', 'line', 'name', 'psr4_map', 'related', 'related_count', 'relatedness_score', 'repo', 'signature', 'specifier', 'symbol', 'timing_ms']

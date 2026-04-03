@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\starlette\websockets.py
+# hypothesis_version: 6.151.10
+
+[1000, 1006, ',', ':', 'binary', 'bytes', 'code', 'extensions', 'headers', 'more_body', 'reason', 'subprotocol', 'text', 'type', 'utf-8', 'websocket', 'websocket.accept', 'websocket.close', 'websocket.connect', 'websocket.disconnect', 'websocket.receive', 'websocket.send']

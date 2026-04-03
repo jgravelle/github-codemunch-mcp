@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\rich\_log_render.py
+# hypothesis_version: 6.151.10
+
+[':', 'Console', 'ConsoleRenderable', 'RenderableType', 'Table', '[%x %X]', '[on blue]Hello', '[on blue]hello', '__main__', 'fold', 'log.level', 'log.message', 'log.path', 'log.time', 'right']

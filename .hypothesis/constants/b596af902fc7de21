@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\mcp\server\auth\provider.py
+# hypothesis_version: 6.151.10
+
+['AccessTokenT', 'AuthorizationCodeT', 'RefreshTokenT', 'access_denied', 'invalid_client', 'invalid_grant', 'invalid_redirect_uri', 'invalid_request', 'invalid_scope', 'server_error', 'unauthorized_client']

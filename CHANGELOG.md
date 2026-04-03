@@ -4,6 +4,16 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ## [Unreleased]
 
+## [1.21.20] - 2026-04-02
+
+### Added
+- **Dart import extractor (T19)** — `imports.py` now includes `_extract_dart_imports` (regex on `import`/`export` statements) registered as `"dart"` in `_LANGUAGE_EXTRACTORS`. Dart files no longer appear in `missing_extractors` after indexing. 9 new tests in `tests/test_dart_imports.py`; `test_parse_warnings.py` updated to use Elixir as the canonical missing-extractor example.
+- **LANGUAGE_SUPPORT.md expanded (T20)** — added full extraction rows for CSS, SCSS, SASS, YAML, Ansible, OpenAPI, and JSON; fixed C# entry to list `constant (property/field/event)` symbol types (were incorrectly documented as "not indexed"); corrected CSS row previously listed only under "text search indexing"; SASS entry now documents the CSS-parser fallback.
+- **Hypothesis property-based tests (T22)** — `tests/test_property_based.py` with 4 tests across 3 invariant classes: **ID uniqueness** (`TestIdUniqueness` — all symbol IDs in a freshly indexed folder are unique); **Incremental idempotency** (`TestIncrementalIdempotency` — indexing the same files twice yields the same symbol IDs and counts); **No self-imports** (`TestNoSelfImports` — no file in the import graph lists itself as an importer). `hypothesis>=6.0.0` added to dev dependency group. 4 new tests, 90 Hypothesis examples per run.
+
+### Changed
+- **`JCODEMUNCH_EXTRA_EXTENSIONS` valid language names** (T21) — added `scss`, `sass`, `less`, `styl`, `yaml`, `ansible`, `json`, `openapi`, `luau` to the documented list in LANGUAGE_SUPPORT.md.
+
 ## [1.21.19] - 2026-04-02
 
 ### Added

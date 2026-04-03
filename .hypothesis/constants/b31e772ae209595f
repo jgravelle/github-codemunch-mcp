@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\_types.py
+# hypothesis_version: 6.151.10
+
+['APIResponse[Any]', 'BaseModel', 'IncEx', 'ModelT', 'NOT_GIVEN', 'ResponseT', '_T', '_T_co', 'str | URL']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\doctest.py
+# hypothesis_version: 6.151.10
+
+[b'distutils', b'setuptools', '%03d %s', '--doctest-glob', '--doctest-modules', '--doctest-report', '...', '.py', '.rst', '.txt', '>>>', 'ALLOW_BYTES', 'ALLOW_UNICODE', 'Darwin', 'ELLIPSIS', 'NUMBER', 'Quitting debugger', '\\1\\2', '__main__', '__main__.py', '__name__', '__wrapped__', 'append', 'args', 'capturemanager', 'cdiff', 'collect', 'doctest_encoding', 'doctest_namespace', 'doctest_optionflags', 'doctestglob', 'doctestmodules', 'doctestreport', 'exponent1', 'exponent2', 'fget', 'fraction', 'ndiff', 'none', 'only_first_failure', 'pat', 'session', 'setup.py', 'store_true', 'test*.txt', 'udiff', 'usepdb', 'utf-8']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\type_adapter.py
+# hypothesis_version: 6.151.10
+
+['$defs', 'P', 'R', 'T', 'TypeAdapter', 'TypeAdapterT', '__dict__', '__name__', '__pydantic_config__', '__slots__', 'any_of', 'defer_build', 'description', 'error', 'json', 'none', 'off', 'on', 'primitive_type_array', 'python', 'title', 'trailing-strings', 'typing', 'validation', 'warn']

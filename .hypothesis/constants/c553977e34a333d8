@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_symbol_diff.py
+# hypothesis_version: 6.151.10
+
+[1000, '_meta', 'added', 'added_count', 'changed', 'changed_count', 'content_hash', 'error', 'file', 'file_a', 'file_b', 'hash_changed', 'kind', 'line', 'name', 'removed', 'removed_count', 'repo_a', 'repo_b', 'signature', 'signature_a', 'signature_b', 'symbols_a', 'symbols_b', 'timing_ms', 'tip', 'unchanged_count']

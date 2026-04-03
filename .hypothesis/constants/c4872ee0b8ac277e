@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\click\parser.py
+# hypothesis_version: 6.151.10
+
+['-', '--', '=', 'Argument', 'Option', 'OptionParser', 'ParsingState', 'V', 'append', 'append_const', 'count', 'normalize_opt', 'split_arg_string', 'split_opt', 'store', 'store_const']

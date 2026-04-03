@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\_internal\_model_construction.py
+# hypothesis_version: 6.151.10
+
+[', ', 'BaseModel', '_', '_T', '__', '__annotations__', '__class_vars__', '__code__', '__deprecated__', '__fields__', '__hash__', '__module__', '__parameters__', '__pydantic_extra__', '__pydantic_fields__', '__pydantic_private__', '__qualname__', '__root__', '__signature__', 'args', 'create_model', 'dict[str, FieldInfo]', 'functools', 'model_config', 'model_post_init', 'my_field', 'origin', 'parameters', 'type[BaseModel]']

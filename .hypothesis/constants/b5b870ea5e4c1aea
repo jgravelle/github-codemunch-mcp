@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_class_hierarchy.py
+# hypothesis_version: 6.151.10
+
+[1000, '(external)', ',', '^[A-Z][\\w.]*$', '_meta', 'ancestor_count', 'ancestors', 'class', 'descendant_count', 'descendants', 'error', 'file', 'kind', 'line', 'name', 'repo', 'signature', 'timing_ms', 'type']

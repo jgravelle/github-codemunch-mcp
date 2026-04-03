@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\starlette\datastructures.py
+# hypothesis_version: 6.151.10
+
+[b'host', 443, '********', ',', ', ', '/', ':', '?', '@', 'Too many arguments.', ']', '_CovariantValueType', '_KeyType', '_components', '_max_size', '_rolled', '_state', 'content-type', 'headers', 'hostname', 'http', 'https', 'items', 'latin-1', 'multi_items', 'netloc', 'password', 'path', 'port', 'query_string', 'scheme', 'server', 'username', 'vary', 'websocket', 'ws', 'wss']

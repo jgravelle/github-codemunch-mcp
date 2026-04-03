@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_changed_symbols.py
+# hypothesis_version: 6.151.10
+
+[1000, '--count', '--diff-filter=ACDMRT', '--git-dir', '--name-only', '--verify', '/', 'HEAD', '_meta', 'added', 'added_count', 'added_symbols', 'blast_radius', 'change_type', 'changed_count', 'changed_files', 'changed_files_count', 'changed_symbols', 'commits_spanned', 'content_hash', 'diff', 'error', 'file', 'from_sha', 'git', 'is_local', 'kind', 'line', 'modified', 'name', 'previous_name', 'psr4_map', 'qualified_name', 'removed', 'removed_count', 'removed_symbols', 'renamed', 'rev-list', 'rev-parse', 'show', 'source_root', 'symbol_id', 'timing_ms', 'tip', 'to_sha', 'utf-8']

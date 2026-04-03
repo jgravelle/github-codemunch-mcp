@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\index_repo.py
+# hypothesis_version: 6.151.10
+
+[403, 404, 429, 500, 1024, '.git', '.gitignore', '/', '1', '://', 'Accept', 'Authorization', 'GITHUB_TOKEN', 'No changes detected', '\\', 'blob', 'changed', 'cmd/', 'deleted', 'duration_seconds', 'error', 'file_count', 'file_summary_count', 'files', 'files_discovered', 'files_indexed', 'files_skipped_cap', 'git_head', 'github.com', 'gitignore', 'incremental', 'indexed_at', 'internal/', 'languages', 'lib/', 'message', 'new', 'no_symbols_count', 'no_symbols_files', 'path', 'pkg/', 'recursive', 'repo', 'retry-after', 'sha', 'size', 'src/', 'success', 'symbol_count', 'tree', 'type', 'utf-8', 'warnings']

@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\parser\context\dbt.py
+# hypothesis_version: 6.151.10
+
+['*.md', '*.yml', '.', '/', '\\', 'columns', 'config', 'dbt', 'dbt_columns', 'dbt_project.yml', 'description', 'doc_blocks', 'docs', 'docs-paths', 'model-paths', 'models', 'models_with_metadata', 'name', 'replace', 'source-paths', 'tags', 'utf-8']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\_internal\_mock_val_ser.py
+# hypothesis_version: 6.151.10
+
+['T', 'ValSer', '_attempt_rebuild', '_built_memo', '_code', '_error_message', '_val_or_ser', 'all referenced types', 'serializer', 'validator']

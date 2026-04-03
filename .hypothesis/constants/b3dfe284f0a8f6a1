@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\mcp\server\fastmcp\utilities\types.py
+# hypothesis_version: 6.151.10
+
+['.aac', '.flac', '.gif', '.jpeg', '.jpg', '.m4a', '.mp3', '.ogg', '.png', '.wav', '.webp', 'audio', 'audio/aac', 'audio/flac', 'audio/mp4', 'audio/mpeg', 'audio/ogg', 'audio/wav', 'image', 'image/gif', 'image/jpeg', 'image/png', 'image/webp', 'rb']

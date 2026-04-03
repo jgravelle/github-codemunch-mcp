@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic_settings\sources\providers\nested_secrets.py
+# hypothesis_version: 6.151.10
+
+['**/*', 'PathType', 'case_sensitive', 'env_nested_delimiter', 'env_prefix', 'error', 'ok', 'secrets_dir', 'secrets_dir_max_size', 'secrets_dir_missing', 'secrets_prefix', 'settings_cls', 'warn']

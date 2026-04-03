@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\rich\box.py
+# hypothesis_version: 6.151.10
+
+['ASCII', 'ASCII2', 'ASCII_DOUBLE_HEAD', 'Box', 'Box(...)', 'Cell', 'ConsoleOptions', 'DOUBLE', 'DOUBLE_EDGE', 'Footer 1', 'Footer 2', 'HEAVY', 'HEAVY_EDGE', 'HEAVY_HEAD', 'HORIZONTALS', 'Header 1', 'Header 2', 'MARKDOWN', 'MINIMAL', 'MINIMAL_DOUBLE_HEAD', 'MINIMAL_HEAVY_HEAD', 'ROUNDED', 'SIMPLE', 'SIMPLE_HEAD', 'SIMPLE_HEAVY', 'SQUARE', 'SQUARE_DOUBLE_HEAD', '__main__', 'center', 'dim', 'foot', 'green', 'head', 'magenta', 'mid', 'not dim', 'row']

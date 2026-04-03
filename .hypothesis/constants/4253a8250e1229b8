@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anyio\lowlevel.py
+# hypothesis_version: 6.151.10
+
+['D', 'EventLoopToken', 'RunVar', 'RunvarToken', 'T', '_default', '_name', '_redeemed', '_value', '_var', 'checkpoint', 'current_token']

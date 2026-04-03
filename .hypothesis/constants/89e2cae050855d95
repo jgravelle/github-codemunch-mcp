@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\httpx\_urls.py
+# hypothesis_version: 6.151.10
+
+['/', ':', '?', 'QueryParams', 'RawURL', 'Too many arguments.', 'URL', 'ascii', 'fragment', 'host', 'netloc', 'params', 'password', 'path', 'port', 'query', 'raw_host', 'raw_path', 'raw_scheme', 'scheme', 'userinfo', 'username', 'xn--']

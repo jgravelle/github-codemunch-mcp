@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\httpx\_client.py
+# hypothesis_version: 6.151.10
+
+[b'*/*', b'/', b'Accept', b'Accept-Encoding', b'Connection', b'User-Agent', b'keep-alive', 443, ', ', 'AsyncClient', 'Authorization', 'Client', 'Content-Length', 'Cookie', 'DELETE', 'GET', 'HEAD', 'Host', 'Location', 'OPTIONS', 'PATCH', 'POST', 'PUT', 'T', 'Transfer-Encoding', 'U', 'USE_CLIENT_DEFAULT', 'all://', 'ascii', 'http', 'https', 'httpx', 'identity', 'request', 'response', 'timeout', 'utf-8']

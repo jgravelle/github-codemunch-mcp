@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\mcp\server\fastmcp\server.py
+# hypothesis_version: 6.151.10
+
+[8000, '.env', '/', '/mcp', '/messages/', '/sse', '127.0.0.1', '127.0.0.1:*', '::1', 'CRITICAL', 'DEBUG', 'ERROR', 'FASTMCP_', 'FastMCP', 'GET', 'INFO', 'WARNING', '[::1]:*', '__', 'client_id', 'debug', 'error', 'http://127.0.0.1:*', 'http://[::1]:*', 'http://localhost:*', 'ignore', 'info', 'localhost', 'localhost:*', 'sse', 'stdio', 'streamable-http', 'warning', '{', '{(\\w+)}', '}']

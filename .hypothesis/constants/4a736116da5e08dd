@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\distro\__init__.py
+# hypothesis_version: 6.151.10
+
+['LinuxDistribution', 'NORMALIZED_DISTRO_ID', 'NORMALIZED_LSB_ID', 'NORMALIZED_OS_ID', 'build_number', 'codename', 'distro_release_attr', 'distro_release_info', 'id', 'info', 'like', 'linux_distribution', 'lsb_release_attr', 'lsb_release_info', 'major_version', 'minor_version', 'name', 'os_release_attr', 'os_release_info', 'uname_attr', 'uname_info', 'version', 'version_parts']

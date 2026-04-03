@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\rich\highlighter.py
+# hypothesis_version: 6.151.10
+
+[1234567.34, 123123123123, ' /foo', '(?P<brace>[][{}()])', '(?P<call>[\\w.]*?)\\(', '(?P<ellipsis>\\.\\.\\.)', '/foo/', '/foo/bar', '/foo/bar/baz/', '/foo/bar/baz/egg', '/foo/bar/baz/egg.py', ':', '__main__', 'apple', 'count', 'foo/bar/baz', 'iso8601.', 'json.', 'json.key', 'name', 'repr.', '|']

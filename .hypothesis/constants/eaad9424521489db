@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\find_importers.py
+# hypothesis_version: 6.151.10
+
+[200, 1000, '/', '_meta', 'cross_repo', 'cross_repo_default', 'cross_repo_importers', 'error', 'file', 'file_path', 'has_importers', 'importer_count', 'importers', 'names', 'note', 'package_names', 'psr4_map', 'repo', 'repos', 'results', 'source_repo', 'specifier', 'timing_ms', 'tip', 'truncated']

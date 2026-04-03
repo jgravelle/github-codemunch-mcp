@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_churn_rate.py
+# hypothesis_version: 6.151.10
+
+[0.0, 1.0, 3.0, 128, 1000, '--', '--diff-filter=A', '--follow', '--format=%H|%ae|%aI', '--format=%aI', '--git-dir', '_meta', 'active', 'assessment', 'authors', 'churn_per_week', 'commits', 'confidence_level', 'days', 'error', 'file', 'first_seen', 'git', 'git_log', 'high', 'id', 'last_modified', 'log', 'methodology', 'name', 'repo', 'rev-parse', 'stable', 'symbol', 'symbol_name', 'target', 'target_type', 'timing_ms', 'volatile', '|']

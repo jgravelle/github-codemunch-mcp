@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_dependency_graph.py
+# hypothesis_version: 6.151.10
+
+[1000, '/', '_meta', 'both', 'cross_repo', 'cross_repo_default', 'cross_repo_edges', 'depth', 'direction', 'edge_count', 'edges', 'error', 'file', 'from', 'from_repo', 'imported_by', 'importers', 'imports', 'neighbors', 'node_count', 'nodes', 'package_name', 'package_names', 'psr4_map', 'repo', 'repos', 'specifier', 'timing_ms', 'to', 'to_repo']

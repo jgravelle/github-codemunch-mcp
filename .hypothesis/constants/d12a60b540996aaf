@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\httpx\_auth.py
+# hypothesis_version: 6.151.10
+
+[b'%08x', b', ?', b':', b'auth', b'auth-int', 401, ', ', '-sess', '=', 'Auth', 'Authorization', 'BasicAuth', 'Digest ', 'DigestAuth', 'MD5', 'MD5-SESS', 'NetRCAuth', 'SHA', 'SHA-256', 'SHA-256-SESS', 'SHA-512', 'SHA-512-SESS', 'SHA-SESS', 'algorithm', 'cnonce', 'digest', 'digest ', 'nc', 'nonce', 'opaque', 'qop', 'realm', 'response', 'uri', 'username', 'www-authenticate', '{}="{}"', '{}={}']

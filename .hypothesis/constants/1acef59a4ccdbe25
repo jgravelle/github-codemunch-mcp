@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\watcher.py
+# hypothesis_version: 6.151.10
+
+[0.05, 0.5, 30.0, 200, 420, 4096, '--porcelain', '-C', '.', '.code-index', '/', '?', 'Done.', 'No changes detected', '__cache_miss__', 'added', 'auto', 'changed', 'create', 'deleted', 'duration_seconds', 'error', 'event', 'folder', 'git', 'idle-watchdog', 'list', 'manifest-watcher', 'message', 'modified', 'new', 'path', 'pid', 'prunable', 'remove', 'repos-poller', 'started_at', 'success', 'unknown error', 'utf-8', 'value', 'watch:', 'win32', 'worktree', 'worktree ']

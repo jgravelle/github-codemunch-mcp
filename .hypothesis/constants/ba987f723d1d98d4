@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic_settings\sources\providers\pyproject.py
+# hypothesis_version: 6.151.10
+
+['pydantic-settings', 'pyproject.toml', 'pyproject_toml_depth', 'tool']

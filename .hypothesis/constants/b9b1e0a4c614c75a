@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\attr\converters.py
+# hypothesis_version: 6.151.10
+
+['0', '1', 'default_if_none', 'f', 'false', 'n', 'no', 'off', 'on', 'optional', 'pipe', 'return', 't', 'to_bool', 'true', 'val', 'y', 'yes']

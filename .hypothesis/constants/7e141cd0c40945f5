@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\types\beta\beta_output_config_param.py
+# hypothesis_version: 6.151.10
+
+['high', 'low', 'max', 'medium']

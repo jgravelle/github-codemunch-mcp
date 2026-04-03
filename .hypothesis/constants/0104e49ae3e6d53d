@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\uvicorn\server.py
+# hypothesis_version: 6.151.10
+
+[b'date', 0.0, 0.1, 438, 864000, '%d', '%s://%s:%d', '%s://[%s]:%d', '0.0.0.0', ':', 'Shutting down', 'Uvicorn running on ', 'Windows', ']', 'color_message', 'cyan', 'http', 'https', 'uvicorn.error', 'win32']

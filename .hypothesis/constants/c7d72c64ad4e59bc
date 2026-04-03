@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anyio\from_thread.py
+# hypothesis_version: 6.151.10
+
+['BlockingPortal', 'PosArgsT', 'T_Retval', 'T_co', 'asyncio', 'check_cancelled', 'run', 'run_sync', 'task_status']

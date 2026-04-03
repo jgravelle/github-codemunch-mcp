@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\types\base64_image_source_param.py
+# hypothesis_version: 6.151.10
+
+['base64', 'image/gif', 'image/jpeg', 'image/png', 'image/webp']

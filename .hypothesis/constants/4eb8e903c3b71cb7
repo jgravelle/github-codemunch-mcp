@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_file_tree.py
+# hypothesis_version: 6.151.10
+
+[500, 1000, '/', '_meta', 'children', 'dir', 'error', 'file', 'file_count', 'file_tree_max_files', 'get_file_tree', 'hint', 'language', 'path', 'path_prefix', 'repo', 'summary', 'symbol_count', 'timing_ms', 'tokens_saved', 'total_file_count', 'total_tokens_saved', 'tree', 'truncated', 'type']

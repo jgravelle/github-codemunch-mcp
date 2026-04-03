@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\_py\error.py
+# hypothesis_version: 6.151.10
+
+[267, 'P', 'R', 'UnknownErrno%d', '[{}]: {}', '_', '__doc__', '__module__', 'errno', 'py.error', 'win32', '{}.{} {!r}: {} ']

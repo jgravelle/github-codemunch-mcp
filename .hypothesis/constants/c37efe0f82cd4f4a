@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\_internal\_core_utils.py
+# hypothesis_version: 6.151.10
+
+['<No __module__>', '<No __qualname__>', '<stripped>', '__module__', '__qualname__', 'args', 'computed-field', 'custom_init', 'dataclass-field', 'frozenset', 'function-after', 'function-before', 'function-wrap', 'js_metadata', 'list', 'metadata', 'model-field', 'origin', 'ref', 'root_model', 'set', 'type', 'typed-dict-field']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\cffi\api.py
+# hypothesis_version: 6.151.10
+
+[255, '&', '&[', '(%s)', '*', '.', '.c', '/', '/MANIFEST', '1', 'DEBUG_EXT', 'FFILibrary_%s', 'NULL', 'RTLD_', 'UNICODE', '[', '[(', '\\s*', '\\s*\\n', ']', '_UNICODE', '__addressof__', '__file__', '__pypy__', '_assigned_source', '_cffi_base_type', '_d', 'abiflags', 'addressof(pointer)', 'array', 'ascii', 'bin', 'build', 'c', 'cffi_init', 'constant', 'define_macros', 'exec', 'extra_link_args', 'function', 'function ', 'gettotalrefcount', 'goal', 'libraries', 'library_dirs', 'libs', 'new_types', 'not modified: %r\n', 'parsed_types', 'pointer', 'prefix', 'pypy', 'pypy-c', 'pypy3-c', 'python%d%d', 'python%d.%d', 'python{0[0]}{0[1]}', 'regenerated: %r\n', 'self.include(self)', 'set_ffi', 'struct ', 'typedef ', 'union ', 'utf-8', 'variable', 'variable ', 'verifier', 'win32']

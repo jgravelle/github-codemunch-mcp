@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\cacheprovider.py
+# hypothesis_version: 6.151.10
+
+[511, ' first', '*', '-', '--cache-clear', '--cache-show', '--failed-first', '--ff', '--last-failed', '--lf', '--lfnf', '--new-first', '--nf', '.gitignore', '.pytest_cache', '::', '?', 'CACHEDIR.TAG', 'Cache directory path', 'README.md', 'TOX_ENV_DIR', 'UTF-8', 'all', 'append', 'cache is empty', 'cache/lastfailed', 'cache/nodeids', 'cache_dir', 'cacheclear', 'cachedir: ', 'cacheshow', 'call', 'collectonly', 'd', 'failedfirst', 'failure', 'failures', 'file', 'files', 'general', 'lf', 'lfplugin', 'lfplugin-collskip', 'lfplugin-collwrapper', 'newfirst', 'nfplugin', 'none', 'passed', 'pytest-cache-files-', 'r', 'skipped', 'store', 'store_true', 'v', 'verbose', 'w', 'workerinput', 'x', 'xb']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\pagination.py
+# hypothesis_version: 6.151.10
+
+['AsyncPage', 'AsyncPageCursor', 'AsyncTokenPage', 'SyncPage', 'SyncPageCursor', 'SyncTokenPage', '_T', 'after_id', 'before_id', 'page', 'page_token']

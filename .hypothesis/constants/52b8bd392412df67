@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\_client.py
+# hypothesis_version: 6.151.10
+
+[400, 401, 403, 404, 409, 413, 422, 429, 500, 529, '2023-06-01', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'Anthropic', 'AsyncAnthropic', 'AsyncClient', 'Authorization', 'Client', 'ProxiesTypes', 'RequestOptions', 'Timeout', 'Transport', 'X-Api-Key', 'X-Stainless-Async', 'anthropic-version', 'comma', 'false']

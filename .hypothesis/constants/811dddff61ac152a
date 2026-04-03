@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_blast_radius.py
+# hypothesis_version: 6.151.10
+
+[0.0, 0.7, 1.0, 1000, '/', '\\b', '_meta', 'cache_hit', 'caller_count', 'callers', 'candidates', 'confirmed', 'confirmed_count', 'content unavailable', 'cross_repo', 'cross_repo_confirmed', 'cross_repo_default', 'depth', 'error', 'file', 'files', 'get_blast_radius', 'id', 'impact_by_depth', 'importer_count', 'kind', 'line', 'name', 'overall_risk_score', 'package_names', 'potential', 'potential_count', 'psr4_map', 'reason', 'references', 'repo', 'repos', 'risk_score', 'source_repo', 'specifier', 'symbol', 'timing_ms', 'tip']

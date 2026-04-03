@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\_call_graph.py
+# hypothesis_version: 6.151.10
+
+['CodeIndex', 'IndexStore', '\\b', '_symbol_index', 'alias_map', 'depth', 'end_line', 'file', 'id', 'kind', 'line', 'name', 'psr4_map', 'specifier']

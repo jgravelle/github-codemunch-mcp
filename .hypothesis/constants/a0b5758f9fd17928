@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\validate_call_decorator.py
+# hypothesis_version: 6.151.10
+
+['AnyCallableT', 'Partial of partial', 'validate-call-type', 'validate_call']

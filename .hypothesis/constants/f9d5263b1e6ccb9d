@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_cross_repo_map.py
+# hypothesis_version: 6.151.10
+
+[1000, '/', '_meta', 'cross_repo_edges', 'depended_on_by', 'depends_on', 'error', 'from_repo', 'package_name', 'package_names', 'repo', 'repos', 'specifier', 'timing_ms', 'to_repo', 'total_repos_scanned']

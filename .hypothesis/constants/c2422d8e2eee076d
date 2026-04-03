@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\click\termui.py
+# hypothesis_version: 6.151.10
+
+['\x1b[0m', '\x1b[2J\x1b[1;1H', '#', '-', '.txt', ': ', 'Error: invalid input', 'Error: {e.message}', 'V', 'Y/n', 'black', 'blue', 'bright_black', 'bright_blue', 'bright_cyan', 'bright_green', 'bright_magenta', 'bright_red', 'bright_white', 'bright_yellow', 'cabc.Iterable[str]', 'cyan', 'green', 'magenta', 'n', 'name', 'no', 'red', 'reset', 'white', 'y', 'y/N', 'y/n', 'yellow', 'yes']

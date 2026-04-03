@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\docstring_parser\google.py
+# hypothesis_version: 6.151.10
+
+['(?=\\S)', ')', ', optional', '-', ':', '?', 'Args', 'Args:', 'Arguments', 'Attributes', 'Attributes:', 'Example', 'Examples', 'Except', 'Exceptions', 'Parameters', 'Params', 'Raises', 'Raises:', 'Returns', 'Returns:', 'SectionBase', 'Yields', 'Yields:', '[ \t\r\x0c\x0b]*$', '\\n\\S', '^', '^(', '^\\s*', '_', 'attribute', 'examples', 'param', 'raises', 'returns', 'title key type', 'yields', '|']

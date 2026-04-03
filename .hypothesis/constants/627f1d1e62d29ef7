@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\storage\token_tracker.py
+# hypothesis_version: 6.151.10
+
+[0.0, 1.0, 3.0, 5.0, 10.0, 256, 1000000, '.code-index', '_savings.json', 'anon_id', 'by_tool', 'cached_entries', 'claude_haiku_4_5', 'claude_opus_4_6', 'claude_sonnet_4_6', 'delta', 'gpt5_latest', 'hit_rate', 'hits', 'jcodemunch-telemetry', 'last_updated', 'misses', 'result_cache', 'session_calls', 'session_cost_avoided', 'session_duration_s', 'session_stats.json', 'session_tokens_saved', 'share_savings', 'stats_file_interval', 'tool_breakdown', 'total_cost_avoided', 'total_hits', 'total_misses', 'total_tokens_saved']

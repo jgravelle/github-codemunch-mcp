@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\_utils\_datetime_parse.py
+# hypothesis_version: 6.151.10
+
+[20000000000.0, 3e+20, 1000, 1970, '-', '0', 'Z', 'date', 'datetime', 'invalid date format', 'microsecond', 'tzinfo']

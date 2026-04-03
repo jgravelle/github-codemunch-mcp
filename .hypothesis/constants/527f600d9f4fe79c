@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\click\core.py
+# hypothesis_version: 6.151.10
+
+[' / ', '!', '""', '(DEPRECATED)', '(dynamic)', '*', ', ', '-', '--help', '.', '...', '/', ';', '; ', 'Aborted!', 'BaseCommand', 'COMMAND [ARGS]...', 'Command has no name.', 'Commands', 'F', 'Missing command.', 'MultiCommand', 'Options', 'V', '[OPTIONS]', '_', 'allow_extra_args', 'append', 'argument', 'auto_envvar_prefix', 'cls', 'command', 'count', 'default', 'default: {default}', 'deprecated', 'env var: {var}', 'envvar', 'envvars', 'epilog', 'help', 'hidden', 'inf', 'info_name', 'list[CompletionItem]', 'meta', 'multiple', 'name', 'nargs', 'nt', 'option', 'opts', 'param_type_name', 'parameter', 'params', 'range', 'red', 'required', 'secondary_opts', 'short_help', 'show_default', 'store', 't.Callable[..., V]', 'type']

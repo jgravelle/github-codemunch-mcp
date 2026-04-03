@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\alias_generators.py
+# hypothesis_version: 6.151.10
+
+['([0-9])([A-Z])', '([A-Z]+)([A-Z][a-z])', '([a-z])([0-9])', '([a-z])([A-Z])', '(^_*[A-Z])', '-', '\\d[a-z]', '^[a-z]+[A-Za-z0-9]*$', '_', 'to_camel', 'to_pascal', 'to_snake']

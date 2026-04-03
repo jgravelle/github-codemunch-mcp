@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\jsonschema\_format.py
+# hypothesis_version: 6.151.10
+
+['#', '%H:%M:%S', '-', '1970-01-01T', '@', 'DMYWHMS', 'IRI', 'IRI_reference', 'URI', 'URI_reference', '^\\d{4}-\\d{2}-\\d{2}$', '_F', 'color', 'date', 'date-time', 'draft201909', 'draft202012', 'draft3', 'draft4', 'draft6', 'draft7', 'duration', 'email', 'host-name', 'hostname', 'idn-email', 'idn-hostname', 'ip-address', 'ipv4', 'ipv6', 'iri', 'iri-reference', 'iri_reference', 'json-pointer', 'regex', 'scope_id', 'time', 'uri', 'uri-reference', 'uri-template', 'uuid']

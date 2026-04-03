@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_impact_preview.py
+# hypothesis_version: 6.151.10
+
+[1000, '_meta', '_symbol_index', 'affected_by_file', 'affected_files', 'affected_symbols', 'alias_map', 'call_chain', 'call_chains', 'candidates', 'chain', 'confidence_level', 'error', 'file', 'id', 'kind', 'line', 'low', 'methodology', 'name', 'psr4_map', 'repo', 'source', 'symbol', 'symbol_id', 'text_heuristic', 'timing_ms', 'tip']

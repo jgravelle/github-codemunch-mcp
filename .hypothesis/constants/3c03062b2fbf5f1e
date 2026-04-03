@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\starlette\convertors.py
+# hypothesis_version: 6.151.10
+
+[0.0, '%0.20f', '.', '.*', '/', '0', 'Must not be empty', 'T', '[0-9]+', '[0-9]+(\\.[0-9]+)?', '[^/]+', 'float', 'int', 'path', 'str', 'uuid']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\_response.py
+# hypothesis_version: 6.151.10
+
+['*', ';', 'APIResponse[Any]', 'P', 'R', '_APIResponseT', '_AsyncAPIResponseT', '_T', 'content-type', 'extra_headers', 'json', 'raw', 'request-id', 'stream', 'true', 'tuple[type, ...]', 'wb']

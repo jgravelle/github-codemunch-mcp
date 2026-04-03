@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\lib\bedrock\_stream_decoder.py
+# hypothesis_version: 6.151.10
+
+[200, 'ResponseStream', 'bedrock-runtime', 'bytes', 'chunk', 'completion', 'service-2', 'status_code']

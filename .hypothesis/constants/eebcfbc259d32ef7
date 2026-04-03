@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\resources\__init__.py
+# hypothesis_version: 6.151.10
+
+['AsyncBeta', 'AsyncCompletions', 'AsyncMessages', 'AsyncModels', 'Beta', 'BetaWithRawResponse', 'Completions', 'Messages', 'Models']

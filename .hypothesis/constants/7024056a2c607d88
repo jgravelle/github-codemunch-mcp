@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_symbol_complexity.py
+# hypothesis_version: 6.151.10
+
+[1000, '_meta', 'assessment', 'confidence_level', 'cyclomatic', 'end_line', 'error', 'file', 'high', 'id', 'kind', 'line', 'lines', 'low', 'max_nesting', 'medium', 'methodology', 'name', 'note', 'param_count', 'repo', 'stored_metrics', 'symbol_id', 'timing_ms']

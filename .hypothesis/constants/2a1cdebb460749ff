@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\referencing\jsonschema.py
+# hypothesis_version: 6.151.10
+
+['#', '$anchor', '$defs', '$dynamicAnchor', '$id', '$recursiveAnchor', '$ref', 'additionalItems', 'additionalProperties', 'allOf', 'anyOf', 'contains', 'contentSchema', 'definitions', 'dependencies', 'dependentSchemas', 'draft-03', 'draft-04', 'draft-06', 'draft-07', 'draft2019-09', 'draft2020-12', 'else', 'extends', 'id', 'if', 'items', 'not', 'oneOf', 'patternProperties', 'prefixItems', 'properties', 'propertyNames', 'then', 'unevaluatedItems']

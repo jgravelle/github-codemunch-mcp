@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\reindex_state.py
+# hypothesis_version: 6.151.10
+
+[0.0, 1000.0, 500, 1000, '_global', 'fresh', 'index_stale', 'reason', 'reindex_error', 'reindex_failed', 'reindex_failures', 'reindex_in_progress', 'relaxed', 'stale_since_ms', 'strict', 'timeout', 'waited_ms']

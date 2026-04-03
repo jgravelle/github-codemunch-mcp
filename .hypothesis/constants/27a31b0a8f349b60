@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\sse_starlette\sse.py
+# hypothesis_version: 6.151.10
+
+[0.5, 200, 'Cache-Control', 'Connection', 'X-Accel-Buffering', '__self__', 'aclose', 'body', 'chunk: %s', 'headers', 'http.disconnect', 'http.response.body', 'http.response.start', 'keep-alive', 'more_body', 'no', 'no-store', 'ping: %s', 'should_exit', 'shutdown_state', 'status', 'text/event-stream', 'type']

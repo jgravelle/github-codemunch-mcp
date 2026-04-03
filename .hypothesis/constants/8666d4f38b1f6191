@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\capture.py
+# hypothesis_version: 6.151.10
+
+[', ', '--capture', '-s', '<UNSET>', 'CaptureResult', 'Captured stderr', 'Captured stdout', 'UTF-8', '_old', 'b', 'buffer', 'call', 'capture', 'capturemanager', 'done', 'err', 'fd', 'general', 'global', 'initialized', 'method', 'no', 'out', 'pypy_version_info', 'raw', 'rb', 'replace', 'resume', 'setup', 'snap', 'start', 'started', 'stderr', 'stdin', 'stdout', 'stopped', 'store', 'store_const', 'suspend', 'suspended', 'sys', 'teardown', 'tee-sys', 'utf-8', 'w', 'was already stopped', 'wb', 'win32', 'writeorg']

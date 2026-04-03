@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\faker\typing.py
+# hypothesis_version: 6.151.10
+
+['CVC', 'CardType', 'Country', 'CreditCard', 'DateParseType', 'F', 'HueType', 'M', 'OrderedDictType', 'SeedType', 'SexLiteral']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\types\beta\beta_web_fetch_tool_result_error_code.py
+# hypothesis_version: 6.151.10
+
+['invalid_tool_input', 'max_uses_exceeded', 'too_many_requests', 'unavailable', 'url_not_accessible', 'url_not_allowed', 'url_too_long']

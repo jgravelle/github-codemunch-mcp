@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\httpx\_urlparse.py
+# hypothesis_version: 6.151.10
+
+[123, 124, 125, 127, 443, 65536, "!$&'()*+,;=", '"`{}%|\\', '%[A-Fa-f0-9]{2}', '(\\[.*\\]|[^:@]*)', '(\\[.*\\]|[^:]*)', '.', '.*', '..', '/', '//', ':', '?', 'URL too long', '[', '[^#]*', '[^/?#]*', '[^?#]*', '[^@]*', ']', '^\\[.*\\]$', 'ascii', 'authority', 'fragment', 'ftp', 'host', 'http', 'https', 'netloc', 'password', 'path', 'port', 'query', 'raw_path', 'scheme', 'userinfo', 'username', 'utf-8', 'ws', 'wss']

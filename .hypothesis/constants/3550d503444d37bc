@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\click\decorators.py
+# hypothesis_version: 6.151.10
+
+['-', '--help', '--password', '--version', '--yes', '.', 'CmdType', 'FC', 'GrpType', 'P', 'R', 'T', '_', '__click_params__', '__main__', '__name__', '__package__', 'callback', 'cmd', 'command', 'confirmation_prompt', 'expose_value', 'group', 'grp', 'help', 'hide_input', 'is_eager', 'is_flag', 'package', 'params', 'prog', 'prompt', 'type[CmdType]', 'type[GrpType]', 'version']

@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\suggest_queries.py
+# hypothesis_version: 6.151.10
+
+[1000, '_', '_meta', 'class', 'description', 'error', 'example_queries', 'file', 'file_count', 'function', 'get_file_outline', 'imported_by', 'keywords', 'kind', 'kind_distribution', 'language', 'method', 'most_imported_files', 'name', 'psr4_map', 'query', 'repo', 'search_symbols', 'specifier', 'symbol_count', 'timing_ms', 'tool', 'top_keywords', 'unknown']

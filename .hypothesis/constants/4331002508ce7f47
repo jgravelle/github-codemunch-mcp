@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\mcp\server\fastmcp\resources\resource_manager.py
+# hypothesis_version: 6.151.10
+
+['Adding resource', 'Getting resource', 'Listing resources', 'Listing templates', 'count', 'resource_name', 'type', 'uri']

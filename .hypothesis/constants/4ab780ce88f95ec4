@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\_constants.py
+# hypothesis_version: 6.151.10
+
+[0.5, 5.0, 8.0, 100, 1000, 8192, '\n\nAssistant:', '\n\nHuman:', 'claude-opus-4-0']

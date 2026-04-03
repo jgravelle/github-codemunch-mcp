@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\faker\utils\text.py
+# hypothesis_version: 6.151.10
+
+['-', 'NFKC', 'NFKD', '[-\\s]+', '[^\\.\\w\\s-]', '[^\\w\\s-]', 'ascii', 'ignore']

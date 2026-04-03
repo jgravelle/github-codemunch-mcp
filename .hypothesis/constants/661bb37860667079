@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\_internal\_schema_gather.py
+# hypothesis_version: 6.151.10
+
+['arguments', 'arguments-v3', 'arguments_schema', 'call', 'chain', 'choices', 'collected_references', 'computed-field', 'computed_fields', 'dataclass-args', 'definition-ref', 'definitions', 'dict', 'extras_schema', 'fields', 'frozenset', 'function-before', 'function-plain', 'function-wrap', 'generator', 'items_schema', 'json-or-python', 'json_schema', 'keys_schema', 'lax-or-strict', 'lax_schema', 'list', 'metadata', 'model-fields', 'python_schema', 'return_schema', 'schema', 'schema_ref', 'serialization', 'set', 'steps', 'strict_schema', 'tagged-union', 'tuple', 'type', 'typed-dict', 'union', 'values_schema', 'var_args_schema', 'var_kwargs_schema']

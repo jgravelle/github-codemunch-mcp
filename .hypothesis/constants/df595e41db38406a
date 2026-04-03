@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\errors.py
+# hypothesis_version: 6.151.10
+
+[".*'(.+?)'", 'PydanticErrorCodes', 'PydanticImportError', 'PydanticUserError', 'class_var', 'config-both', 'custom-json-schema', 'dataclass-on-model', 'dataclasses.InitVar', 'discriminator-alias', 'final', 'import-error', 'init_var', 'invalid-self-type', 'not_required', 'read_only', 'removed-kwargs', 'required', 'root-model-extra', 'typed-dict-version', 'typing.ClassVar', 'typing.Final', 'typing.NotRequired', 'typing.ReadOnly', 'typing.Required', 'undefined-annotation', 'unpack-typed-dict', 'validate-call-type', 'validator-input-type', 'validator-no-fields', 'validator-signature', 'with-config-on-model']

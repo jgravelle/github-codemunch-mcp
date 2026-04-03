@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\httpx\_config.py
+# hypothesis_version: 6.151.10
+
+[5.0, 100, '********', 'Limits', 'Proxy', 'SSL_CERT_DIR', 'SSL_CERT_FILE', 'Timeout', 'connect', 'create_ssl_context', 'http', 'https', 'pool', 'read', 'socks5', 'socks5h', 'utf-8', 'write']

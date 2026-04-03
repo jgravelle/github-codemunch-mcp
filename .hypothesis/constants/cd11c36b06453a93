@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\lib\foundry.py
+# hypothesis_version: 6.151.10
+
+['Authorization', '_DefaultStreamT', '_HttpxClientT', 'api-key', 'str | Awaitable[str]']

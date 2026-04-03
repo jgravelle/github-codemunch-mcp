@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\parser\__init__.py
+# hypothesis_version: 6.151.10
+
+['LANGUAGE_EXTENSIONS', 'LANGUAGE_REGISTRY', 'LanguageSpec', 'PYTHON_SPEC', 'Symbol', 'SymbolNode', 'build_symbol_tree', 'compute_content_hash', 'flatten_tree', 'make_symbol_id', 'parse_file']

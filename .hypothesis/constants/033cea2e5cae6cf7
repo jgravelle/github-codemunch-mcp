@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anyio\_backends\_asyncio.py
+# hypothesis_version: 6.151.10
+
+[0.1, 100, 65536, '.', 'AbstractEventLoop', 'AnyIO worker thread', 'P', 'PosArgsT', 'Runner is closed', 'T_Retval', 'T_contra', '__closure__', '__code__', '__module__', '__qualname__', '__weakref__', '_root_task', '_threadpool_workers', 'asyncio', 'cancel_scope', 'closed', 'created', 'current_cancel_scope', 'deadline exceeded', 'debug', 'exception', 'i', 'initialized', 'loop_factory', 'message', 'parent_id', 'read_events', 'reading from', 'socket', 'task', 'task_status', 'uncancel', 'use_uvloop', 'uvloop.loop', 'win32', 'write_events', 'writing to']

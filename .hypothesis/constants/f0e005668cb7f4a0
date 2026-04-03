@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\mcp\client\streamable_http.py
+# hypothesis_version: 6.151.10
+
+[1000.0, 200, 202, 204, 404, 405, 1000, 32600, '2.0', 'Error in post_writer', 'GET', 'POST', 'Session terminated', 'accept', 'application/json', 'auth', 'content-type', 'headers', 'initialize', 'json', 'last-event-id', 'mcp-protocol-version', 'mcp-session-id', 'message', 'sse_read_timeout', 'text/event-stream', 'timeout']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\lib\bedrock\_client.py
+# hypothesis_version: 6.151.10
+
+[400, 401, 403, 404, 409, 422, 429, 500, 503, ',', '/v1/complete', '/v1/messages', '/v1/messages/batches', ':', 'AWS_REGION', '_DefaultStreamT', '_HttpxClientT', 'anthropic-beta', 'anthropic_beta', 'anthropic_version', 'bedrock-2023-05-31', 'model', 'post', 'stream', 'us-east-1']

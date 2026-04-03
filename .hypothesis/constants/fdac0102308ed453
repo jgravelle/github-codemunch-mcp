@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_symbol.py
+# hypothesis_version: 6.151.10
+
+[1000, '_meta', 'byte_length', 'content_hash', 'content_verified', 'context_after', 'context_before', 'decorators', 'docstring', 'end_line', 'error', 'errors', 'file', 'get_symbol_source', 'hint', 'id', 'kind', 'line', 'name', 'replace', 'signature', 'source', 'symbol_count', 'symbols', 'timing_ms', 'utf-8']

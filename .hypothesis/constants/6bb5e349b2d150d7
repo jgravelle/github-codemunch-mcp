@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\uvicorn\middleware\wsgi.py
+# hypothesis_version: 6.151.10
+
+[',', '-', 'CONTENT_LENGTH', 'CONTENT_TYPE', 'HTTP/%s', 'HTTP_%s', 'PATH_INFO', 'QUERY_STRING', 'REMOTE_ADDR', 'REQUEST_METHOD', 'SCRIPT_NAME', 'SERVER_NAME', 'SERVER_PORT', 'SERVER_PROTOCOL', '_', 'ascii', 'body', 'client', 'content-length', 'content-type', 'headers', 'http', 'http.response.body', 'http.response.start', 'http_version', 'latin1', 'localhost', 'method', 'more_body', 'path', 'query_string', 'root_path', 'scheme', 'server', 'status', 'type', 'utf8', 'wsgi.errors', 'wsgi.input', 'wsgi.multiprocess', 'wsgi.multithread', 'wsgi.run_once', 'wsgi.url_scheme', 'wsgi.version']

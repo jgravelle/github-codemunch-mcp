@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\package_registry.py
+# hypothesis_version: 6.151.10
+
+[0.0, '-', '-+', '.', '..', '.code-index', '.csproj', '/', '::', '<', '>', '>\\s*([^<]+)\\s*</', '@', 'AssemblyName', 'CODE_INDEX_PATH', 'Cargo.toml', 'PackageName', '[', '[-_]+', '[./]', '[^A-Za-z0-9._-]', '[metadata]', '[package]', '[project.', '[project]', '^module\\s+(\\S+)', '^name\\s*=\\s*(.+)$', '__init__.py', 'app.py', 'cmd/main.go', 'file', 'go', 'go.mod', 'index.js', 'index.jsx', 'index.ts', 'index.tsx', 'javascript', 'jsx', 'lib.rs', 'local', 'main.go', 'main.js', 'main.py', 'main.rs', 'main.ts', 'name', 'package', 'package.json', 'package_name', 'package_names', 'project', 'pyproject.toml', 'python', 'r', 'replace', 'repo', 'repo_id', 'rust', 'setup.cfg', 'source_root', 'src/index.js', 'src/index.ts', 'src/lib.rs', 'src/main.rs', 'tsx', 'typescript', 'utf-8', 'vue']

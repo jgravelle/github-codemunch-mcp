@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\check_rename_safe.py
+# hypothesis_version: 6.151.10
+
+[1000, '_meta', 'alias_map', 'candidates', 'checked_files', 'conflicts', 'error', 'existing_name', 'existing_symbol_id', 'file', 'id', 'kind', 'line', 'name', 'new_name', 'psr4_map', 'safe', 'specifier', 'symbol', 'timing_ms']

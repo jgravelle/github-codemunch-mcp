@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\jsonschema\_keywords.py
+# hypothesis_version: 6.151.10
+
+[', ', 'array', 'do', 'does', 'else', 'is too long', 'is too short', 'item', 'items', 'maxContains', 'minContains', 'number', 'object', 'patternProperties', 'prefixItems', 'should be non-empty', 'string', 'then']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\_io\terminalwriter.py
+# hypothesis_version: 6.151.10
+
+['\x1b[0m', '0', '1', 'FORCE_COLOR', 'NO_COLOR', 'PYTEST_THEME', 'PYTEST_THEME_MODE', 'PY_COLORS', 'TERM', 'ascii', 'dark', 'diff', 'dumb', 'isatty', 'python', 'unicode-escape', 'win32']

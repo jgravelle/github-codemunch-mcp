@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\_internal\_known_annotated_metadata.py
+# hypothesis_version: 6.151.10
+
+['_', '__qualname__', 'allow_inf_nan', 'allowed_schemes', 'bool', 'bytes', 'complex', 'date', 'datetime', 'decimal', 'decimal_places', 'default_host', 'default_path', 'default_port', 'dict', 'enum', 'fail_fast', 'float', 'frozenset', 'function-after', 'function-before', 'function-wrap', 'ge', 'generator', 'gt', 'host_required', 'int', 'json-or-python', 'json_schema', 'lax-or-strict', 'le', 'list', 'lt', 'maxItems', 'maxLength', 'max_digits', 'max_length', 'metadata', 'minItems', 'minLength', 'min_length', 'mode', 'model', 'multi-host-url', 'multiple_of', 'not_operation_failed', 'pattern', 'predicate_failed', 'pydantic_js_updates', 'schema', 'set', 'str', 'strict', 'strip_whitespace', 'time', 'timedelta', 'to_lower', 'to_upper', 'tuple', 'type', 'typed-dict', 'union', 'union_mode', 'url', 'uuid']

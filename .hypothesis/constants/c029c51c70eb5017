@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\skipping.py
+# hypothesis_version: 6.151.10
+
+['--runxfail', 'X', 'XFAIL', 'XPASS', '[NOTRUN] ', '[XPASS(strict)] ', '^', 'bool', 'call', 'condition', 'condition: ', 'config', 'eval', 'failed', 'general', 'markers', 'obj', 'os', 'passed', 'platform', 'raises', 'reason', 'reason: ', 'run', 'runxfail', 'skip', 'skipif', 'skipped', 'store_true', 'strict', 'sys', 'unconditional skip', 'wasxfail', 'x', 'xfail', 'xfail_strict', 'xfailed', 'xpassed']

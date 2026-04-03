@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\uvicorn\middleware\proxy_headers.py
+# hypothesis_version: 6.151.10
+
+[b'x-forwarded-for', b'x-forwarded-proto', '*', ',', '/', '127.0.0.1', 'client', 'headers', 'http', 'https', 'latin1', 'lifespan', 'scheme', 'type', 'websocket', 'ws', 'wss']

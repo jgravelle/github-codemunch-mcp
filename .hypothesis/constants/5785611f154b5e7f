@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pytest_asyncio\plugin.py
+# hypothesis_version: 6.151.10
+
+[', ', '--asyncio-mode', '127.0.0.1', 'MODE', 'Yield only once.', '_T', '__func__', '__pytest_asyncio', '_loop_scope', '_raw_test_func', 'asyncio', 'asyncio_mode', 'auto', 'callspec', 'class', 'event_loop', 'funcmanage', 'function', 'hypothesis', 'ignore', 'is_hypothesis_test', 'loop_scope', 'markers', 'module', 'obj', 'package', 'request', 'scope', 'session', 'strict', 'string']

@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\storage\index_store.py
+# hypothesis_version: 6.151.10
+
+['*.db', '*.json', '*.meta.json', '-', '-+', '.', '..', '.code-index', '.json', '.json.migrated', '.json.sha256', '.meta', '.meta.json', '.meta.tmp', '.php', '/', 'CodeIndex', 'HEAD', '[^A-Za-z0-9._-]', '\\', '_dl', '_tf', '_tokens', 'byte_length', 'byte_offset', 'content_hash', 'context_metadata', 'cyclomatic', 'decorators', 'display_name', 'docstring', 'end_line', 'file', 'file_blob_shas', 'file_count', 'file_hashes', 'file_languages', 'file_mtimes', 'file_summaries', 'git', 'git_head', 'id', 'imports', 'index_version', 'indexed_at', 'keywords', 'kind', 'language', 'languages', 'line', 'max_nesting', 'name', 'owner', 'param_count', 'parent', 'qualified_name', 'r', 'redact_source_root', 'replace', 'repo', 'rev-parse', 'signature', 'source_files', 'source_root', 'summary', 'symbol_count', 'symbols', 'utf-8', 'w']

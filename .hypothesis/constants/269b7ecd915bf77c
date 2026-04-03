@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\helpconfig.py
+# hypothesis_version: 6.151.10
+
+['--debug', '--help', '--override-ini', '--trace-config', '--traceconfig', '--version', '-V', '-h', '-o', '-p', '.', '?', 'BUILD_NUMBER', 'CI', 'DEBUG_FILE_NAME', 'Equivalent to CI', 'PYTEST_ADDOPTS', 'PYTEST_DEBUG', 'PYTEST_PLUGINS', '__file__', 'active plugins:', 'after_preparse', 'append', 'count', 'debug', 'debugconfig', 'help', 'name', 'override_ini', 'plugins', 'pytest_plugins', 'pytestdebug.log', 'store', 'store_true', 'string', 'terminalreporter', 'utf-8', 'version', 'w', 'warning : ', 'warnings']

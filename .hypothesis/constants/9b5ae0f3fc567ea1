@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\_internal\_fields.py
+# hypothesis_version: 6.151.10
+
+['_', '__', '__func__', '__pydantic_fields__', '_calculate_keys', '_copy_and_set_values', '_get_value', '_iter', 'construct', 'copy', 'default', 'dict', 'final', 'from_orm', 'json', 'model_config', 'origin', 'parse_file', 'parse_obj', 'parse_raw', 'root', 'schema', 'schema_json', 'update_forward_refs', 'validate']

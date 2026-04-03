@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\mcp\server\sse.py
+# hypothesis_version: 6.151.10
+
+[202, 400, 404, '#', '/', '//', '://', '?', 'Accepted', 'Invalid session ID', 'Starting SSE writer', 'data', 'endpoint', 'event', 'http', 'message', 'root_path', 'session_id', 'type']

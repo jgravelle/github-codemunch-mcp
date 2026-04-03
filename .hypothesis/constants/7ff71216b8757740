@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\find_references.py
+# hypothesis_version: 6.151.10
+
+[200, 1000, '_meta', 'cache_hit', 'calling_symbols', 'error', 'file', 'find_references', 'id', 'identifier', 'kind', 'line', 'match_type', 'matches', 'name', 'named', 'names', 'note', 'reference_count', 'references', 'repo', 'results', 'specifier', 'specifier_stem', 'timing_ms', 'tip', 'truncated']

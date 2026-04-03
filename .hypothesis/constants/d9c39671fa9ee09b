@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\lib\_parse\_transform.py
+# hypothesis_version: 6.151.10
+
+['$defs', '$ref', ', ', 'additionalProperties', 'allOf', 'anyOf', 'array', 'boolean', 'date', 'date-time', 'description', 'dict[str, Any]', 'duration', 'email', 'format', 'hostname', 'integer', 'ipv4', 'ipv6', 'items', 'minItems', 'null', 'number', 'object', 'oneOf', 'properties', 'required', 'string', 'text', 'time', 'title', 'type', 'uri', 'uuid', '{', '}']

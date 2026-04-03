@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\_py\path.py
+# hypothesis_version: 6.151.10
+
+[420, 448, 172800, 524288, '$py.class', '%SystemRoot%', '*', '*?[', ',', '-', '.', '..', '.lock', '.py', '.pyc', '.pyo', '/', '1', ':', ';', 'HOME', 'HOMEDRIVE', 'HOMEPATH', 'PATH', 'PATHEXT', 'Path', 'SYSTEMROOT', 'USER', 'USERNAME', 'XXX win32', '_', '__call__', '__init__', '__init__.py', '_name', 'append', 'b', 'basename', 'current', 'dir', 'dirname', 'drive', 'exists', 'ext', 'file', 'garbage-', 'importlib', 'link', 'md5', 'mksymlinkto', 'not', 'nt', 'purebasename', 'r', 'rb', 'samefile', 'sep', 'session-', 'sha', 'sha1', 'st_', 'stderr', 'stdout', 'w', 'wb', 'win32']

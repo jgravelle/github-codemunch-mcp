@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\starlette\middleware\authentication.py
+# hypothesis_version: 6.151.10
+
+[400, 1000, 'auth', 'code', 'http', 'type', 'user', 'websocket', 'websocket.close']

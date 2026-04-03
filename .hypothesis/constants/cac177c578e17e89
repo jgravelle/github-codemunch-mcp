@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_symbol_importance.py
+# hypothesis_version: 6.151.10
+
+[0.0, 200, 1000, '/', '/**', '_meta', 'algorithm', 'byte_length', 'class', 'constant', 'degree', 'error', 'file', 'function', 'id', 'in_degree', 'kind', 'method', 'note', 'out_degree', 'pagerank', 'psr4_map', 'rank', 'ranked_symbols', 'score', 'symbol_id', 'timing_ms', 'tokens_saved', 'total_tokens_saved', 'type']

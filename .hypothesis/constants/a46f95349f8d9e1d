@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\colorama\ansi.py
+# hypothesis_version: 6.151.10
+
+[100, 101, 102, 103, 104, 105, 106, 107, '\x07', '\x1b[', '\x1b]', '2;', ';', 'A', 'B', 'C', 'D', 'H', 'J', 'K', '_', 'm']

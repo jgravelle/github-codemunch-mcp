@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\storage\__init__.py
+# hypothesis_version: 6.151.10
+
+['CodeIndex', 'INDEX_VERSION', 'IndexStore', 'cost_avoided', 'estimate_savings', 'get_session_stats', 'get_total_saved', 'record_savings', 'result_cache_get', 'result_cache_put', 'result_cache_stats']

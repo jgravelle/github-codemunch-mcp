@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_repo_outline.py
+# hypothesis_version: 6.151.10
+
+[500, 1000, '(root)', '/', '_meta', 'byte_length', 'class', 'constant', 'directories', 'error', 'file', 'file_count', 'function', 'get_repo_outline', 'id', 'imported_by', 'indexed_at', 'is_stale', 'kind', 'languages', 'method', 'most_central_symbols', 'most_imported_files', 'psr4_map', 'repo', 'score', 'specifier', 'staleness_days', 'staleness_warning', 'symbol_count', 'symbol_id', 'symbol_kinds', 'timing_ms', 'tokens_saved', 'total_tokens_saved', 'type', 'unknown', 'utf-8']

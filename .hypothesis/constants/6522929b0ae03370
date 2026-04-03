@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\rich\progress.py
+# hypothesis_version: 6.151.10
+
+[0.0, 0.01, 0.1, 0.3, 0.5, 1.0, 30.0, 100.0, 100, 1000, 1024, '--:--', '-:--:--', '/', '1', '2', '3', '?', 'EB', 'EiB', 'GB', 'GiB', 'Give it a try!', 'KiB', 'MB', 'MiB', 'PB', 'PathLike[str]', 'PiB', 'Pretty printed', 'Progress', 'ProgressColumn', 'ProgressType', 'Reading...', 'Syntax...', 'TB', 'Task', 'TaskID', 'TiB', 'Working...', 'YB', 'YiB', 'ZB', 'ZiB', '[green]Processing', '[red]Downloading', '[yellow]Thinking', '_I', '_Reader', '_TrackThread', '__main__', 'bar', 'bar.back', 'bar.complete', 'bar.finished', 'bar.pulse', 'baz', 'br', 'bytes', 'dots', 'example', 'foo', 'invalid mode {!r}', 'kB', 'left', 'none', 'progress.data.speed', 'progress.download', 'progress.elapsed', 'progress.filesize', 'progress.percentage', 'progress.remaining', 'progress.spinner', 'python', 'r', 'rb', 'rt', 'text', 'type', 'write', '×10³', '×10¹²', '×10⁶', '×10⁹']

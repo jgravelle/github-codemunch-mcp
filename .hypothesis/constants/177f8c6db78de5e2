@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\search_text.py
+# hypothesis_version: 6.151.10
+
+[100, 200, 500, 1000, '[+*]\\s*\\)\\s*[+*{]', '_meta', 'after', 'before', 'error', 'file', 'files_searched', 'line', 'matches', 'r', 'replace', 'result_count', 'results', 'search_text', 'text', 'timing_ms', 'tokens_saved', 'total_tokens_saved', 'truncated', 'utf-8', '|']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\_migration.py
+# hypothesis_version: 6.151.10
+
+['GetterDict', 'ROOT_KEY', 'Representation', '__path__', 'deep_update', 'import_string', 'is_valid_field', 'lenient_isinstance', 'lenient_issubclass', 'pydantic.BaseModel', 'pydantic:JsonWrapper', 'pydantic:NoneBytes', 'pydantic:NoneStr', 'pydantic:Protocol', 'pydantic:PyObject', 'pydantic:Required', 'pydantic:StrBytes', 'pydantic:compiled', 'pydantic:stricturl', 'sequence_like', 'smart_deepcopy', 'update_not_none']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\lib\tools\_beta_builtin_memory_tool.py
+# hypothesis_version: 6.151.10
+
+['cache_control', 'create', 'delete', 'insert', 'memory', 'memory_20250818', 'name', 'rename', 'str_replace', 'type', 'view']

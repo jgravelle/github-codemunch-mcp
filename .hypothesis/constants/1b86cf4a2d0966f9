@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\uvicorn\_compat.py
+# hypothesis_version: 6.151.10
+
+['_T', 'asyncio_run', 'exception', 'iscoroutinefunction', 'message', 'task']

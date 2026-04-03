@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\jsonschema\_utils.py
+# hypothesis_version: 6.151.10
+
+['$dynamicRef', '$ref', ', ', '<unset>', 'additionalProperties', 'allOf', 'anyOf', 'boolean', 'contains', 'dependentSchemas', 'else', 'if', 'items', 'object', 'oneOf', 'patternProperties', 'prefixItems', 'properties', 'then', 'unevaluatedItems', 'was', 'were', '|']

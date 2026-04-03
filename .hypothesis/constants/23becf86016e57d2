@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\mcp\server\streamable_http.py
+# hypothesis_version: 6.151.10
+
+[',', ', ', '2.0', '2025-11-25', ';', 'Allow', 'Cache-Control', 'Closing SSE writer', 'Connection', 'Content-Type', 'DELETE', 'Error in SSE writer', 'GET', 'GET, POST, DELETE', 'Method Not Allowed', 'POST', 'SSE response error', '^[\\x21-\\x7E]+$', '_GET_stream', 'accept', 'application/json', 'content-type', 'data', 'event', 'id', 'initialize', 'keep-alive', 'last-event-id', 'mcp-protocol-version', 'mcp-session-id', 'message', 'protocolVersion', 'retry', 'server-error', 'text/event-stream']

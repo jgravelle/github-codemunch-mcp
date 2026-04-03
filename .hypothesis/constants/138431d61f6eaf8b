@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_context_bundle.py
+# hypothesis_version: 6.151.10
+
+[0.0, 1000, '\n```\n', '### Callers\n', ')', '---\n', '^\\s*#\\s*include\\b', '^\\s*import \\S', '^\\s*import\\b', '^\\s*use \\S', '^\\s*using \\S', '_meta', 'budget_report', 'budget_tokens', 'byte_length', 'c', 'callers', 'cl100k_base', 'compact', 'core_first', 'cpp', 'csharp', 'dart', 'docstring', 'elixir', 'end_line', 'error', 'excluded_by', 'excluded_symbols', 'file', 'files', 'get_context_bundle', 'go', 'haskell', 'id', 'import (', 'imports', 'included_symbols', 'java', 'javascript', 'json', 'kind', 'kotlin', 'language', 'line', 'lua', 'markdown', 'most_relevant', 'name', 'php', 'psr4_map', 'python', 'repo', 'ruby', 'rust', 'scala', 'signature', 'source', 'specifier', 'strategy', 'swift', 'symbol_count', 'symbol_id', 'symbols', 'timing_ms', 'token_budget', 'tokens_saved', 'total_tokens_saved', 'tsx', 'typescript', 'used_tokens']

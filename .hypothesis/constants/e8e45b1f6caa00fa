@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic_settings\utils.py
+# hypothesis_version: 6.151.10
+
+['FIFO', 'block device', 'char device', 'directory', 'file', 'mount point', 'path does not exist', 'socket', 'symlink', 'unknown']

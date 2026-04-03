@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\unittest.py
+# hypothesis_version: 6.151.10
+
+['Unexpected success', '__test__', '__unittest', '__unittest_skip__', '_excinfo', '_rawexcinfo', 'class', 'doClassCleanups', 'function', 'runTest', 'setUpClass', 'setup_method', 'tearDown', 'tearDownClass', 'tearDown_exceptions', 'teardown_method', 'unittest', 'usepdb']

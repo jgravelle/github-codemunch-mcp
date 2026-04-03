@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\httpx\_types.py
+# hypothesis_version: 6.151.10
+
+['AsyncByteStream', 'Auth', 'Cookies', 'Headers', 'Proxy', 'QueryParams', 'Request', 'SyncByteStream', 'Timeout', 'URL']

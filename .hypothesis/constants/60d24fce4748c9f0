@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\starlette\responses.py
+# hypothesis_version: 6.151.10
+
+[b'\n', b'content-length', b'content-type', b'set-cookie', 200, 204, 206, 304, 307, 400, 416, 1024, ',', '-', '.', '/', '2.0', ':', ":/%#?=@[]!$&'()*+,;", '; charset=', '=', 'Content-Range', 'HEAD', '_headers', 'accept-ranges', 'application/json', 'asgi', 'attachment', 'body', 'bytes', 'charset=', 'content-disposition', 'content-length', 'content-range', 'content-type', 'domain', 'etag', 'expires', 'extensions', 'headers', 'http.disconnect', 'http.response.body', 'http.response.start', 'httponly', 'if-range', 'last-modified', 'latin-1', 'lax', 'location', 'max-age', 'method', 'more_body', 'none', 'partitioned', 'path', 'range', 'rb', 'samesite', 'secure', 'spec_version', 'status', 'strict', 'text/', 'text/html', 'text/plain', 'type', 'utf-8', 'websocket', 'websocket.']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\_models.py
+# hypothesis_version: 6.151.10
+
+['BaseModel', 'DEFER_PYDANTIC_BUILD', 'GenericModel', 'LiteralSchema', 'ModelField', 'ModelFieldsSchema', 'ModelSchema', 'P', 'TypeAdapter[object]', '_BaseModelT', '_T', '__dict__', '__exclude_fields__', '__fields_set__', '__pydantic_config__', '__pydantic_extra__', '__pydantic_private__', '_request_id', 'allow', 'annotation', 'cls', 'definitions', 'dict[str, Any]', 'dict[str, FieldInfo]', 'error', 'expected', 'extras_schema', 'fields', 'json', 'literal', 'metadata', 'model', 'model-fields', 'none', 'populate_by_name', 'python', 'schema', 'serialization_alias', 'true', 'type', 'type[object]', 'warn']

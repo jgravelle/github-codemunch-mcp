@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\search_symbols.py
+# hypothesis_version: 6.151.10
+
+[0.0, 0.1, 0.3, 0.4, 0.5, 0.75, 1.0, 1.5, 50.0, 100.0, 100, 500, 1000, '([a-z])([A-Z])', 'CODE_RETRIEVAL_QUERY', 'RETRIEVAL_DOCUMENT', '[a-zA-Z0-9]{2,}', '\\1_\\2', '_dl', '_meta', '_tf', '_tokens', 'avgdl', 'byte_length', 'candidates_scored', 'centrality', 'combined', 'compact', 'docstring', 'edit_distance', 'end_line', 'error', 'exact', 'file', 'full', 'fuzzy', 'fuzzy_similarity', 'gemini', 'hint', 'hybrid', 'id', 'idf', 'inverted', 'keywords', 'kind', 'language', 'line', 'match_type', 'message', 'name', 'name_exact_bonus', 'pagerank', 'psr4_map', 'relevance', 'result_count', 'results', 'score', 'score_breakdown', 'search_mode', 'search_symbols', 'semantic_only', 'signature', 'source', 'specifier', 'standard', 'summary', 'timing_ms', 'token_budget', 'tokens_remaining', 'tokens_saved', 'tokens_used', 'total_symbols', 'total_tokens_saved', 'truncated']

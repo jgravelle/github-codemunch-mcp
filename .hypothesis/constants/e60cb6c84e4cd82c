@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\lib\streaming\_beta_types.py
+# hypothesis_version: 6.151.10
+
+['citation', 'compaction', 'content_block_stop', 'input_json', 'message_stop', 'signature', 'text', 'thinking', 'trailing-strings', 'type', 'utf-8']

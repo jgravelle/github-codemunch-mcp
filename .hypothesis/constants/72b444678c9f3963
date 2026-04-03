@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anyio\streams\stapled.py
+# hypothesis_version: 6.151.10
+
+[65536, 'MultiListener', 'StapledByteStream', 'StapledObjectStream', 'T_Item', 'T_Stream']

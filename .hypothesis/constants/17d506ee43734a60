@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_repo_health.py
+# hypothesis_version: 6.151.10
+
+[0.0, 0.67, 0.7, 100, 1000, '.', '; ', 'Issues found: ', '_meta', 'aggregate', 'alias_map', 'avg_complexity', 'confidence_level', 'cycle_count', 'cycles', 'cycles_sample', 'cyclomatic', 'days', 'dead_code_pct', 'dead_count', 'dead_symbols', 'error', 'fn_method_count', 'function', 'hotspots', 'kind', 'medium', 'method', 'methodology', 'psr4_map', 'repo', 'summary', 'timing_ms', 'top_hotspots', 'total_files', 'total_symbols', 'unstable_modules']

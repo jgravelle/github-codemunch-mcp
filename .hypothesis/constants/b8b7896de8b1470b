@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\types\stop_reason.py
+# hypothesis_version: 6.151.10
+
+['StopReason', 'end_turn', 'max_tokens', 'pause_turn', 'refusal', 'stop_sequence', 'tool_use']

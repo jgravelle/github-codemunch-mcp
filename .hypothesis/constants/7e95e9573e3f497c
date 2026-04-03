@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\faker\providers\python\__init__.py
+# hypothesis_version: 6.151.10
+
+[100, 9999, '+', '-', '0', '0.', '1', 'TEnum', '__name__', 'date_time', 'decimal', 'dict', 'email', 'float', 'int', 'iterable', 'list', 'set', 'str', 'struct', 'tuple', 'uri']

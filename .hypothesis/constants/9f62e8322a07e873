@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\_exceptions.py
+# hypothesis_version: 6.151.10
+
+[400, 401, 403, 404, 409, 413, 422, 429, 503, 504, 529, 'AuthenticationError', 'BadRequestError', 'ConflictError', 'Connection error.', 'InternalServerError', 'NotFoundError', 'RateLimitError', 'request-id']

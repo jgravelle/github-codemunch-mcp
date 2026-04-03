@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\resources\beta\skills\skills.py
+# hypothesis_version: 6.151.10
+
+[',', '/v1/skills?beta=true', '<array>', 'AsyncSkills', 'Content-Type', 'Skills', 'anthropic-beta', 'display_title', 'files', 'limit', 'multipart/form-data', 'page', 'skills-2025-10-02', 'source']

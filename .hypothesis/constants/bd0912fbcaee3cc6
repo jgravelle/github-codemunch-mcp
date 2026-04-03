@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\resources\beta\messages\batches.py
+# hypothesis_version: 6.151.10
+
+[',', 'Accept', 'AsyncBatches', 'Batches', 'after_id', 'anthropic-beta', 'application/binary', 'before_id', 'limit', 'requests']

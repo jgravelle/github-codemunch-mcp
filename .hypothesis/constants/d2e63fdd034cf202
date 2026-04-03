@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\parser\sql_preprocessor.py
+# hypothesis_version: 6.151.10
+
+[b'{%', b'{{', '#}', '*', '*/', '--', '/**', '\\s*-?%\\}', '\\{#(.*?)#\\}', '\\{%-?\\s*end', '__jinja__', 'directive', 'name', 'params', 'replace', 'utf-8']

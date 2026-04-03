@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\starlette\formparsers.py
+# hypothesis_version: 6.151.10
+
+[b'boundary', b'charset', b'content-disposition', b'filename', b'name', 1000, 1024, 'Content-Type', 'latin-1', 'on_end', 'on_field_data', 'on_field_end', 'on_field_name', 'on_field_start', 'on_header_end', 'on_header_field', 'on_header_value', 'on_headers_finished', 'on_part_begin', 'on_part_data', 'on_part_end', 'utf-8']

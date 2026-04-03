@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\aliases.py
+# hypothesis_version: 6.151.10
+
+['AliasChoices', 'AliasGenerator', 'AliasPath', 'alias', 'serialization_alias', 'validation_alias']

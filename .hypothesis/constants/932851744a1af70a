@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\iniconfig\_parse.py
+# hypothesis_version: 6.151.10
+
+['#;', ':', '=', '[', ']', 'empty section name', 'unexpected line: %r']

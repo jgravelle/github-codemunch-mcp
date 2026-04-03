@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\parser\imports.py
+# hypothesis_version: 6.151.10
+
+['()', '*', ',', '.', './', '.cjs', '.go', '.js', '.jsx', '.mjs', '.php', '.py', '.rb', '.sql', '.svelte', '.svelte-kit', '.ts', '.tsx', '.vue', '/', '/*', ':', '::', '\\', '\\{([^}]+)\\}', '^import\\s+([\\w.{}]+)', '^import\\s+(\\w+)', '^type\\s+', '__future__', '__init__.py', 'asm', 'autoload', 'autoload-dev', 'c', 'compilerOptions', 'composer.json', 'cpp', 'csharp', 'dart', 'go', 'haskell', 'import\\s*\\((.*?)\\)', 'index', 'java', 'javascript', 'jsconfig.json', 'jsx', 'kotlin', 'names', 'objc', 'paths', 'php', 'psr-4', 'python', 'replace', 'ruby', 'rust', 'scala', 'specifier', 'sql', 'swift', 'tsconfig.json', 'tsx', 'typescript', 'utf-8', 'vue', '{']

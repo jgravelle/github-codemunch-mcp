@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\faker\providers\sbn\rules.py
+# hypothesis_version: 6.151.10
+
+['0000000', '1999999', '2000000', '2279999', '2280000', '2289999', '2290000', '6479999', '6480000', '6489999', '6490000', '6999999', '7000000', '8499999', '8500000', '8999999', '9000000', '9499999', '9500000', '9999999', 'RegistrantRule', 'max', 'min', 'registrant_length']

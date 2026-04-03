@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anyio\streams\tls.py
+# hypothesis_version: 6.151.10
+
+[65536, 'PosArgsT', 'TLSAttribute', 'TLSConnectable', 'TLSListener', 'TLSStream', 'T_Retval']

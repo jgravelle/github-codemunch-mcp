@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\httpx\_multipart.py
+# hypothesis_version: 6.151.10
+
+[b'\r\n', b'\r\n\r\n', b'"', b'--%s\r\n', b'--%s--\r\n', b';', b'; ', b'Content-Disposition: form-data; ', b'boundary=', b'multipart/form-data', 1024, '"', '%22', '%{:02X}', 'Content-Length', 'Content-Type', 'Transfer-Encoding', '\\', '\\\\', '_data', '_headers', 'ascii', 'chunked', 'content-type', 'filename', 'name', 'seek', 'upload', '|']

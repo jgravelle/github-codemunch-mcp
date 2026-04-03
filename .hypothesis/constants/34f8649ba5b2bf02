@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\find_dead_code.py
+# hypothesis_version: 6.151.10
+
+[0.5, 0.7, 0.8, 0.9, 1.0, 1000, '.py', '.pyw', '/', '/test/', '/tests/', 'Makefile', '\\', '__init__.py', '__main__.py', '_meta', '_test.py', 'all_importers_dead', 'analysis_notes', 'app.py', 'asgi.py', 'celery.py', 'cli.py', 'confidence', 'conftest.py', 'dead_file_count', 'dead_files', 'dead_symbol_count', 'dead_symbols', 'decorators', 'error', 'file', 'framework_decorator', 'granularity', 'id', 'importer_count', 'kind', 'live_root_count', 'main.py', 'manage.py', 'min_confidence', 'psr4_map', 'reason', 'repo', 'run.py', 'setup.py', 'specifier', 'symbol', 'symbol_id', 'test_', 'timing_ms', 'wsgi.py', 'zero_importers']

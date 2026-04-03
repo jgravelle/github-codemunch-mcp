@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\legacypath.py
+# hypothesis_version: 6.151.10
+
+[10.0, '.', '_getini_unknown_type', '_tmpdirhandler', 'fspath', 'inifile', 'invocation_dir', 'legacypath-pytester', 'legacypath-tmpdir', 'makedir', 'pathlist', 'pytester', 'rootdir', 'session', 'startdir', 'test_func', 'tmpdir']

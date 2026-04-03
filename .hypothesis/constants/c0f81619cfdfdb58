@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\debugging.py
+# hypothesis_version: 6.151.10
+
+['--pdb', '--pdbcls', '--trace', '.', ':', '>', 'PDB continue', 'Quitting debugger', '__tracebackhide__', 'all', 'captured ', 'capturemanager', 'entering PDB', 'general', 'global', 'header', 'log', 'modulename:classname', 'pdbinvoke', 'pdbtrace', 'post_mortem', 'runcall', 'set_trace', 'stderr', 'stdout', 'store_true', 'terminalreporter', 'trace', 'traceback', 'usepdb', 'usepdb_cls']

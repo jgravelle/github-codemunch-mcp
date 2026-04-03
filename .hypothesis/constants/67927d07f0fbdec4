@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\stepwise.py
+# hypothesis_version: 6.151.10
+
+['--stepwise', '--stepwise-skip', '--sw', '--sw-skip', 'cache/stepwise', 'call', 'general', 'stepwise', 'stepwise_skip', 'stepwiseplugin', 'store_true', 'verbose', 'workerinput']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\faker\providers\misc\__init__.py
+# hypothesis_version: 6.151.10
+
+[100, 128, 256, 1024, 4096, 65536, '!@#$%^&*()_+', ',', '.*\\{\\{.*\\}\\}.*', ':', '<', '>', '@', 'ID', 'RGB', '^', '^@.*', '^[a-zA-Z0-9_-]*:\\w', 'bz2', 'bzip2', 'deflate', 'faker-csv', 'gz', 'gzip', 'image', 'left', 'lzma', 'max_value', 'middle', 'name', 'png', 'pyint', 'residency', 'right', 'w', 'w:bz2', 'w:gz', 'w:xz', 'xml', 'xz', '{{address}}', '{{name}}', '|']

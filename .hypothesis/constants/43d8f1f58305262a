@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\reports.py
+# hypothesis_version: 6.151.10
+
+[100, '$report_type', '-', '::', 'Captured log', 'Captured stderr', 'Captured stdout', 'CollectReport', 'ReprEntry', 'ReprEntryNative', 'TestReport', '__dict__', 'auto', 'call', 'chain', 'collect', 'data', 'executable', 'failed', 'id', 'lines', 'longrepr', 'node', 'passed', 'reprcrash', 'reprentries', 'reprfileloc', 'reprfuncargs', 'reprlocals', 'reprtraceback', 'result', 'sections', 'setup', 'skipped', 'style', 'sysplatform', 'tbstyle', 'teardown', 'toterminal', 'type', 'version_info', '{}.{}.{}']

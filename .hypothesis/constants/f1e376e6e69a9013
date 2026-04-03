@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\httpx\_main.py
+# hypothesis_version: 6.151.10
+
+[b'HTTP/2', 5.0, '-', '--auth', '--content', '--cookies', '--data', '--download', '--files', '--follow-redirects', '--headers', '--help', '--http2', '--json', '--method', '--no-verify', '--params', '--proxy', '--proxy [cyan]URL', '--timeout', '--verbose', '-c', '-d', '-f', '-h', '-j', '-m', '-p', '-v', '-v, --verbose', ';', 'Content-Length', 'Content-Type', 'Description', 'GET', 'HTTP/1.1', 'HTTP/2', 'Not valid JSON', 'POST', 'Parameter', 'Password', 'ansi_dark', 'ascii', 'auth', 'bold', 'center', 'content', 'cookies', 'data', 'files', 'follow_redirects', 'headers', 'host', 'http', 'http2', 'issuer', 'json', 'left', 'method', 'params', 'proxy', 'rb', 'request', 'return_value', 'server_addr', 'ssl_object', 'subject', 'timeout', 'trace', 'url', 'verify', 'wb']

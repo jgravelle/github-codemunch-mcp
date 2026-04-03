@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\check_references.py
+# hypothesis_version: 6.151.10
+
+[100, 200, 1000, 'IndexStore', '_meta', 'content_count', 'content_references', 'error', 'file', 'identifier', 'identifiers_checked', 'import_count', 'import_references', 'is_referenced', 'line', 'match_type', 'matches', 'name', 'named', 'names', 'r', 'replace', 'repo', 'results', 'specifier', 'specifier_stem', 'text', 'timing_ms', 'utf-8']

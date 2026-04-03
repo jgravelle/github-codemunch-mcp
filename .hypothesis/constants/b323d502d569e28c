@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\uvicorn\_types.py
+# hypothesis_version: 6.151.10
+
+['2.0', '3.0', 'http', 'http.disconnect', 'http.request', 'http.response.body', 'http.response.debug', 'http.response.push', 'http.response.start', 'lifespan', 'lifespan.shutdown', 'lifespan.startup', 'websocket', 'websocket.accept', 'websocket.close', 'websocket.connect', 'websocket.disconnect', 'websocket.receive', 'websocket.send']

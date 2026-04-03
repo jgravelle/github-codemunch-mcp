@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\_pytest\config\argparsing.py
+# hypothesis_version: 6.151.10
+
+['*', ', ', '-', '--', '<notset>', '=', '???', '@', 'Argument({})', 'Custom options', '_', '_config_source_hint', '_long_opts: ', '_short_opts: ', 'args', 'bool', 'default', 'default dest help', 'default: ', 'dest', 'dest: ', 'file_or_dir', 'linelist', 'matches', 'option', 'pathlist', 'paths', 'string', 'type', 'type: ', 'width']

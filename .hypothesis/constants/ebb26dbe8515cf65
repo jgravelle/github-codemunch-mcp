@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\cffi\commontypes.py
+# hypothesis_version: 6.151.10
+
+['Buffer', 'FILE', 'LPCTSTR', 'LPTSTR', 'Length', 'MaximumLength', 'PCTSTR', 'PCUNICODE_STRING', 'PTBYTE', 'PTCHAR', 'PTSTR', 'PUNICODE_STRING', 'TBYTE', 'TCHAR', 'UNICODE_STRING', 'UNICODE_STRING *', '_Bool', '_IO_FILE', '_UNICODE_STRING', '_t', 'bool', 'double _Complex', 'float _Complex', 'set-unicode-needed', 'unsigned short', 'wchar_t', 'win32']

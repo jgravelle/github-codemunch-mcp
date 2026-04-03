@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\types\beta\beta_tool_text_editor_20241022_param.py
+# hypothesis_version: 6.151.10
+
+['direct', 'str_replace_editor', 'text_editor_20241022']

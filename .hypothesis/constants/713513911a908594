@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\resources\beta\files.py
+# hypothesis_version: 6.151.10
+
+[',', '/v1/files?beta=true', 'Accept', 'AsyncFiles', 'Content-Type', 'Files', 'after_id', 'anthropic-beta', 'application/binary', 'before_id', 'file', 'files-api-2025-04-14', 'limit', 'multipart/form-data']

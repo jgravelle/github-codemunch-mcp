@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\faker\providers\credit_card\__init__.py
+# hypothesis_version: 6.151.10
+
+['#', '%m/%y', '+10y', '0', '0604', '1', '1800', '2', '2131', '222%', '223', '224', '225', '226', '227', '228', '229', '23', '24', '25', '26', '270', '271', '2720', '3', '300', '301', '302', '303', '304', '305', '34', '35', '36', '37', '38', '4', '5', '5018', '5020', '5038', '51', '52', '53', '54', '55', '56##', '57##', '58##', '6', '6011', '6304', '6390', '65', '6759', '6761', '6762', '6763', '7', '8', '9', 'American Express', 'CID', 'CVV', 'Discover', 'JCB 15 digit', 'JCB 16 digit', 'Maestro', 'Mastercard', 'VISA 13 digit', 'VISA 16 digit', 'VISA 19 digit', 'amex', 'diners', 'discover', 'jcb', 'jcb15', 'jcb16', 'maestro', 'mastercard', 'now', 'visa', 'visa13', 'visa16', 'visa19']

@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\docstring_parser\numpydoc.py
+# hypothesis_version: 6.151.10
+
+[', optional', '-', '.. deprecated::', '>>>', 'Args', 'Arguments', 'Attribute', 'Attributes', 'Example', 'Examples', 'Note', 'Notes', 'Other Args', 'Other Arguments', 'Other Parameters', 'Other Params', 'Parameters', 'Params', 'Raise', 'Raises', 'Receive', 'Receives', 'Reference', 'References', 'Related', 'Return', 'Returns', 'See Also', 'Warn', 'Warning', 'Warnings', 'Warns', 'Yield', 'Yields', '^[^\\s].*$', '_', 'attribute', 'deprecated', 'deprecation', 'examples', 'name', 'notes', 'other_param', 'param', 'raises', 'receives', 'references', 'returns', 'see_also', 'type', 'value', 'warnings', 'warns', 'yields', '|']

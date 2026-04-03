@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\resolve_repo.py
+# hypothesis_version: 6.151.10
+
+[1000, '--show-toplevel', '/', '_meta', '_sqlite', 'display_name', 'error', 'file_count', 'found', 'git', 'hint', 'indexed', 'indexed_at', 'languages', 'r', 'repo', 'rev-parse', 'source_root', 'symbol_count', 'timing_ms', 'utf-8']

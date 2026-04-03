@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\types\parsed_message.py
+# hypothesis_version: 6.151.10
+
+['ParsedContentBlock', 'ParsedMessage', 'ParsedTextBlock', 'ResponseFormatT', 'parsed_output', 'text', 'type']

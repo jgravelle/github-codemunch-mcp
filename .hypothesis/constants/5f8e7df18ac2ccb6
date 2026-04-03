@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\hook_event.py
+# hypothesis_version: 6.151.10
+
+['.claude', 'a', 'create', 'event', 'path', 'remove', 'ts', 'worktreePath', 'worktree_path']

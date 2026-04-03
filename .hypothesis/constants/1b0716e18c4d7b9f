@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\attr\validators.py
+# hypothesis_version: 6.151.10
+
+[', ', '<', '<=', '>', '>=', 'None', 'and_', 'deep_iterable', 'deep_mapping', 'disabled', 'ge', 'get_disabled', 'gt', 'in_', 'instance_of', 'is_callable', 'le', 'lt', 'matches_re', 'max_len', 'min_len', 'not_', 'optional', 'or_', 'set_disabled']

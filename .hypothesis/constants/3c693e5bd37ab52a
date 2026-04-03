@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\anthropic\resources\beta\messages\messages.py
+# hypothesis_version: 6.151.10
+
+[',', 'Anthropic', 'AsyncAnthropic', 'AsyncMessages', 'BetaToolRunner', 'Messages', 'X-Stainless-Helper', 'anthropic-beta', 'auto', 'beta.messages', 'beta.messages.parse', 'cache_control', 'container', 'context_management', 'enabled', 'extra_body', 'extra_headers', 'extra_query', 'fast', 'format', 'inference_geo', 'json_schema', 'max_tokens', 'mcp_servers', 'messages', 'metadata', 'model', 'output_config', 'output_format', 'service_tier', 'speed', 'standard', 'standard_only', 'stop_sequences', 'stream', 'system', 'temperature', 'thinking', 'timeout', 'tool_choice', 'tools', 'top_k', 'top_p', 'type']

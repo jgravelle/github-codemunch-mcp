@@ -1,0 +1,4 @@
+# file: C:\MCPs\jcodemunch-mcp\src\jcodemunch_mcp\tools\get_call_hierarchy.py
+# hypothesis_version: 6.151.10
+
+[1000, '_meta', 'alias_map', 'both', 'callee_count', 'callees', 'caller_count', 'callers', 'candidates', 'confidence_level', 'depth', 'depth_reached', 'direction', 'error', 'file', 'id', 'kind', 'line', 'low', 'methodology', 'name', 'psr4_map', 'repo', 'source', 'symbol', 'text_heuristic', 'timing_ms', 'tip']

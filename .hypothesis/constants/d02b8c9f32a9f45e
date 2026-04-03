@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\typing_inspection\introspection.py
+# hypothesis_version: 6.151.10
+
+['<UNKNOWN>', 'AnnotationSource', 'ForbiddenQualifier', 'InspectedAnnotation', 'Qualifier', 'UNKNOWN', 'class_var', 'eager', 'final', 'get_literal_values', 'init_var', 'inspect_annotation', 'is_union_origin', 'lenient', 'not_required', 'read_only', 'required', 'skip']

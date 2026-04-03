@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\mcp\server\fastmcp\resources\types.py
+# hypothesis_version: 6.151.10
+
+['*', '<lambda>', 'FunctionResource', 'Path to the file', 'application/json', 'files', 'is_binary', 'mime_type', 'path', 'text/', 'text/plain']

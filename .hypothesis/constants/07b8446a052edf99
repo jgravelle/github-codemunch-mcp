@@ -1,0 +1,4 @@
+# file: C:\Users\j\AppData\Roaming\Python\Python312\site-packages\pydantic\_internal\_discriminated_union.py
+# hypothesis_version: 6.151.10
+
+['-', 'CoreMetadata', 'DataclassArgs', 'ModelFields', 'TypedDict', 'choices', 'cls', 'computed-field', 'custom_error_context', 'custom_error_message', 'custom_error_type', 'dataclass', 'dataclass-args', 'default', 'definition-ref', 'definitions', 'discriminator', 'discriminator-alias', 'expected', 'fields', 'function-after', 'function-before', 'function-plain', 'function-wrap', 'lax-or-strict', 'lax_schema', 'list', 'literal', 'metadata', 'model', 'model-fields', 'name', 'none', 'nullable', 'ref', 'schema', 'schema_ref', 'serialization', 'strict_schema', 'tagged-union', 'type', 'typed-dict', 'union', 'validation_alias']
