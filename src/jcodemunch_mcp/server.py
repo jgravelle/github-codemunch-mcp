@@ -3226,6 +3226,14 @@ def main(argv: Optional[list[str]] = None):
         help="Show what would be done without making changes",
     )
     init_parser.add_argument(
+        "--demo",
+        action="store_true",
+        help=(
+            "Walk through the full init process without making any changes, "
+            "then summarise what would have been done and the benefit of each action"
+        ),
+    )
+    init_parser.add_argument(
         "--yes", "-y",
         action="store_true",
         help="Accept all defaults non-interactively",
@@ -3328,6 +3336,7 @@ def main(argv: Optional[list[str]] = None):
             index=args.index,
             audit=args.audit,
             dry_run=args.dry_run,
+            demo=args.demo,
             yes=args.yes,
             no_backup=args.no_backup,
         ))

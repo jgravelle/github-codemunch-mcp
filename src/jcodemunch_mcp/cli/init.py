@@ -68,6 +68,20 @@ _WORKTREE_HOOKS = {
     }],
 }
 
+# Cursor rules use MDC format (frontmatter + markdown).
+# alwaysApply: true ensures the rule is in context for every agent turn,
+# including subagents — which is the main reliability complaint.
+_CURSOR_RULES_CONTENT = """\
+---
+description: Use jCodemunch MCP tools for all code navigation instead of built-in search
+alwaysApply: true
+---
+
+""" + _CLAUDE_MD_POLICY
+
+# Windsurf uses a plain-text .windsurfrules file in the project root.
+_WINDSURF_RULES_CONTENT = _CLAUDE_MD_POLICY
+
 
 # ---------------------------------------------------------------------------
 # Client detection
@@ -259,6 +273,65 @@ def install_claude_md(scope: str = "global", *, dry_run: bool = False, backup: b
 
 
 # ---------------------------------------------------------------------------
+# Cursor rules injection
+# ---------------------------------------------------------------------------
+
+def _cursor_rules_path() -> Path:
+    """Return the project-level Cursor rules path for jcodemunch."""
+    return Path.cwd() / ".cursor" / "rules" / "jcodemunch.mdc"
+
+
+def install_cursor_rules(*, dry_run: bool = False, backup: bool = True) -> str:
+    """Write .cursor/rules/jcodemunch.mdc in the current project.
+
+    Returns a status message.
+    """
+    path = _cursor_rules_path()
+    if path.exists() and _CLAUDE_MD_MARKER in path.read_text(encoding="utf-8"):
+        return f"  already present in {path}"
+    if dry_run:
+        return f"  would write {path}"
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if backup and path.exists():
+        shutil.copy2(path, path.with_suffix(".mdc.bak"))
+
+    path.write_text(_CURSOR_RULES_CONTENT, encoding="utf-8")
+    return f"  wrote {path}"
+
+
+# ---------------------------------------------------------------------------
+# Windsurf rules injection
+# ---------------------------------------------------------------------------
+
+def _windsurf_rules_path() -> Path:
+    """Return the project-level .windsurfrules path."""
+    return Path.cwd() / ".windsurfrules"
+
+
+def install_windsurf_rules(*, dry_run: bool = False, backup: bool = True) -> str:
+    """Append the Code Exploration Policy to .windsurfrules.
+
+    Returns a status message.
+    """
+    path = _windsurf_rules_path()
+    if path.exists() and _CLAUDE_MD_MARKER in path.read_text(encoding="utf-8"):
+        return f"  already present in {path}"
+    if dry_run:
+        return f"  would append policy to {path}"
+
+    if backup and path.exists():
+        shutil.copy2(path, path.with_suffix(".windsurfrules.bak"))
+
+    with open(path, "a", encoding="utf-8") as f:
+        if path.exists() and path.stat().st_size > 0:
+            f.write("\n\n")
+        f.write(_WINDSURF_RULES_CONTENT)
+
+    return f"  appended policy to {path}"
+
+
+# ---------------------------------------------------------------------------
 # Hooks injection
 # ---------------------------------------------------------------------------
 
@@ -439,14 +512,23 @@ def run_init(
     index: bool = False,
     audit: bool = False,
     dry_run: bool = False,
+    demo: bool = False,
     yes: bool = False,
     no_backup: bool = False,
 ) -> int:
     """Run the init flow. Returns exit code (0 = success)."""
+    if demo:
+        dry_run = True  # demo never writes anything
     backup = not no_backup
     interactive = not yes and sys.stdin.isatty()
 
-    print("\njCodeMunch init -- one-command setup\n")
+    if demo:
+        print("\njCodeMunch init -- DEMO MODE (no changes will be made)\n")
+    else:
+        print("\njCodeMunch init -- one-command setup\n")
+
+    # Collects (action_label, benefit) for the demo summary
+    _demo_actions: list[tuple[str, str]] = []
 
     # ----- Step 1: MCP client registration -----
     detected = _detect_clients()
@@ -474,8 +556,17 @@ def run_init(
     for client in targets:
         msg = configure_client(client, backup=backup, dry_run=dry_run)
         print(f"  {client.name}:{msg}")
+        if demo and "would" in msg:
+            loc = str(client.config_path) if client.config_path else "via CLI"
+            _demo_actions.append((
+                f"Register jcodemunch with {client.name} ({loc})",
+                "Your AI assistant could immediately call all jCodemunch tools without any manual setup or restart",
+            ))
 
-    # ----- Step 2: CLAUDE.md policy -----
+    # ----- Step 2: Agent policies -----
+    selected_names = {c.name for c in targets}
+
+    # 2a: CLAUDE.md (Claude Code / Claude Desktop)
     md_scope = claude_md
     if md_scope is None and interactive:
         print()
@@ -486,6 +577,46 @@ def run_init(
     if md_scope in ("global", "project"):
         msg = install_claude_md(md_scope, dry_run=dry_run, backup=backup)
         print(f"  CLAUDE.md:{msg}")
+        if demo and "would" in msg:
+            where = "globally (all projects)" if md_scope == "global" else "in this project only"
+            _demo_actions.append((
+                f"Inject Code Exploration Policy into CLAUDE.md {where}",
+                "Every future Claude session would automatically navigate code via jCodemunch — no slow, token-heavy file reads",
+            ))
+
+    # 2b: Cursor rules (.cursor/rules/jcodemunch.mdc)
+    if "Cursor" in selected_names:
+        do_cursor_rules = yes or not interactive
+        if interactive:
+            print()
+            do_cursor_rules = _prompt_yn(
+                "Install Cursor rules (.cursor/rules/jcodemunch.mdc)?",
+            )
+        if do_cursor_rules:
+            msg = install_cursor_rules(dry_run=dry_run, backup=backup)
+            print(f"  Cursor rules:{msg}")
+            if demo and "would" in msg:
+                _demo_actions.append((
+                    "Write .cursor/rules/jcodemunch.mdc (alwaysApply: true)",
+                    "Cursor and its subagents would prefer jCodemunch tools over built-in search on every turn — no more unreliable fallbacks",
+                ))
+
+    # 2c: Windsurf rules (.windsurfrules)
+    if "Windsurf" in selected_names:
+        do_windsurf_rules = yes or not interactive
+        if interactive:
+            print()
+            do_windsurf_rules = _prompt_yn(
+                "Install Windsurf rules (.windsurfrules)?",
+            )
+        if do_windsurf_rules:
+            msg = install_windsurf_rules(dry_run=dry_run, backup=backup)
+            print(f"  Windsurf rules:{msg}")
+            if demo and "would" in msg:
+                _demo_actions.append((
+                    "Append Code Exploration Policy to .windsurfrules",
+                    "Windsurf Cascade would prefer jCodemunch tools over built-in search on every turn",
+                ))
 
     # ----- Step 3: Agent hooks -----
     do_hooks = hooks
@@ -495,6 +626,11 @@ def run_init(
     if do_hooks:
         msg = install_hooks(dry_run=dry_run, backup=backup)
         print(f"  Hooks:{msg}")
+        if demo and "would" in msg:
+            _demo_actions.append((
+                "Install WorktreeCreate/WorktreeRemove hooks in ~/.claude/settings.json",
+                "New git worktrees would be automatically indexed so jCodemunch stays in sync with every branch you check out",
+            ))
 
     # ----- Step 4: Index -----
     do_index = index
@@ -504,6 +640,11 @@ def run_init(
     if do_index:
         msg = run_index(dry_run=dry_run)
         print(f"  Index:{msg}")
+        if demo and "would" in msg:
+            _demo_actions.append((
+                f"Index {os.getcwd()}",
+                "Symbol search, find-references, and repo exploration would be available immediately — without opening a single file",
+            ))
 
     # ----- Step 5: Audit agent config -----
     do_audit = audit
@@ -518,10 +659,26 @@ def run_init(
         print("  Audit:")
         for line in run_audit(project_path=os.getcwd(), dry_run=dry_run):
             print(line)
+        if demo:
+            _demo_actions.append((
+                "Audit agent config files (CLAUDE.md, .cursorrules, etc.) for token waste",
+                "Stale symbols, oversized instructions, and repeated boilerplate would be flagged — reducing context overhead on every Claude turn",
+            ))
 
     # ----- Done -----
     print()
-    if dry_run:
+    if demo:
+        print("Demo complete — no changes were made.\n")
+        if _demo_actions:
+            print("Had this NOT been a demo, I would have:\n")
+            for action, benefit in _demo_actions:
+                print(f"  • {action}")
+                print(f"    Benefit: {benefit}")
+                print()
+        else:
+            print("(Nothing to do — everything is already configured.)")
+        print()
+    elif dry_run:
         print("Dry run complete -- no changes were made.")
     else:
         print("Done. Restart your MCP client(s) to connect.")

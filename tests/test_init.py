@@ -17,6 +17,8 @@ from jcodemunch_mcp.cli.init import (
     _write_json,
     configure_client,
     install_claude_md,
+    install_cursor_rules,
+    install_windsurf_rules,
     install_hooks,
     run_audit,
     run_init,
@@ -178,6 +180,69 @@ def test_install_claude_md_dry_run(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# install_cursor_rules
+# ---------------------------------------------------------------------------
+
+def test_install_cursor_rules_new(tmp_path, monkeypatch):
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._cursor_rules_path", lambda: tmp_path / ".cursor" / "rules" / "jcodemunch.mdc")
+    msg = install_cursor_rules(backup=False)
+    assert "wrote" in msg
+    content = (tmp_path / ".cursor" / "rules" / "jcodemunch.mdc").read_text(encoding="utf-8")
+    assert "alwaysApply: true" in content
+    assert _CLAUDE_MD_MARKER in content
+
+
+def test_install_cursor_rules_idempotent(tmp_path, monkeypatch):
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._cursor_rules_path", lambda: tmp_path / ".cursor" / "rules" / "jcodemunch.mdc")
+    install_cursor_rules(backup=False)
+    msg = install_cursor_rules(backup=False)
+    assert "already" in msg
+
+
+def test_install_cursor_rules_dry_run(tmp_path, monkeypatch):
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._cursor_rules_path", lambda: tmp_path / ".cursor" / "rules" / "jcodemunch.mdc")
+    msg = install_cursor_rules(dry_run=True)
+    assert "would" in msg
+    assert not (tmp_path / ".cursor" / "rules" / "jcodemunch.mdc").exists()
+
+
+# ---------------------------------------------------------------------------
+# install_windsurf_rules
+# ---------------------------------------------------------------------------
+
+def test_install_windsurf_rules_new(tmp_path, monkeypatch):
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._windsurf_rules_path", lambda: tmp_path / ".windsurfrules")
+    msg = install_windsurf_rules(backup=False)
+    assert "appended" in msg
+    content = (tmp_path / ".windsurfrules").read_text(encoding="utf-8")
+    assert _CLAUDE_MD_MARKER in content
+
+
+def test_install_windsurf_rules_idempotent(tmp_path, monkeypatch):
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._windsurf_rules_path", lambda: tmp_path / ".windsurfrules")
+    install_windsurf_rules(backup=False)
+    msg = install_windsurf_rules(backup=False)
+    assert "already" in msg
+
+
+def test_install_windsurf_rules_dry_run(tmp_path, monkeypatch):
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._windsurf_rules_path", lambda: tmp_path / ".windsurfrules")
+    msg = install_windsurf_rules(dry_run=True)
+    assert "would" in msg
+    assert not (tmp_path / ".windsurfrules").exists()
+
+
+def test_install_windsurf_rules_appends_to_existing(tmp_path, monkeypatch):
+    f = tmp_path / ".windsurfrules"
+    f.write_text("# Existing rules\n", encoding="utf-8")
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._windsurf_rules_path", lambda: f)
+    install_windsurf_rules(backup=False)
+    content = f.read_text(encoding="utf-8")
+    assert content.startswith("# Existing rules\n")
+    assert _CLAUDE_MD_MARKER in content
+
+
+# ---------------------------------------------------------------------------
 # install_hooks
 # ---------------------------------------------------------------------------
 
@@ -276,6 +341,61 @@ def test_run_init_explicit_client_none(tmp_path, monkeypatch, capsys):
 
 
 # ---------------------------------------------------------------------------
+# run_init with Cursor/Windsurf rules
+# ---------------------------------------------------------------------------
+
+def test_run_init_yes_cursor_writes_rules(tmp_path, monkeypatch, capsys):
+    """--yes with a Cursor client should install .cursor/rules/jcodemunch.mdc."""
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._detect_clients", lambda: [
+        MCPClient("Cursor", tmp_path / "mcp.json", "json_patch"),
+    ])
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._claude_md_path", lambda scope: tmp_path / "CLAUDE.md")
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._cursor_rules_path", lambda: tmp_path / ".cursor" / "rules" / "jcodemunch.mdc")
+
+    rc = run_init(yes=True, no_backup=True)
+    assert rc == 0
+
+    mdc = tmp_path / ".cursor" / "rules" / "jcodemunch.mdc"
+    assert mdc.exists()
+    content = mdc.read_text(encoding="utf-8")
+    assert "alwaysApply: true" in content
+    assert _CLAUDE_MD_MARKER in content
+
+
+def test_run_init_yes_windsurf_writes_rules(tmp_path, monkeypatch, capsys):
+    """--yes with a Windsurf client should install .windsurfrules."""
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._detect_clients", lambda: [
+        MCPClient("Windsurf", tmp_path / "windsurf_mcp.json", "json_patch"),
+    ])
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._claude_md_path", lambda scope: tmp_path / "CLAUDE.md")
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._windsurf_rules_path", lambda: tmp_path / ".windsurfrules")
+
+    rc = run_init(yes=True, no_backup=True)
+    assert rc == 0
+
+    rules = tmp_path / ".windsurfrules"
+    assert rules.exists()
+    assert _CLAUDE_MD_MARKER in rules.read_text(encoding="utf-8")
+
+
+def test_run_init_demo_cursor_reports_benefit(tmp_path, monkeypatch, capsys):
+    """--demo with Cursor should include rules benefit in summary."""
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._detect_clients", lambda: [
+        MCPClient("Cursor", tmp_path / "mcp.json", "json_patch"),
+    ])
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._claude_md_path", lambda scope: tmp_path / "CLAUDE.md")
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._cursor_rules_path", lambda: tmp_path / ".cursor" / "rules" / "jcodemunch.mdc")
+
+    rc = run_init(demo=True, yes=True)
+    assert rc == 0
+
+    out = capsys.readouterr().out
+    assert "Cursor rules" in out
+    assert "subagents" in out
+    assert not (tmp_path / ".cursor" / "rules" / "jcodemunch.mdc").exists()
+
+
+# ---------------------------------------------------------------------------
 # _detect_clients smoke test
 # ---------------------------------------------------------------------------
 
@@ -337,3 +457,56 @@ def test_run_init_dry_run_audit(tmp_path, monkeypatch, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "would audit" in out
+
+
+# ---------------------------------------------------------------------------
+# run_init --demo
+# ---------------------------------------------------------------------------
+
+def test_run_init_demo_makes_no_changes(tmp_path, monkeypatch, capsys):
+    """--demo should make no file changes and print the summary."""
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._detect_clients", lambda: [
+        MCPClient("TestClient", tmp_path / "mcp.json", "json_patch"),
+    ])
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._claude_md_path", lambda scope: tmp_path / "CLAUDE.md")
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._settings_json_path", lambda: tmp_path / "settings.json")
+
+    rc = run_init(demo=True, yes=True)
+    assert rc == 0
+
+    # No files written
+    assert not (tmp_path / "mcp.json").exists()
+    assert not (tmp_path / "CLAUDE.md").exists()
+    assert not (tmp_path / "settings.json").exists()
+
+    out = capsys.readouterr().out
+    assert "DEMO MODE" in out
+    assert "Demo complete" in out
+    assert "Had this NOT been a demo" in out
+    assert "Benefit:" in out
+
+
+def test_run_init_demo_nothing_to_do(tmp_path, monkeypatch, capsys):
+    """--demo with everything already configured prints the 'nothing to do' message."""
+    # Pre-write mcp.json with jcodemunch already present
+    mcp_cfg = tmp_path / "mcp.json"
+    mcp_cfg.write_text(
+        json.dumps({"mcpServers": {"jcodemunch": {"command": "uvx", "args": ["jcodemunch-mcp"]}}}),
+        encoding="utf-8",
+    )
+    # Pre-write CLAUDE.md with policy already present
+    md = tmp_path / "CLAUDE.md"
+    md.write_text(_CLAUDE_MD_MARKER, encoding="utf-8")
+
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._detect_clients", lambda: [
+        MCPClient("TestClient", mcp_cfg, "json_patch"),
+    ])
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._claude_md_path", lambda scope: md)
+    monkeypatch.setattr("jcodemunch_mcp.cli.init._settings_json_path", lambda: tmp_path / "settings.json")
+
+    # Explicit flags bypass the yes-mode defaults so audit isn't force-enabled
+    rc = run_init(demo=True, clients=["auto"], claude_md="global", hooks=False, index=False, audit=False)
+    assert rc == 0
+
+    out = capsys.readouterr().out
+    assert "Nothing to do" in out
