@@ -6,6 +6,9 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ## [1.22.5] - 2026-04-06
 
+### Added
+- **`TWEAKCC.md`** — guide for system prompt routing via [tweakcc](https://github.com/Piebald-AI/tweakcc) as an alternative to hook-based enforcement. Includes 8 prompt rewrites that embed jCodemunch preferences into Claude's core tool descriptions. Cross-referenced from AGENT_HOOKS.md. Credit: [@vadash](https://github.com/vadash). Closes #173.
+
 ### Fixed
 - **PreToolUse hook no longer blocks Read** — changed from hard `deny` to a stderr warning. The deny broke the Edit workflow because Claude Code requires Read before Edit, forcing workarounds or env var overrides. Targeted reads (with `offset` or `limit`) are now silently allowed; full-file reads on large code files produce a stderr hint nudging toward `get_file_outline` + `get_symbol_source`. Aligns the Python CLI hook with the documented shell hook design in AGENT_HOOKS.md which explicitly notes "Read is intentionally NOT blocked".
 

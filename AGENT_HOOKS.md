@@ -1142,4 +1142,12 @@ Logging is **off by default** (`JCODEMUNCH_DEBUG=0`). Remove the export from you
 
 ---
 
+## Alternative: System Prompt Routing (tweakcc)
+
+For the strongest enforcement without runtime hooks, you can patch Claude's system prompts directly using [tweakcc](https://github.com/Piebald-AI/tweakcc). This embeds jCodemunch preferences into the core tool descriptions Claude reads at startup, so the model internalizes the preference rather than relying on per-repo instructions or hook triggers.
+
+See **[TWEAKCC.md](TWEAKCC.md)** for the full setup guide, all 8 prompt rewrites, and verification steps. Credit: [@vadash](https://github.com/vadash).
+
+---
+
 > Full tool reference with parameters: [USER_GUIDE.md §6](USER_GUIDE.md#6-tool-reference)
