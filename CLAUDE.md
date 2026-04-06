@@ -62,6 +62,8 @@ src/jcodemunch_mcp/
 | `hook-pretooluse` | PreToolUse hook: intercept Read on large code files, suggest jCodemunch (reads JSON stdin) |
 | `hook-posttooluse` | PostToolUse hook: auto-reindex files after Edit/Write (reads JSON stdin) |
 | `hook-precompact` | PreCompact hook: generate session snapshot before context compaction (reads JSON stdin) |
+| `hook-guard-explore` | PreToolUse guard: hard-block Bash/Grep/Glob code exploration, redirect to jCodemunch (reads JSON stdin) |
+| `hook-guard-edit` | PreToolUse guard: gate Edit/Write/MultiEdit with warning or block (reads JSON stdin) |
 
 ## Architecture Notes
 - `index_folder` is **synchronous** — dispatched via `asyncio.to_thread()` in server.py to avoid blocking the event loop

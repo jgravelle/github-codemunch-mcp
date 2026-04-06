@@ -6,10 +6,11 @@ Installing jCodeMunch makes the tools available. It does **not** guarantee your 
 
 The common failure mode isn't forgetting — it's skipping. The agent sees the rule in CLAUDE.md and reaches for Read or Grep anyway because native tools feel faster under pressure or in a long session. A prompt policy can't stop this. The hooks below intercept at the tool-call level: they fire *before* the shortcut executes and redirect Claude before the bypass happens.
 
-This document covers two ways to enforce usage:
+This document covers three enforcement layers:
 
 1. **Basic Setup (Prompt Policies)** — soft rules for any agent (Claude Code, Cursor, VS Code)
-2. **Advanced Setup (Tool Hooks)** — hard redirects at the tool-call level (Claude Code only)
+2. **Recommended: Built-in Python Hooks** — zero-install enforcement via `jcodemunch-mcp init` (Claude Code only)
+3. **Legacy: Shell Script Hooks** — manual shell scripts (deprecated, kept for reference)
 
 ---
 
@@ -18,7 +19,11 @@ This document covers two ways to enforce usage:
 - [Basic Setup: Prompt Policies](#basic-setup-prompt-policies)
   - [Claude Code (CLAUDE.md)](#claude-code-claudemd)
   - [Other AI Agents](#other-ai-agents)
-- [Advanced Setup: Tool Hooks (Claude Code)](#advanced-setup-tool-hooks-claude-code)
+- [Built-in Python Hooks (Recommended)](#built-in-python-hooks-recommended)
+  - [Quick Install](#quick-install)
+  - [Hook Reference](#hook-reference)
+  - [Environment Variables](#environment-variables)
+- [Legacy: Shell Script Hooks](#legacy-shell-script-hooks)
   - [Hook Flow](#hook-flow)
   - [1. Read Guard (`jcodemunch_read_guard.sh`)](#1-read-guard-jcodemunch_read_guardsh)
   - [2. Edit Guard (`jcodemunch_edit_guard.sh`)](#2-edit-guard-jcodemunch_edit_guardsh)
@@ -135,7 +140,65 @@ After editing a file: index_file { "path": "/abs/path" } to keep the index fresh
 
 ---
 
-## Advanced Setup: Tool Hooks (Claude Code)
+## Built-in Python Hooks (Recommended)
+
+Since v1.23.0, all enforcement hooks are built into jCodemunch as Python CLI subcommands. No shell scripts to copy, no chmod, no drift -- just run `init`.
+
+### Quick Install
+
+```bash
+jcodemunch-mcp init --hooks --yes
+```
+
+This adds all hooks to `~/.claude/settings.json`. Verify with:
+
+```bash
+jcodemunch-mcp config --check
+```
+
+### Hook Reference
+
+| Subcommand | Hook Event | Matcher | Behavior |
+|---|---|---|---|
+| `hook-pretooluse` | PreToolUse | `Read` | Soft warn on large code files (exit 0 + stderr hint) |
+| `hook-guard-explore` | PreToolUse | `Bash\|Grep\|Glob` | **Hard block** code exploration (exit 2); safe commands pass through |
+| `hook-guard-edit` | PreToolUse | `Edit\|Write\|MultiEdit` | Soft warn by default; hard block with `JCODEMUNCH_HARD_BLOCK=1` |
+| `hook-posttooluse` | PostToolUse | `Edit\|Write` | Fire-and-forget reindex via `index-file` |
+| `hook-precompact` | PreCompact | (all) | Session snapshot before context compaction |
+
+**Explore guard** (`hook-guard-explore`): Intercepts `Bash`, `Grep`, and `Glob`. Blocks Bash commands that look like code exploration (`grep`, `rg`, `find`, `cat`, `head`, `tail` targeting code files). Allows safe commands (npm, pytest, git, cargo, docker, etc.) and non-code Glob patterns.
+
+**Edit guard** (`hook-guard-edit`): Intercepts `Edit`, `Write`, and `MultiEdit`. Prints a warning suggesting jCodemunch read tools before editing. Configurable via env vars.
+
+### Environment Variables
+
+| Variable | Default | Effect |
+|---|---|---|
+| `JCODEMUNCH_HOOK_MIN_SIZE` | `4096` | Minimum file size (bytes) to trigger the Read warning |
+| `JCODEMUNCH_HARD_BLOCK` | `0` | Set `1` to make `hook-guard-edit` block edits (exit 2) |
+| `JCODEMUNCH_ALLOW_RAW_WRITE` | `0` | Set `1` to disable `hook-guard-edit` entirely |
+
+### Manual Testing
+
+```bash
+# Should exit 2 (blocked)
+echo '{"tool_name":"Grep","tool_input":{"pattern":"TODO"}}' | jcodemunch-mcp hook-guard-explore
+echo $?
+
+# Should exit 0 with stderr warning
+echo '{"tool_name":"Edit","tool_input":{"file_path":"src/app.py"}}' | jcodemunch-mcp hook-guard-edit
+echo $?
+
+# Should exit 0 (safe command)
+echo '{"tool_name":"Bash","tool_input":{"command":"npm test"}}' | jcodemunch-mcp hook-guard-explore
+echo $?
+```
+
+---
+
+## Legacy: Shell Script Hooks
+
+> **Deprecated:** The shell scripts below have been replaced by built-in Python hooks (see above). They are kept here for reference only. Run `jcodemunch-mcp init --hooks` to migrate to the Python hooks and remove these scripts from `~/.claude/hooks/`.
 
 > **Disclaimer:** These hooks intercept internal Claude Code tool calls. They modify the core behavior of the agent to heavily prefer jCodeMunch over native file exploration. Use them to strictly enforce jCodeMunch usage, but be aware they may block legitimate edge cases.
 

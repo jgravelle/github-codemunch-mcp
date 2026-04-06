@@ -95,10 +95,20 @@ _WORKTREE_HOOKS = {
 }
 
 _ENFORCEMENT_HOOKS = {
-    "PreToolUse": [{
-        "matcher": "Read",
-        "hooks": [{"type": "command", "command": "jcodemunch-mcp hook-pretooluse"}],
-    }],
+    "PreToolUse": [
+        {
+            "matcher": "Read",
+            "hooks": [{"type": "command", "command": "jcodemunch-mcp hook-pretooluse"}],
+        },
+        {
+            "matcher": "Bash|Grep|Glob",
+            "hooks": [{"type": "command", "command": "jcodemunch-mcp hook-guard-explore"}],
+        },
+        {
+            "matcher": "Edit|Write|MultiEdit",
+            "hooks": [{"type": "command", "command": "jcodemunch-mcp hook-guard-edit"}],
+        },
+    ],
     "PostToolUse": [{
         "matcher": "Edit|Write",
         "hooks": [{"type": "command", "command": "jcodemunch-mcp hook-posttooluse"}],
@@ -392,22 +402,40 @@ def _merge_hooks(
 
     ``marker`` is a substring used to detect whether our hook is already
     installed (e.g. ``"jcodemunch-mcp hook-event"``).
+
+    Each rule is checked individually: if a rule's command already exists
+    in the event's hook list, it is skipped.  This allows multiple rules
+    for the same event to be added incrementally.
     """
     hooks = data.setdefault("hooks", {})
     added: list[str] = []
 
     for event_name, event_hooks in hook_defs.items():
+        existing_cmds: set[str] = set()
         if event_name in hooks:
-            existing_cmds: list[str] = []
             for rule in hooks[event_name]:
                 for h in rule.get("hooks", []):
-                    existing_cmds.append(h.get("command", ""))
-            if any(marker in c for c in existing_cmds):
+                    existing_cmds.add(h.get("command", ""))
+
+        new_rules = []
+        for rule in event_hooks:
+            # Check if this specific rule's command is already installed.
+            rule_cmds = [h.get("command", "") for h in rule.get("hooks", [])]
+            if any(cmd in existing_cmds for cmd in rule_cmds if cmd):
                 continue
-            hooks[event_name].extend(event_hooks)
-        else:
-            hooks[event_name] = list(event_hooks)
-        added.append(event_name)
+            # Fallback: check against the broad marker for legacy detection.
+            if any(marker in cmd for cmd in existing_cmds):
+                # Only skip if the marker matches this specific rule's command too.
+                if any(marker in cmd for cmd in rule_cmds):
+                    continue
+            new_rules.append(rule)
+
+        if new_rules:
+            if event_name in hooks:
+                hooks[event_name].extend(new_rules)
+            else:
+                hooks[event_name] = new_rules
+            added.append(event_name)
 
     return added
 
@@ -431,16 +459,19 @@ def install_hooks(*, dry_run: bool = False, backup: bool = True) -> str:
 
 
 def install_enforcement_hooks(*, dry_run: bool = False, backup: bool = True) -> str:
-    """Merge PreToolUse/PostToolUse enforcement hooks into ~/.claude/settings.json.
+    """Merge all enforcement hooks into ~/.claude/settings.json.
 
-    PreToolUse (Read)  — nudge Claude toward jCodemunch for large code files.
-    PostToolUse (Edit|Write) — auto-reindex modified files.
+    PreToolUse (Read)              — nudge Claude toward jCodemunch for large code files.
+    PreToolUse (Bash|Grep|Glob)    — hard-block code exploration, redirect to jCodemunch.
+    PreToolUse (Edit|Write|MultiEdit) — gate raw edits with warning or block.
+    PostToolUse (Edit|Write)       — auto-reindex modified files.
+    PreCompact                     — session snapshot before context compaction.
 
     Returns a status message.
     """
     path = _settings_json_path()
     data = _read_json(path)
-    added = _merge_hooks(data, _ENFORCEMENT_HOOKS, "jcodemunch-mcp hook-p")  # matches hook-pretooluse & hook-posttooluse & hook-precompact
+    added = _merge_hooks(data, _ENFORCEMENT_HOOKS, "jcodemunch-mcp hook-")  # matches all jcodemunch hook commands
 
     if not added:
         return f"  enforcement hooks already present in {path}"

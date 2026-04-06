@@ -56,7 +56,7 @@ class TestInstallEnforcementHooksIntegration:
         install_enforcement_hooks(backup=False)
         data = json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))
         assert len(data["hooks"]["PostToolUse"]) == 1
-        assert len(data["hooks"]["PreToolUse"]) == 1
+        assert len(data["hooks"]["PreToolUse"]) == 3  # Read, Bash|Grep|Glob, Edit|Write|MultiEdit
 
 
 class TestCacheKeyIndexedAt:

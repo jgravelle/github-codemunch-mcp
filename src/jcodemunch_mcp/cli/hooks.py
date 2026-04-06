@@ -2,13 +2,15 @@
 
 PreToolUse  — intercept Read on large code files, suggest jCodemunch tools.
 PostToolUse — auto-reindex after Edit/Write to keep the index fresh.
+Guard hooks — hard-block code exploration via Bash/Grep/Glob, gate raw edits.
 
-Both read JSON from stdin and write JSON to stdout per the Claude Code
+All hooks read JSON from stdin and write JSON to stdout per the Claude Code
 hooks specification.
 """
 
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -184,3 +186,167 @@ def run_precompact() -> int:
     }
     json.dump(result, sys.stdout)
     return 0
+
+
+# ---------------------------------------------------------------------------
+# Guard hooks — replacements for the legacy shell scripts
+# ---------------------------------------------------------------------------
+
+# Regex for code-file extensions used by the explore guard.
+_EXT_PATTERN = r"\.(?:" + "|".join(
+    ext.lstrip(".") for ext in sorted(_CODE_EXTENSIONS)
+) + r")\b"
+
+# Commands that are safe even when they touch code files (builds, tests, VCS).
+_SAFE_COMMANDS_RE = re.compile(
+    r"(?:npm|yarn|pnpm|cargo|go |pytest|jest|vitest|rspec|mvn|gradle|"
+    r"git |docker|kubectl|uv |pip |brew |jcodemunch|uvx jcodemunch)",
+)
+
+# Bash commands that indicate code exploration.
+_EXPLORATION_COMMANDS_RE = re.compile(
+    r"(?:grep|rg|find|cat|head|tail|sed|awk)\b",
+)
+
+_GUARD_EXPLORE_MESSAGE = """\
+jCodemunch guard -- use structured retrieval instead.
+
+  Discovery
+  suggest_queries  -> best first step for an unfamiliar repo
+  get_repo_outline -> high-level overview of the repo
+  get_file_tree    -> browse directory structure
+  get_file_outline -> list all symbols in a file (before reading any source)
+
+  Retrieval
+  search_symbols   -> find a function/class/method by name
+  get_symbol_source -> fetch one symbol (symbol_id) or many (symbol_ids[])
+  get_context_bundle -> symbol + its imports (+ optional callers) in one call
+  get_file_content -> read a specific line range (last resort)
+
+  Search
+  search_text      -> full-text search (strings, comments, TODOs)
+  search_columns   -> search dbt / SQLMesh / database column metadata
+
+  Relationship & Impact
+  find_importers   -> what imports a file
+  find_references  -> where is an identifier used
+  check_references -> quick dead-code check
+  get_dependency_graph -> file-level dependency graph (up to 3 hops)
+  get_blast_radius -> what breaks if this symbol changes
+  get_class_hierarchy  -> full inheritance chain (ancestors + descendants)
+  get_related_symbols  -> symbols related via co-location / shared importers
+  get_symbol_diff  -> diff symbol sets between two indexed repo snapshots
+
+  Utilities
+  get_session_stats -> token savings and cost-avoided breakdown for this session
+
+Not indexed yet? -> index_folder { "path": "/path/to/project" } first.
+"""
+
+_GUARD_EDIT_MESSAGE = """\
+jCodemunch edit guard -- raw file edit {verb}.
+{file_hint}
+Before writing to source files, jCodeMunch read tools give you safer context:
+
+  get_symbol_source            -> confirm you are editing the right implementation
+  get_file_outline             -> see all symbols in the file before touching it
+  get_blast_radius             -> understand what else breaks if you change this
+  find_references              -> find all call sites that may need updating too
+  search_text                  -> locate related strings, comments, or config values
+
+To suppress this warning:  JCODEMUNCH_ALLOW_RAW_WRITE=1
+To hard-block all edits:   JCODEMUNCH_HARD_BLOCK=1
+
+Not indexed yet? -> index_folder {{ "path": "/path/to/project" }} first.
+"""
+
+
+def run_guard_explore() -> int:
+    """PreToolUse guard: hard-block Bash/Grep/Glob code exploration.
+
+    Intercepts Bash (grep/find/cat patterns), Grep, and Glob when they look
+    like code exploration.  Builds, tests, and git operations pass through.
+
+    Exit 2 = block with feedback.  Exit 0 = allow.
+    Returns exit code (0 on parse errors to avoid blocking).
+    """
+    try:
+        data = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        return 0
+
+    tool_name: str = data.get("tool_name", "")
+    if tool_name not in ("Bash", "Grep", "Glob"):
+        return 0
+
+    tool_input: dict = data.get("tool_input", {})
+
+    # Build a single payload string from all relevant fields.
+    payload_parts = [
+        tool_input.get("command", ""),
+        tool_input.get("file_path", ""),
+        tool_input.get("pattern", ""),
+        tool_input.get("query", ""),
+    ]
+    payload = " ".join(p for p in payload_parts if p)
+
+    is_exploration = False
+
+    if tool_name == "Bash":
+        # Safe commands pass through even if they touch code files.
+        if _SAFE_COMMANDS_RE.search(payload):
+            return 0
+        # Check for exploration commands targeting code files.
+        if _EXPLORATION_COMMANDS_RE.search(payload) and re.search(_EXT_PATTERN, payload, re.IGNORECASE):
+            is_exploration = True
+
+    elif tool_name == "Grep":
+        is_exploration = True
+
+    elif tool_name == "Glob":
+        if re.search(_EXT_PATTERN, payload, re.IGNORECASE):
+            is_exploration = True
+
+    if not is_exploration:
+        return 0
+
+    print(_GUARD_EXPLORE_MESSAGE, file=sys.stderr)
+    return 2
+
+
+def run_guard_edit() -> int:
+    """PreToolUse guard: gate Edit/Write/MultiEdit with a warning or block.
+
+    Default: soft gate (exit 0 + stderr warning).
+    JCODEMUNCH_HARD_BLOCK=1: hard block (exit 2).
+    JCODEMUNCH_ALLOW_RAW_WRITE=1: skip entirely.
+
+    Returns exit code (0 on parse errors to avoid blocking).
+    """
+    try:
+        data = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        return 0
+
+    tool_name: str = data.get("tool_name", "")
+    if tool_name not in ("Edit", "Write", "MultiEdit"):
+        return 0
+
+    if os.environ.get("JCODEMUNCH_ALLOW_RAW_WRITE", "0") == "1":
+        return 0
+
+    tool_input: dict = data.get("tool_input", {})
+    file_path: str = tool_input.get("file_path", "")
+    file_hint = f"  Target file: {file_path}\n" if file_path else ""
+
+    hard_block = os.environ.get("JCODEMUNCH_HARD_BLOCK", "0") == "1"
+
+    if hard_block:
+        verb = "blocked"
+        exit_code = 2
+    else:
+        verb = "allowed -- but consider consulting jCodeMunch first"
+        exit_code = 0
+
+    print(_GUARD_EDIT_MESSAGE.format(verb=verb, file_hint=file_hint), file=sys.stderr)
+    return exit_code

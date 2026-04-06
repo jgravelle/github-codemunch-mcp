@@ -16,6 +16,8 @@ from jcodemunch_mcp.cli.hooks import (
     run_pretooluse,
     run_posttooluse,
     run_precompact,
+    run_guard_explore,
+    run_guard_edit,
 )
 
 
@@ -342,11 +344,13 @@ class TestEnforcementHooksInstall:
         assert "PreToolUse" in hooks
         assert "PostToolUse" in hooks
         assert "PreCompact" in hooks
-        # Verify matchers
-        pre_matcher = hooks["PreToolUse"][0]["matcher"]
+        # Verify matchers — 3 PreToolUse rules (Read, Bash|Grep|Glob, Edit|Write|MultiEdit)
+        pre_matchers = [r["matcher"] for r in hooks["PreToolUse"]]
+        assert "Read" in pre_matchers
+        assert "Bash|Grep|Glob" in pre_matchers
+        assert "Edit|Write|MultiEdit" in pre_matchers
         post_matcher = hooks["PostToolUse"][0]["matcher"]
         precompact_matcher = hooks["PreCompact"][0]["matcher"]
-        assert pre_matcher == "Read"
         assert post_matcher == "Edit|Write"
         assert precompact_matcher == ""  # PreCompact hook has empty matcher
 
@@ -363,7 +367,7 @@ class TestEnforcementHooksInstall:
 
         assert "already present" in msg2
         data = json.loads(settings.read_text(encoding="utf-8"))
-        assert len(data["hooks"]["PreToolUse"]) == 1
+        assert len(data["hooks"]["PreToolUse"]) == 3  # Read, Bash|Grep|Glob, Edit|Write|MultiEdit
         assert len(data["hooks"]["PostToolUse"]) == 1
 
     def test_preserves_existing_hooks(self, tmp_path):
@@ -399,3 +403,190 @@ class TestEnforcementHooksInstall:
         assert "would add" in msg
         data = json.loads(settings.read_text(encoding="utf-8"))
         assert "hooks" not in data  # Nothing written
+
+
+# ---------------------------------------------------------------------------
+# Guard explore tests (replaces jcodemunch_read_guard.sh)
+# ---------------------------------------------------------------------------
+
+def _make_guard_input(tool_name: str, **tool_input_fields) -> str:
+    """Build a JSON string for guard hook stdin."""
+    data = {
+        "session_id": "test-session",
+        "hook_event_name": "PreToolUse",
+        "tool_name": tool_name,
+        "tool_input": tool_input_fields,
+    }
+    return json.dumps(data)
+
+
+class TestGuardExplore:
+    """Tests for run_guard_explore()."""
+
+    def test_blocks_grep_tool(self):
+        """Grep tool is always treated as code exploration."""
+        inp = _make_guard_input("Grep", pattern="def foo")
+        rc, out, err = _run_with_stdin(run_guard_explore, inp)
+        assert rc == 2
+        assert "search_symbols" in err
+        assert "get_symbol_source" in err
+
+    def test_blocks_bash_code_exploration(self):
+        """Bash commands exploring code files are blocked."""
+        inp = _make_guard_input("Bash", command="grep -r 'TODO' src/main.py")
+        rc, out, err = _run_with_stdin(run_guard_explore, inp)
+        assert rc == 2
+        assert "jCodemunch guard" in err
+
+    def test_blocks_bash_find_code(self):
+        """Bash find targeting code extensions is blocked."""
+        inp = _make_guard_input("Bash", command="find . -name '*.ts' -type f")
+        rc, out, err = _run_with_stdin(run_guard_explore, inp)
+        assert rc == 2
+
+    def test_blocks_bash_cat_code(self):
+        """Bash cat on code files is blocked."""
+        inp = _make_guard_input("Bash", command="cat src/server.py")
+        rc, out, err = _run_with_stdin(run_guard_explore, inp)
+        assert rc == 2
+
+    def test_allows_bash_safe_commands(self):
+        """Safe commands (npm, pytest, git, etc.) pass through."""
+        for cmd in ["npm test", "pytest -v", "git status", "cargo build", "uv pip install foo"]:
+            inp = _make_guard_input("Bash", command=cmd)
+            rc, out, err = _run_with_stdin(run_guard_explore, inp)
+            assert rc == 0, f"Should allow safe command: {cmd}"
+            assert err == "", f"Should be silent for: {cmd}"
+
+    def test_allows_bash_non_code_command(self):
+        """Bash commands that don't match exploration patterns pass through."""
+        inp = _make_guard_input("Bash", command="ls -la")
+        rc, out, err = _run_with_stdin(run_guard_explore, inp)
+        assert rc == 0
+        assert err == ""
+
+    def test_blocks_glob_code_pattern(self):
+        """Glob targeting code extensions is blocked."""
+        inp = _make_guard_input("Glob", pattern="**/*.py")
+        rc, out, err = _run_with_stdin(run_guard_explore, inp)
+        assert rc == 2
+        assert "jCodemunch guard" in err
+
+    def test_allows_glob_non_code(self):
+        """Glob targeting non-code extensions passes through."""
+        inp = _make_guard_input("Glob", pattern="**/*.md")
+        rc, out, err = _run_with_stdin(run_guard_explore, inp)
+        assert rc == 0
+        assert err == ""
+
+    def test_allows_glob_json(self):
+        """Glob for JSON files passes through."""
+        inp = _make_guard_input("Glob", pattern="*.json")
+        rc, out, err = _run_with_stdin(run_guard_explore, inp)
+        assert rc == 0
+
+    def test_allows_unknown_tool(self):
+        """Tools other than Bash/Grep/Glob pass through immediately."""
+        for tool in ["Read", "Edit", "Write", "MultiEdit"]:
+            inp = _make_guard_input(tool, file_path="/some/file.py")
+            rc, out, err = _run_with_stdin(run_guard_explore, inp)
+            assert rc == 0, f"Should allow tool: {tool}"
+
+    def test_handles_invalid_json(self):
+        """Invalid JSON stdin doesn't crash."""
+        rc, out, err = _run_with_stdin(run_guard_explore, "not json")
+        assert rc == 0
+
+    def test_handles_empty_input(self):
+        """Missing tool_input fields are handled gracefully."""
+        inp = json.dumps({"tool_name": "Bash", "tool_input": {}})
+        rc, out, err = _run_with_stdin(run_guard_explore, inp)
+        assert rc == 0
+
+    def test_allows_jcodemunch_command(self):
+        """jcodemunch commands in Bash are safe."""
+        inp = _make_guard_input("Bash", command="jcodemunch-mcp index-file src/app.py")
+        rc, out, err = _run_with_stdin(run_guard_explore, inp)
+        assert rc == 0
+
+    @pytest.mark.parametrize("ext", [".py", ".ts", ".tsx", ".go", ".rs", ".java", ".rb", ".cpp"])
+    def test_blocks_bash_rg_code_extensions(self, ext):
+        """rg targeting various code extensions is blocked."""
+        inp = _make_guard_input("Bash", command=f"rg 'pattern' file{ext}")
+        rc, out, err = _run_with_stdin(run_guard_explore, inp)
+        assert rc == 2
+
+
+# ---------------------------------------------------------------------------
+# Guard edit tests (replaces jcodemunch_edit_guard.sh)
+# ---------------------------------------------------------------------------
+
+class TestGuardEdit:
+    """Tests for run_guard_edit()."""
+
+    def test_soft_gate_default(self):
+        """Default mode: allow edit but print warning to stderr."""
+        inp = _make_guard_input("Edit", file_path="src/app.py")
+        rc, out, err = _run_with_stdin(run_guard_edit, inp)
+        assert rc == 0
+        assert "edit guard" in err
+        assert "get_symbol_source" in err
+        assert "get_blast_radius" in err
+
+    def test_soft_gate_includes_file_path(self):
+        """Warning includes the target file path."""
+        inp = _make_guard_input("Edit", file_path="src/server.py")
+        rc, out, err = _run_with_stdin(run_guard_edit, inp)
+        assert rc == 0
+        assert "src/server.py" in err
+
+    def test_hard_block_env(self, monkeypatch):
+        """JCODEMUNCH_HARD_BLOCK=1 exits 2 (hard block)."""
+        monkeypatch.setenv("JCODEMUNCH_HARD_BLOCK", "1")
+        inp = _make_guard_input("Edit", file_path="src/app.py")
+        rc, out, err = _run_with_stdin(run_guard_edit, inp)
+        assert rc == 2
+        assert "blocked" in err
+
+    def test_allow_raw_write_env(self, monkeypatch):
+        """JCODEMUNCH_ALLOW_RAW_WRITE=1 skips entirely."""
+        monkeypatch.setenv("JCODEMUNCH_ALLOW_RAW_WRITE", "1")
+        inp = _make_guard_input("Edit", file_path="src/app.py")
+        rc, out, err = _run_with_stdin(run_guard_edit, inp)
+        assert rc == 0
+        assert err == ""
+
+    def test_write_tool(self):
+        """Write tool is also gated."""
+        inp = _make_guard_input("Write", file_path="src/new.py")
+        rc, out, err = _run_with_stdin(run_guard_edit, inp)
+        assert rc == 0
+        assert "edit guard" in err
+
+    def test_multiedit_tool(self):
+        """MultiEdit tool is also gated."""
+        inp = _make_guard_input("MultiEdit", file_path="src/refactor.py")
+        rc, out, err = _run_with_stdin(run_guard_edit, inp)
+        assert rc == 0
+        assert "edit guard" in err
+
+    def test_non_edit_tool_passes(self):
+        """Non-edit tools pass through silently."""
+        for tool in ["Read", "Bash", "Grep", "Glob"]:
+            inp = _make_guard_input(tool, file_path="src/app.py")
+            rc, out, err = _run_with_stdin(run_guard_edit, inp)
+            assert rc == 0, f"Should allow tool: {tool}"
+            assert err == "", f"Should be silent for: {tool}"
+
+    def test_handles_invalid_json(self):
+        """Invalid JSON stdin doesn't crash."""
+        rc, out, err = _run_with_stdin(run_guard_edit, "not json")
+        assert rc == 0
+
+    def test_handles_missing_file_path(self):
+        """Missing file_path still shows warning but no file hint."""
+        inp = json.dumps({"tool_name": "Edit", "tool_input": {}})
+        rc, out, err = _run_with_stdin(run_guard_edit, inp)
+        assert rc == 0
+        assert "edit guard" in err
+        assert "Target file:" not in err
