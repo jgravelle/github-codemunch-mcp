@@ -4,6 +4,9 @@ All notable changes to jcodemunch-mcp are documented here.
 
 ## [Unreleased]
 
+### Added
+- `get_blast_radius`: new `include_source` flag returns `source_snippets` (lines referencing the symbol) and `symbols_in_file` (nearby symbol signatures) on each confirmed entry — enables fix-ready context in one call without extra `get_symbol_source`/`get_file_content` round-trips. Optional `source_budget` (default 8000 tokens) caps output size; files prioritised by reference count.
+
 ## [1.23.0] - 2026-04-07
 
 ### Added

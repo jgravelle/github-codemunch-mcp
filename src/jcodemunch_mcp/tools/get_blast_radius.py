@@ -69,6 +69,50 @@ def _name_in_content(content: str, name: str) -> bool:
     return bool(re.search(r"\b" + re.escape(name) + r"\b", content))
 
 
+def _extract_reference_snippets(content: str, name: str) -> list[dict]:
+    """Extract lines where ``name`` appears as a word token.
+
+    Returns list of {"line": int, "text": str} dicts.
+    """
+    snippets: list[dict] = []
+    pattern = re.compile(r"\b" + re.escape(name) + r"\b")
+    for i, line in enumerate(content.splitlines()):
+        if pattern.search(line):
+            snippets.append({"line": i + 1, "text": line.rstrip()})
+    return snippets
+
+
+def _get_symbols_near_references(
+    syms_by_file: dict, file_path: str, snippet_lines: list[int]
+) -> list[dict]:
+    """Return symbols from *file_path* that contain or neighbour any snippet line.
+
+    *syms_by_file* must be pre-built via ``build_symbols_by_file(index)`` so
+    callers can reuse a single dict across many files.
+
+    Returns compact dicts: {name, kind, line, signature}.
+    """
+    file_syms = syms_by_file.get(file_path, [])
+    result: list[dict] = []
+    seen: set[str] = set()
+    for sym in file_syms:
+        sym_start = sym.get("line", 0)
+        sym_end = sym.get("end_line", sym_start)
+        for ref_line in snippet_lines:
+            if (sym_start <= ref_line <= sym_end) or abs(ref_line - sym_start) <= 5:
+                sid = sym.get("id", sym.get("name"))
+                if sid not in seen:
+                    seen.add(sid)
+                    result.append({
+                        "name": sym.get("name", ""),
+                        "kind": sym.get("kind", ""),
+                        "line": sym_start,
+                        "signature": sym.get("signature", ""),
+                    })
+                break
+    return result
+
+
 def get_blast_radius(
     repo: str,
     symbol: str,
@@ -79,6 +123,8 @@ def get_blast_radius(
     call_depth: int = 0,
     fqn: Optional[str] = None,
     decorator_filter: Optional[str] = None,
+    include_source: bool = False,
+    source_budget: int = 8000,
 ) -> dict:
     """Find all files that would be affected if a symbol's signature or behaviour changed.
 
@@ -100,6 +146,11 @@ def get_blast_radius(
         decorator_filter: Optional case-insensitive substring filter. When set,
             only confirmed files containing a symbol with a matching decorator
             are returned (e.g. ``"route"`` matches ``@route('/users')``).
+        include_source: When True, each confirmed entry includes ``source_snippets``
+            (lines referencing the symbol) and ``symbols_in_file`` (nearby symbol
+            signatures).  Enables fix-ready context in one call.
+        source_budget: Max tokens for source snippets across all files (default 8000).
+            Files are prioritised by reference count.
 
     Returns:
         Dict with symbol info, confirmed/potential affected files, counts, and _meta.
@@ -127,7 +178,7 @@ def get_blast_radius(
 
     # Check session cache before the expensive BFS + content scans
     repo_key = f"{owner}/{name}"
-    specific_key = (symbol, depth, call_depth, bool(cross_repo), include_depth_scores)
+    specific_key = (symbol, depth, call_depth, bool(cross_repo), include_depth_scores, decorator_filter, include_source, source_budget)
     cached = result_cache_get("get_blast_radius", repo_key, specific_key)
     if cached is not None:
         result = dict(cached)
@@ -178,9 +229,12 @@ def get_blast_radius(
     # Text-scan each importer for the symbol name
     confirmed: list[dict] = []
     potential: list[dict] = []
+    content_cache: dict[str, str] = {}
 
     for imp_file in importer_files:
         content = store.get_file_content(owner, name, imp_file)
+        if content is not None:
+            content_cache[imp_file] = content
         if content is None:
             potential.append({"file": imp_file, "reason": "content unavailable"})
             continue
@@ -194,9 +248,12 @@ def get_blast_radius(
     confirmed.sort(key=lambda x: x["file"])
     potential.sort(key=lambda x: x["file"])
 
+    # Build symbols-by-file once if needed by decorator_filter or include_source
+    _need_syms_by_file = bool(decorator_filter) or (include_source and confirmed and source_budget > 0)
+    syms_by_file = build_symbols_by_file(index) if _need_syms_by_file else {}
+
     # Post-filter by decorator: keep only confirmed files that contain a symbol with the matching decorator
     if decorator_filter:
-        syms_by_file = build_symbols_by_file(index)
         filtered_confirmed = []
         for entry in confirmed:
             imp_file = entry["file"]
@@ -207,6 +264,44 @@ def get_blast_radius(
             ):
                 filtered_confirmed.append(entry)
         confirmed = filtered_confirmed
+
+    # Enrich confirmed entries with source snippets (optional)
+    if include_source:
+        # Ensure consistent shape: every confirmed entry gets these keys
+        for entry in confirmed:
+            entry.setdefault("source_snippets", [])
+            entry.setdefault("symbols_in_file", [])
+        if confirmed and source_budget > 0:
+            budget_remaining = source_budget
+            # Sort by reference count descending — most-referenced files first
+            confirmed.sort(key=lambda x: x.get("references", 0), reverse=True)
+            for entry in confirmed:
+                if budget_remaining <= 0:
+                    break
+                content = content_cache.get(entry["file"])
+                if not content:
+                    continue
+                snippets = _extract_reference_snippets(content, sym_name)
+                # Rough token estimate: ~4 chars per token
+                snippet_tokens = sum(len(s["text"]) // 4 + 1 for s in snippets)
+                if snippet_tokens > budget_remaining:
+                    kept: list[dict] = []
+                    for s in snippets:
+                        t = len(s["text"]) // 4 + 1
+                        if t > budget_remaining:
+                            break
+                        kept.append(s)
+                        budget_remaining -= t
+                    snippets = kept
+                else:
+                    budget_remaining -= snippet_tokens
+                entry["source_snippets"] = snippets
+                snippet_lines = [s["line"] for s in snippets]
+                entry["symbols_in_file"] = _get_symbols_near_references(
+                    syms_by_file, entry["file"], snippet_lines
+                )
+            # Re-sort by file path for stable output
+            confirmed.sort(key=lambda x: x["file"])
 
     # Cross-repo: find other repos that import this repo's package
     cross_repo_confirmed: list[dict] = []

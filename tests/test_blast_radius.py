@@ -1,7 +1,12 @@
-"""Tests for get_blast_radius — depth scoring and risk fields (Feature 4)."""
+"""Tests for get_blast_radius — depth scoring, risk fields, and include_source."""
 
 import pytest
-from jcodemunch_mcp.tools.get_blast_radius import _bfs_importers, get_blast_radius
+from jcodemunch_mcp.tools.get_blast_radius import (
+    _bfs_importers,
+    _extract_reference_snippets,
+    _get_symbols_near_references,
+    get_blast_radius,
+)
 from jcodemunch_mcp.tools.index_folder import index_folder
 
 
@@ -165,3 +170,124 @@ class TestBlastRadiusRiskFields:
         assert "potential" in result
         assert "confirmed_count" in result
         assert "potential_count" in result
+
+
+# ---------------------------------------------------------------------------
+# Unit tests: _extract_reference_snippets
+# ---------------------------------------------------------------------------
+
+class TestExtractReferenceSnippets:
+
+    def test_finds_matching_lines(self):
+        content = "import helper\n\nx = helper()\ny = 42\nz = helper(1)\n"
+        result = _extract_reference_snippets(content, "helper")
+        assert len(result) == 3
+        assert result[0] == {"line": 1, "text": "import helper"}
+        assert result[1] == {"line": 3, "text": "x = helper()"}
+        assert result[2] == {"line": 5, "text": "z = helper(1)"}
+
+    def test_no_matches_returns_empty(self):
+        assert _extract_reference_snippets("x = 42\n", "helper") == []
+
+    def test_word_boundary_prevents_partial(self):
+        content = "helpers = []\nhelper_fn()\nhelper()\n"
+        result = _extract_reference_snippets(content, "helper")
+        assert len(result) == 1
+        assert result[0]["line"] == 3
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: include_source flag
+# ---------------------------------------------------------------------------
+
+class TestBlastRadiusIncludeSource:
+    """Tests for include_source flag."""
+
+    def _build_repo(self, tmp_path):
+        src = tmp_path / "src"
+        store = tmp_path / "store"
+        src.mkdir()
+        store.mkdir()
+        (src / "utils.py").write_text("def helper():\n    return 42\n")
+        (src / "main.py").write_text(
+            "from utils import helper\n\nresult = helper()\n\n"
+            "def process():\n    return helper()\n"
+        )
+        (src / "cli.py").write_text("from main import result\n\nprint(result)\n")
+        result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
+        assert result["success"] is True
+        return result["repo"], str(store)
+
+    def test_include_source_false_no_snippets(self, tmp_path):
+        """Default behavior: no source_snippets in confirmed entries."""
+        repo, store = self._build_repo(tmp_path)
+        r = get_blast_radius(repo, "helper", storage_path=store)
+        for entry in r["confirmed"]:
+            assert "source_snippets" not in entry
+            assert "symbols_in_file" not in entry
+
+    def test_include_source_true_adds_snippets(self, tmp_path):
+        """With include_source=True, confirmed entries have source_snippets."""
+        repo, store = self._build_repo(tmp_path)
+        r = get_blast_radius(repo, "helper", include_source=True, storage_path=store)
+        main_entry = next(e for e in r["confirmed"] if e["file"] == "main.py")
+        assert "source_snippets" in main_entry
+        assert len(main_entry["source_snippets"]) >= 2  # import + usage(s)
+        assert all("line" in s and "text" in s for s in main_entry["source_snippets"])
+
+    def test_include_source_adds_symbols_in_file(self, tmp_path):
+        """With include_source=True, confirmed entries have symbols_in_file."""
+        repo, store = self._build_repo(tmp_path)
+        r = get_blast_radius(repo, "helper", include_source=True, storage_path=store)
+        main_entry = next(e for e in r["confirmed"] if e["file"] == "main.py")
+        assert "symbols_in_file" in main_entry
+        sym_names = [s["name"] for s in main_entry["symbols_in_file"]]
+        assert "process" in sym_names
+
+    def test_source_budget_limits_output(self, tmp_path):
+        """source_budget=1 should truncate snippets severely."""
+        repo, store = self._build_repo(tmp_path)
+        r = get_blast_radius(
+            repo, "helper", include_source=True, source_budget=1, storage_path=store
+        )
+        total_snippets = sum(
+            len(e.get("source_snippets", [])) for e in r["confirmed"]
+        )
+        assert total_snippets <= 1
+
+    def test_include_source_does_not_affect_potential(self, tmp_path):
+        """Potential entries should NOT get source_snippets."""
+        repo, store = self._build_repo(tmp_path)
+        r = get_blast_radius(repo, "helper", include_source=True, storage_path=store)
+        for entry in r.get("potential", []):
+            assert "source_snippets" not in entry
+
+    def test_confirmed_sorted_by_file_after_enrichment(self, tmp_path):
+        """Confirmed entries remain sorted by file path after enrichment."""
+        repo, store = self._build_repo(tmp_path)
+        r = get_blast_radius(repo, "helper", include_source=True, storage_path=store)
+        files = [e["file"] for e in r["confirmed"]]
+        assert files == sorted(files)
+
+    def test_source_budget_zero_gives_empty_snippets(self, tmp_path):
+        """source_budget=0 with include_source=True → consistent shape, empty lists."""
+        repo, store = self._build_repo(tmp_path)
+        r = get_blast_radius(
+            repo, "helper", include_source=True, source_budget=0, storage_path=store
+        )
+        for entry in r["confirmed"]:
+            assert entry["source_snippets"] == []
+            assert entry["symbols_in_file"] == []
+
+    def test_include_source_no_importers(self, tmp_path):
+        """include_source=True on a leaf symbol with no importers is a no-op."""
+        src = tmp_path / "src"
+        store = tmp_path / "store2"
+        src.mkdir(exist_ok=True)
+        store.mkdir()
+        (src / "leaf.py").write_text("def lonely():\n    return 1\n")
+        res = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
+        assert res["success"]
+        r = get_blast_radius(res["repo"], "lonely", include_source=True, storage_path=str(store))
+        assert "error" not in r
+        assert r["confirmed"] == []

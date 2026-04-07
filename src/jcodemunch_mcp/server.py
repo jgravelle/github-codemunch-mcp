@@ -1094,7 +1094,7 @@ def _build_tools_list() -> list[Tool]:
         ),
         Tool(
             name="get_blast_radius",
-            description="Find all files affected by changing a symbol. Returns confirmed files (import + name match) and potential files (import only, e.g. wildcard). Use before renaming or deleting a symbol. Set cross_repo=true to also find consumers in other indexed repos.",
+            description="Find all files affected by changing a symbol. Returns confirmed files (import + name match) and potential files (import only, e.g. wildcard). Use before renaming or deleting a symbol. Set cross_repo=true to also find consumers in other indexed repos. Set include_source=true to get source snippets at each reference site (fix-ready context in one call).",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1133,6 +1133,16 @@ def _build_tools_list() -> list[Tool]:
                     "decorator_filter": {
                         "type": "string",
                         "description": "Optional: filter confirmed results to only those containing symbols with this decorator (case-insensitive substring match)"
+                    },
+                    "include_source": {
+                        "type": "boolean",
+                        "description": "When true, each confirmed file includes source_snippets (lines referencing the symbol) and symbols_in_file (nearby symbol signatures). Use for fix-ready context without extra tool calls. Default false.",
+                        "default": False,
+                    },
+                    "source_budget": {
+                        "type": "integer",
+                        "description": "Max tokens for source snippets across all files (default 8000). Files are prioritized by reference count.",
+                        "default": 8000,
                     },
                 },
                 "required": ["repo", "symbol"]
@@ -2171,6 +2181,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     call_depth=arguments.get("call_depth", 0),
                     fqn=arguments.get("fqn"),
                     decorator_filter=arguments.get("decorator_filter"),
+                    include_source=arguments.get("include_source", False),
+                    source_budget=arguments.get("source_budget", 8000),
                 )
             )
         elif name == "get_call_hierarchy":
