@@ -91,32 +91,29 @@ def _callers_from_references(
     if not sym_name or not sym_file:
         return []
 
-    # Files that import sym's file
+    # Files that import sym's file + sym's own file (for same-file callers)
     importing_files = set(reverse_adj.get(sym_file, []))
-    if not importing_files:
-        return []
+    search_files = importing_files | {sym_file}
 
-    # Look up by (sym_file, sym_name) — all symbols in sym's file that reference sym_name
-    key = (sym_file, sym_name)
-    caller_ids = callers_by_name.get(key, [])
+    # Look up by (file, sym_name) for each candidate file
     sym_id = sym.get("id", "")
     results: list[dict] = []
 
-    for cid in caller_ids:
-        if cid == sym_id:
-            continue  # Skip self-reference
-        caller = index._symbol_index.get(cid)
-        if caller:
-            caller_file = caller.get("file", "")
-            # Only include callers from files that import sym's file
-            if caller_file and caller_file in importing_files:
-                results.append({
-                    "id": cid,
-                    "name": caller.get("name", ""),
-                    "kind": caller.get("kind", ""),
-                    "file": caller_file,
-                    "line": caller.get("line", 0),
-                })
+    for candidate_file in search_files:
+        for cid in callers_by_name.get((candidate_file, sym_name), []):
+            if cid == sym_id:
+                continue  # Skip self-reference
+            caller = index._symbol_index.get(cid)
+            if caller:
+                caller_file = caller.get("file", "")
+                if caller_file and caller_file in search_files:
+                    results.append({
+                        "id": cid,
+                        "name": caller.get("name", ""),
+                        "kind": caller.get("kind", ""),
+                        "file": caller_file,
+                        "line": caller.get("line", 0),
+                    })
     return results
 
 
@@ -213,7 +210,7 @@ def find_direct_callers(
             for c in ast_callers:
                 ast_caller_ids.add(c["id"])
 
-    # Always use text heuristic as fallback/补充 (handles partial AST data)
+    # Always use text heuristic as fallback (handles partial AST data)
     sym_name: str = sym.get("name", "")
     sym_file: str = sym.get("file", "")
     if not sym_name or not sym_file:
@@ -247,7 +244,7 @@ def find_direct_callers(
                     "line": candidate.get("line", 0),
                 })
 
-    return callers
+    return ast_callers + callers
 
 
 def find_direct_callees(

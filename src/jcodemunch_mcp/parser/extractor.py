@@ -14,23 +14,18 @@ from .complexity import compute_complexity
 # These are used to extract call_references from the AST.
 _CALL_NODE_TYPES: dict[str, set[str]] = {
     "python": {"call"},
-    "javascript": {"call_expression"},
-    "typescript": {"call_expression"},
-    "tsx": {"call_expression"},
+    "javascript": {"call_expression", "new_expression"},
+    "typescript": {"call_expression", "new_expression"},
+    "tsx": {"call_expression", "new_expression"},
     "go": {"call_expression"},
     "rust": {"call_expression"},
-    "java": {"method_invocation"},
+    "java": {"method_invocation", "object_creation_expression"},
     "php": {"function_call_expression", "method_call_expression", "scoped_call_expression"},
     "ruby": {"call", "method_call"},
     "csharp": {"invocation_expression"},
     "kotlin": {"call_expression"},
     "dart": {"function_expression_invocation"},
     "swift": {"call_expression"},
-    # Constructor calls (new Foo())
-    "javascript": {"call_expression", "new_expression"},
-    "typescript": {"call_expression", "new_expression"},
-    "tsx": {"call_expression", "new_expression"},
-    "java": {"method_invocation", "object_creation_expression"},
 }
 
 
@@ -57,7 +52,7 @@ def _extract_call_name(node, source_bytes: bytes) -> Optional[str]:
         # For JS call_expression: the function is first child (could be identifier or member expression)
         first_child = None
         for child in node.children:
-            if child.type not in ("(", ")", "[", "]"):
+            if child.type not in ("(", ")", "[", "]", "new"):
                 first_child = child
                 break
 
@@ -65,7 +60,7 @@ def _extract_call_name(node, source_bytes: bytes) -> Optional[str]:
             return None
 
         ft = first_child.type
-        if ft == "identifier":
+        if ft in ("identifier", "type_identifier"):
             return first_child.text.decode("utf-8", errors="replace")
         elif ft in ("member_expression", "attribute_expression", "attribute", "method_declaration"):
             # For JS/TS: member_expression contains property_identifier for the method name

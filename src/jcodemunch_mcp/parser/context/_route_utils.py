@@ -239,10 +239,7 @@ def has_dependency(folder: Path, name: str, manifests: list[str]) -> bool:
             continue
 
         try:
-            if manifest == "package.json":
-                packages = parser(content)
-            else:
-                packages = parser(content)
+            packages = parser(content)
         except Exception:
             continue
 

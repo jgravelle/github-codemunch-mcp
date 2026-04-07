@@ -218,3 +218,52 @@ class TestCallReferenceOrdering:
         process_sym = next((s for s in symbols if s.name == "process"), None)
         assert process_sym is not None
         assert process_sym.call_references == ["first", "second", "third"]
+
+
+# ---------------------------------------------------------------------------
+# Constructor call extraction tests
+# ---------------------------------------------------------------------------
+
+class TestConstructorCallExtraction:
+    """Constructor calls (new Foo()) should be extracted as call references."""
+
+    def test_js_new_expression(self):
+        """new Date() in JavaScript -> "Date" in call_references."""
+        code = 'function foo() {\n    let d = new Date();\n}\n'
+        symbols = parse_file(code, "test.js", "javascript")
+        foo = next((s for s in symbols if s.name == "foo"), None)
+        assert foo is not None
+        assert "Date" in foo.call_references
+
+    def test_js_new_mixed_with_regular_calls(self):
+        """new and regular calls both extracted."""
+        code = 'function foo() {\n    new Map();\n    bar();\n}\n'
+        symbols = parse_file(code, "test.js", "javascript")
+        foo = next((s for s in symbols if s.name == "foo"), None)
+        assert foo is not None
+        assert "Map" in foo.call_references
+        assert "bar" in foo.call_references
+
+    def test_ts_new_expression(self):
+        """new Map() in TypeScript."""
+        code = 'function foo(): void {\n    const m = new Map();\n}\n'
+        symbols = parse_file(code, "test.ts", "typescript")
+        foo = next((s for s in symbols if s.name == "foo"), None)
+        assert foo is not None
+        assert "Map" in foo.call_references
+
+    def test_tsx_new_expression(self):
+        """new Set() in TSX."""
+        code = 'function foo() {\n    const s = new Set();\n}\n'
+        symbols = parse_file(code, "test.tsx", "tsx")
+        foo = next((s for s in symbols if s.name == "foo"), None)
+        assert foo is not None
+        assert "Set" in foo.call_references
+
+    def test_java_object_creation(self):
+        """new Bar() in Java -> "Bar" in call_references."""
+        code = 'class Foo {\n    void run() {\n        Bar b = new Bar();\n    }\n}\n'
+        symbols = parse_file(code, "Test.java", "java")
+        run = next((s for s in symbols if s.name == "run"), None)
+        assert run is not None
+        assert "Bar" in run.call_references

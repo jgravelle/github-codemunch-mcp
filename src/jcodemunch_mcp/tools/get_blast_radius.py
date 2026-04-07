@@ -196,11 +196,11 @@ def get_blast_radius(
 
     # Post-filter by decorator: keep only confirmed files that contain a symbol with the matching decorator
     if decorator_filter:
+        syms_by_file = build_symbols_by_file(index)
         filtered_confirmed = []
         for entry in confirmed:
             imp_file = entry["file"]
-            # Check if any symbol in this file has the matching decorator
-            file_symbols = [s for s in index.symbols if s.get("file") == imp_file]
+            file_symbols = syms_by_file.get(imp_file, [])
             if any(
                 any(decorator_filter.lower() in d.lower() for d in (s.get("decorators") or []))
                 for s in file_symbols
