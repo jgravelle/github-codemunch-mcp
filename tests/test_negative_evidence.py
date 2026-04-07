@@ -86,9 +86,9 @@ class TestGetRankedContextNegativeEvidence:
         src.mkdir()
         (src / "a.py").write_text("def real_function(): pass\n")
 
-        idx = index_folder(path=str(tmp_path), use_ai_summaries=False)
+        storage = str(tmp_path / "idx")
+        idx = index_folder(path=str(tmp_path), use_ai_summaries=False, storage_path=storage)
         repo = idx["repo"]
-        storage = idx.get("storage_path")
 
         result = get_ranked_context(
             repo=repo,
@@ -112,9 +112,9 @@ class TestGetRankedContextNegativeEvidence:
         src.mkdir()
         (src / "a.py").write_text("def real_function(): pass\n")
 
-        idx = index_folder(path=str(tmp_path), use_ai_summaries=False)
+        storage = str(tmp_path / "idx")
+        idx = index_folder(path=str(tmp_path), use_ai_summaries=False, storage_path=storage)
         repo = idx["repo"]
-        storage = idx.get("storage_path")
 
         result = get_ranked_context(
             repo=repo,
@@ -135,9 +135,9 @@ class TestGetRankedContextNegativeEvidence:
         src.mkdir()
         (src / "a.py").write_text("def my_special_function():\n    return 42\n")
 
-        idx = index_folder(path=str(tmp_path), use_ai_summaries=False)
+        storage = str(tmp_path / "idx")
+        idx = index_folder(path=str(tmp_path), use_ai_summaries=False, storage_path=storage)
         repo = idx["repo"]
-        storage = idx.get("storage_path")
 
         result = get_ranked_context(
             repo=repo,
@@ -159,9 +159,9 @@ class TestGetRankedContextNegativeEvidence:
         src.mkdir()
         (src / "auth_handler.py").write_text("def login(): pass\n")
 
-        idx = index_folder(path=str(tmp_path), use_ai_summaries=False)
+        storage = str(tmp_path / "idx")
+        idx = index_folder(path=str(tmp_path), use_ai_summaries=False, storage_path=storage)
         repo = idx["repo"]
-        storage = idx.get("storage_path")
 
         result = get_ranked_context(
             repo=repo,
@@ -188,9 +188,9 @@ class TestSearchSymbolsWarningString:
         src.mkdir()
         (src / "a.py").write_text("def real_function(): pass\n")
 
-        idx = index_folder(path=str(tmp_path), use_ai_summaries=False)
+        storage = str(tmp_path / "idx")
+        idx = index_folder(path=str(tmp_path), use_ai_summaries=False, storage_path=storage)
         repo = idx["repo"]
-        storage = idx.get("storage_path")
 
         result = search_symbols(
             repo=repo,
@@ -211,9 +211,9 @@ class TestSearchSymbolsWarningString:
         src.mkdir()
         (src / "a.py").write_text("def real_function(): pass\n")
 
-        idx = index_folder(path=str(tmp_path), use_ai_summaries=False)
+        storage = str(tmp_path / "idx")
+        idx = index_folder(path=str(tmp_path), use_ai_summaries=False, storage_path=storage)
         repo = idx["repo"]
-        storage = idx.get("storage_path")
 
         result = search_symbols(
             repo=repo,
