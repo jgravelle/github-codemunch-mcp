@@ -229,6 +229,44 @@ class TestExtractImportsPython:
         assert result[0]["specifier"] == "os.path"
         assert result[0]["names"] == []
 
+    def test_function_local_from_import(self):
+        """Function-local 'from x import y' (indented) should be captured.
+
+        Common pattern in FastAPI/Django for breaking circular imports:
+        the import lives inside a function body, not at module level.
+        """
+        content = (
+            "def some_endpoint():\n"
+            "    from app.notifications.mentions import process_comment\n"
+            "    return process_comment()\n"
+        )
+        result = extract_imports(content, "app/router.py", "python")
+        specifiers = [r["specifier"] for r in result]
+        assert "app.notifications.mentions" in specifiers
+        names = [n for r in result for n in r["names"]]
+        assert "process_comment" in names
+
+    def test_function_local_import_statement(self):
+        """Function-local 'import x' (indented) should also be captured."""
+        content = (
+            "def lazy_loader():\n"
+            "    import json\n"
+            "    return json\n"
+        )
+        result = extract_imports(content, "utils.py", "python")
+        specifiers = [r["specifier"] for r in result]
+        assert "json" in specifiers
+
+    def test_class_body_import(self):
+        """Imports inside class bodies (also indented) should be captured."""
+        content = (
+            "class Service:\n"
+            "    from app.helpers import normalize\n"
+        )
+        result = extract_imports(content, "app/service.py", "python")
+        specifiers = [r["specifier"] for r in result]
+        assert "app.helpers" in specifiers
+
 
 class TestExtractImportsSqlDbt:
     """Test dbt ref() and source() extraction from SQL files."""
@@ -590,6 +628,111 @@ class TestResolveSpecifier:
             "find_importers must find @/lib/utils importers when tsconfig.json uses JSONC comments"
         )
         assert "app/components/Header.tsx" in files
+
+
+class TestResolveSpecifierPython:
+    """Resolve Python module-style absolute imports against detected source roots.
+
+    Covers the common case where a project does NOT put its packages at the
+    repo root: backend/, src/, apps/api/, etc. The resolver must convert
+    'app.notifications.mentions' to 'app/notifications/mentions.py' AND
+    auto-detect that 'backend/' (or 'src/', etc.) is a source root by looking
+    at where __init__.py files live.
+    """
+
+    def test_repo_root_layout(self):
+        """Flat layout: 'app.helpers' resolves to 'app/helpers.py'."""
+        files = {
+            "app/__init__.py",
+            "app/helpers.py",
+            "main.py",
+        }
+        result = resolve_specifier("app.helpers", "main.py", files)
+        assert result == "app/helpers.py"
+
+    def test_backend_source_root(self):
+        """FastAPI-style layout: 'app.notifications.mentions' resolves to
+        'backend/app/notifications/mentions.py' because 'backend/' is detected
+        as a source root (parent of the top-level 'app' package).
+        """
+        files = {
+            "backend/app/__init__.py",
+            "backend/app/notifications/__init__.py",
+            "backend/app/notifications/mentions.py",
+            "backend/app/router.py",
+        }
+        result = resolve_specifier(
+            "app.notifications.mentions", "backend/app/router.py", files
+        )
+        assert result == "backend/app/notifications/mentions.py"
+
+    def test_src_source_root(self):
+        """src/ layout: 'mypkg.utils' resolves to 'src/mypkg/utils.py'."""
+        files = {
+            "src/mypkg/__init__.py",
+            "src/mypkg/utils.py",
+            "src/mypkg/main.py",
+        }
+        result = resolve_specifier(
+            "mypkg.utils", "src/mypkg/main.py", files
+        )
+        assert result == "src/mypkg/utils.py"
+
+    def test_resolves_to_init_file(self):
+        """A bare package import resolves to the package's __init__.py."""
+        files = {
+            "backend/app/__init__.py",
+            "backend/app/services/__init__.py",
+            "backend/app/services/email.py",
+        }
+        result = resolve_specifier(
+            "app.services", "backend/app/services/email.py", files
+        )
+        assert result == "backend/app/services/__init__.py"
+
+    def test_pep420_namespace_package(self):
+        """PEP 420 layout (no __init__.py anywhere): falls back to top-level
+        directories that contain .py files. 'app.helpers' should still
+        resolve to 'app/helpers.py'.
+        """
+        files = {
+            "app/helpers.py",
+            "app/main.py",
+        }
+        result = resolve_specifier("app.helpers", "app/main.py", files)
+        assert result == "app/helpers.py"
+
+    def test_unresolvable_third_party(self):
+        """Imports that don't match any indexed file (stdlib, pip packages)
+        return None instead of crashing or false-matching.
+        """
+        files = {
+            "backend/app/__init__.py",
+            "backend/app/main.py",
+        }
+        result = resolve_specifier(
+            "fastapi.responses", "backend/app/main.py", files
+        )
+        assert result is None
+
+    def test_relative_import_routes_through_relative_branch(self):
+        """Imports starting with '.' must NOT trigger the new Python module
+        branch. They go through the existing relative-import branch at the
+        top of resolve_specifier (whose Python-specific behavior is tested
+        separately by test_python_relative).
+        """
+        files = {
+            "backend/app/__init__.py",
+            "backend/app/services/__init__.py",
+            "backend/app/services/email.py",
+        }
+        # The new branch must not match this; whatever the relative branch
+        # returns is fine for this test (we're guarding against the new
+        # branch hijacking dotted-leading specifiers).
+        result = resolve_specifier(
+            ".email", "backend/app/services/sms.py", files
+        )
+        assert result is None or result == "backend/app/services/email.py"
 
 
 # ---------------------------------------------------------------------------
