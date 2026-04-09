@@ -240,6 +240,20 @@ jcodemunch-mcp init --yes --claude-md global --hooks --index --audit
 pip install jcodemunch-mcp
 ```
 
+> **Want AI-generated summaries?** The base install does not include AI provider
+> packages (to keep it lightweight). Install the extra for your provider:
+>
+> ```bash
+> pip install "jcodemunch-mcp[anthropic]"   # Claude
+> pip install "jcodemunch-mcp[gemini]"      # Gemini
+> pip install "jcodemunch-mcp[openai]"      # OpenAI-compatible
+> pip install "jcodemunch-mcp[all]"         # all providers
+> ```
+>
+> Without an extra, summaries fall back to signatures (which still works — you
+> just get shorter descriptions). Run `jcodemunch-mcp config --check` to verify
+> your provider is installed and working.
+
 #### 2. Add it to your MCP client
 
 If you’re using Claude Code:
