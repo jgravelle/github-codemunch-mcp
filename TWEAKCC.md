@@ -72,73 +72,43 @@ All files are tweakcc prompt fragments. Headers (YAML frontmatter in `<!-- -->`)
 ### 1. Read files (`system-prompt-tool-usage-read-files.md`)
 
 ```
-Before reading any source code file, call jCodeMunch get_file_outline to see its
-structure first. To read specific symbols, use get_symbol_source (single symbol_id
-or batch symbol_ids[]) or get_context_bundle (symbol + its imports) instead of
-reading the whole file. Use Read for non-code files (.md, .json, .yaml, .toml,
-.env, .txt, .html, images, PDFs) and when you need complete file content before
-editing. Never use cat, head, tail, or sed to read any file.
+Before reading any source code file, call jCodeMunch get_file_outline to see its structure first. To read specific symbols, use get_symbol_source (single symbol_id or batch symbol_ids[]) or get_context_bundle (symbol + its imports) instead of reading the whole file. Use ${READ_TOOL_NAME} for non-code files (.md, .json, .yaml, .toml, .env, .txt, .html, images, PDFs) and when you need complete file content before editing. Never use cat, head, tail, or sed to read any file.
 ```
 
 ### 2. Search content (`system-prompt-tool-usage-search-content.md`)
 
 ```
-To search code by symbol name (function, class, method, variable), use jCodeMunch
-search_symbols -- narrow with kind=, language=, file_pattern=. To search for
-strings, comments, TODOs, or patterns in source code, use jCodeMunch search_text
-(supports regex via is_regex, context_lines for surrounding code). For database
-columns in dbt/SQLMesh projects, use search_columns. Use Grep only for searching
-non-code file content (.md, .json, .yaml, .txt, .env, config files). Never invoke
-grep or rg via Bash.
+To search code by symbol name (function, class, method, variable), use jCodeMunch search_symbols -- narrow with kind=, language=, file_pattern=. To search for strings, comments, TODOs, or patterns in source code, use jCodeMunch search_text (supports regex via is_regex, context_lines for surrounding code). For database columns in dbt/SQLMesh projects, use search_columns. Use ${GREP_TOOL_NAME} only for searching non-code file content (.md, .json, .yaml, .txt, .env, config files). Never invoke grep or rg via Bash.
 ```
 
 ### 3. Search files (`system-prompt-tool-usage-search-files.md`)
 
 ```
-To browse code project structure, use jCodeMunch get_file_tree (filter with
-path_prefix) or get_repo_outline for a high-level overview of directories,
-languages, and symbol counts. Use Glob when finding files by name pattern. Never
-use find or ls via Bash for file discovery.
+To browse code project structure, use jCodeMunch get_file_tree (filter with path_prefix) or get_repo_outline for a high-level overview of directories, languages, and symbol counts. Use ${GLOB_TOOL_NAME} when finding files by name pattern. Never use find or ls via Bash for file discovery.
 ```
 
 ### 4. Reserve Bash (`system-prompt-tool-usage-reserve-bash.md`)
 
 ```
-Reserve Bash exclusively for system commands and terminal operations: builds,
-tests, git, package managers, docker, kubectl, and similar. Never use Bash for
-code exploration -- do not run grep, rg, find, cat, head, or tail on source code
-files through it. Use jCodeMunch MCP tools for all code reading and searching. If
-unsure whether a dedicated tool exists, default to the dedicated tool.
+Reserve ${BASH_TOOL_NAME} exclusively for system commands and terminal operations: builds, tests, git, package managers, docker, kubectl, and similar. Never use ${BASH_TOOL_NAME} for code exploration -- do not run grep, rg, find, cat, head, or tail on source code files through it. Use jCodeMunch MCP tools for all code reading and searching. If unsure whether a dedicated tool exists, default to the dedicated tool.
 ```
 
 ### 5. Direct search (`system-prompt-tool-usage-direct-search.md`)
 
 ```
-For directed codebase searches (finding a specific function, class, or method),
-use jCodeMunch search_symbols directly -- it is faster and more precise than text
-search. For text pattern searches in code, use jCodeMunch search_text. Use native
-search tools only when searching non-code file content.
+For directed codebase searches (finding a specific function, class, or method), use jCodeMunch search_symbols directly -- it is faster and more precise than text search. For text pattern searches in code, use jCodeMunch search_text. Use ${SEARCH_TOOLS} only when searching non-code file content.
 ```
 
 ### 6. Delegate exploration (`system-prompt-tool-usage-delegate-exploration.md`)
 
 ```
-For broader codebase exploration, start with jCodeMunch: get_repo_outline for
-project overview, get_file_tree to browse structure, suggest_queries when the repo
-is unfamiliar. For deep research requiring multiple rounds, use subagents --
-instruct them to prefer jCodeMunch over native search tools for source code
-exploration.
+For broader codebase exploration, start with jCodeMunch: get_repo_outline for project overview, get_file_tree to browse structure, suggest_queries when the repo is unfamiliar. For deep research requiring multiple rounds, use the ${TASK_TOOL_NAME} tool with subagent_type=${EXPLORE_SUBAGENT.agentType} -- instruct subagents to prefer jCodeMunch over ${SEARCH_TOOLS} for source code exploration. Use subagents only when the task will clearly require more than ${QUERY_LIMIT} queries.
 ```
 
 ### 7. Subagent guidance (`system-prompt-tool-usage-subagent-guidance.md`)
 
 ```
-Use subagents when the task matches the agent's description. Subagents are
-valuable for parallelizing independent queries or protecting the main context
-window from excessive results. When delegating code exploration to subagents,
-instruct them to use jCodeMunch MCP tools (search_symbols, get_symbol_source,
-get_file_outline) rather than Read, Grep, or Glob for source code. Avoid
-duplicating work that subagents are already doing.
+Use the ${TASK_TOOL_NAME} tool with specialized agents when the task matches the agent's description. Subagents are valuable for parallelizing independent queries or protecting the main context window from excessive results. When delegating code exploration to subagents, instruct them to use jCodeMunch MCP tools (search_symbols, get_symbol_source, get_file_outline) rather than Read, Grep, or Glob for source code. Avoid duplicating work that subagents are already doing - if you delegate research to a subagent, do not also perform the same searches yourself.
 ```
 
 ### 8. Read first (`system-prompt-doing-tasks-read-first.md`)
