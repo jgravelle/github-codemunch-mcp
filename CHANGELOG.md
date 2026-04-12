@@ -2,6 +2,14 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.35.1] — 2026-04-12
+
+### Fixed
+- **invalidate_cache + index_folder reliability** ([#238](https://github.com/jgravelle/jcodemunch-mcp/pull/238)): `invalidate_cache` followed by `index_folder` (incremental) no longer returns "No changes detected". Fixes Windows WAL file-locking race, legacy JSON resurrection, and adds `_force_full_reindex` coordination flag
+- **meta_fields config applied to batch results** ([#238](https://github.com/jgravelle/jcodemunch-mcp/pull/238)): `meta_fields` filter now strips/filters nested `_meta` in batch tool responses (e.g. `get_file_outline` with `file_paths=[...]`)
+- **WatcherManager self-restarts on crash** ([#238](https://github.com/jgravelle/jcodemunch-mcp/pull/238)): monitoring loop auto-restarts with 100ms backoff, up to 5 consecutive attempts before clean exit
+- **Orphan index cleanup on startup** ([#238](https://github.com/jgravelle/jcodemunch-mcp/pull/238)): indexes whose `source_root` no longer exists on disk are deleted at server startup
+
 ## [1.35.0] — 2026-04-12
 
 ### Added
