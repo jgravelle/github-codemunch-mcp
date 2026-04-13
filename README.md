@@ -335,6 +335,41 @@ Free packs require no license. Licensed packs require a [jCodeMunch license](htt
 
 ---
 
+## Groq Integration
+
+Use jCodeMunch as a remote MCP tool with [Groq's](https://groq.com) ultra-fast inference — answer codebase questions in seconds with zero local setup.
+
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="YOUR_GROQ_KEY", base_url="https://api.groq.com/openai/v1")
+
+response = client.responses.create(
+    model="llama-3.3-70b-versatile",
+    input="What does parse_file do in jgravelle/jcodemunch-mcp?",
+    tools=[{
+        "type": "mcp",
+        "server_label": "jcodemunch",
+        "server_url": "https://YOUR_JCODEMUNCH_URL",
+        "headers": {"Authorization": "Bearer YOUR_TOKEN"},
+        "server_description": "Code intelligence via tree-sitter AST parsing.",
+        "require_approval": "never",
+    }],
+)
+```
+
+Groq handles MCP tool discovery and execution server-side — one API call, no orchestration needed.
+
+Self-host with Docker + Caddy for auto-TLS:
+
+```bash
+DOMAIN=mcp.example.com JCODEMUNCH_HTTP_TOKEN=secret docker compose up -d
+```
+
+See **[GROQ.md](GROQ.md)** for the full tutorial: allowed-tools presets, model recommendations, deployment options, and validation scripts.
+
+---
+
 ## Configuration
 
 Settings are controlled by a JSONC config file (`config.jsonc`) with env var fallbacks for backward compatibility. Defaults are chosen so that a fresh install works without any configuration.

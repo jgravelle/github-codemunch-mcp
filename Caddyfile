@@ -1,0 +1,26 @@
+# Caddy reverse proxy — auto-TLS for jCodeMunch MCP server
+#
+# Replace {$DOMAIN} with your domain (e.g., mcp.jcodemunch.com)
+# or set the DOMAIN env var in docker-compose.yml.
+
+{$DOMAIN:localhost} {
+    encode gzip
+
+    # SSE paths: disable response buffering for streaming
+    @sse path /sse*
+    handle @sse {
+        reverse_proxy jcodemunch:8901 {
+            flush_interval -1
+        }
+    }
+
+    # Everything else: normal proxy
+    handle {
+        reverse_proxy jcodemunch:8901
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}

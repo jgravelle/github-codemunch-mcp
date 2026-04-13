@@ -2,6 +2,11 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.37.0] — 2026-04-13
+
+### Added
+- **Groq Remote MCP integration** — full tutorial (`GROQ.md`), Docker deployment (`Dockerfile`, `docker-compose.yml`, `Caddyfile`), validation script (`examples/groq_validate.py`), and README section. Deploy jCodeMunch as an HTTPS SSE endpoint and connect via Groq's Responses API in a single API call. Includes allowed-tools presets (explore, deep, review, full) and model recommendations.
+
 ## [1.36.0] — 2026-04-12
 
 ### Added

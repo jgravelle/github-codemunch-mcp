@@ -1,0 +1,44 @@
+# jCodeMunch MCP Server — Docker Compose with Caddy auto-TLS
+#
+# Quick start:
+#   DOMAIN=mcp.example.com JCODEMUNCH_HTTP_TOKEN=mysecret docker compose up -d
+#
+# For local testing (no TLS):
+#   docker compose up -d jcodemunch
+#   # Access at http://localhost:8901/sse
+
+services:
+  jcodemunch:
+    build: .
+    restart: unless-stopped
+    environment:
+      - CODE_INDEX_PATH=/data/code-index
+      - JCODEMUNCH_TRANSPORT=sse
+      - JCODEMUNCH_HOST=0.0.0.0
+      - JCODEMUNCH_PORT=8901
+      - JCODEMUNCH_HTTP_TOKEN=${JCODEMUNCH_HTTP_TOKEN:-}
+      - JCODEMUNCH_RATE_LIMIT=${JCODEMUNCH_RATE_LIMIT:-60}
+    volumes:
+      - code-index:/data/code-index
+    ports:
+      - "8901:8901"  # Direct access (remove if using Caddy exclusively)
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - jcodemunch
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+
+volumes:
+  code-index:
+  caddy-data:
+  caddy-config:
