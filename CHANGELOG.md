@@ -2,6 +2,11 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.44.3] — 2026-04-15
+
+### Added
+- **Native performance backend** — Windows x64 users automatically get compiled native backend for tokenizer, budget packing, hotspot scoring, fusion, and PageRank. Falls back gracefully to Python on other platforms. Linux and macOS wheels coming soon.
+
 ## [1.44.2] — 2026-04-15
 
 ### Fixed
