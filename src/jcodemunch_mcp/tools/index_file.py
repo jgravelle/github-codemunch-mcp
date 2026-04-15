@@ -11,7 +11,7 @@ from ..parser import LANGUAGE_EXTENSIONS, get_language_for_path
 from ..parser.context import discover_providers, collect_metadata
 from ..security import validate_path
 from ..storage import IndexStore
-from ..storage.index_store import _file_hash, _get_git_head
+from ..storage.index_store import _file_hash, _get_git_head, _get_git_branch
 from ._indexing_pipeline import parse_and_prepare_incremental
 
 logger = logging.getLogger(__name__)
@@ -106,9 +106,26 @@ def index_file(
     file_mtime = os.stat(file_path).st_mtime_ns
 
     # Load existing index to check if file has changed
-    index = store.load_index(owner, name)
-    if index is None:
+    # Detect branch for branch-aware indexing
+    _current_branch = _get_git_branch(source_root)
+    _is_branch_delta = False
+
+    base_index = store.load_index(owner, name)  # always load base
+    if base_index is None:
         return {"success": False, "error": f"Failed to load index for {owner}/{name}"}
+
+    if _current_branch:
+        _base_branch = getattr(base_index, "branch", "") or ""
+        if not _base_branch:
+            _base_branch = _current_branch
+        if _current_branch != _base_branch:
+            _is_branch_delta = True
+            # Load branch-composed index for comparison
+            index = store.load_index(owner, name, branch=_current_branch) or base_index
+        else:
+            index = base_index
+    else:
+        index = base_index
 
     stored_hash = index.file_hashes.get(rel_path)
     is_new = rel_path not in index.file_hashes
@@ -160,21 +177,37 @@ def index_file(
     changed_files = [rel_path] if not is_new else []
     new_files = [rel_path] if is_new else []
 
-    updated = store.incremental_save(
-        owner=owner, name=name,
-        changed_files=changed_files,
-        new_files=new_files,
-        deleted_files=[],
-        new_symbols=new_symbols,
-        raw_files={rel_path: content},
-        git_head=git_head,
-        file_summaries=file_summaries,
-        file_languages=file_languages,
-        imports=file_imports,
-        context_metadata=ctx_metadata,
-        file_hashes={rel_path: file_hash},
-        file_mtimes={rel_path: file_mtime},
-    )
+    if _is_branch_delta:
+        store.save_branch_delta(
+            owner=owner, name=name, branch=_current_branch,
+            changed_files=changed_files, new_files=new_files, deleted_files=[],
+            new_symbols=new_symbols,
+            raw_files={rel_path: content},
+            git_head=git_head,
+            base_head=base_index.git_head if base_index else "",
+            file_hashes={rel_path: file_hash},
+            file_mtimes={rel_path: file_mtime},
+            file_languages=file_languages,
+            file_summaries=file_summaries,
+            file_imports=file_imports,
+        )
+        updated = store.load_index(owner, name, branch=_current_branch)
+    else:
+        updated = store.incremental_save(
+            owner=owner, name=name,
+            changed_files=changed_files,
+            new_files=new_files,
+            deleted_files=[],
+            new_symbols=new_symbols,
+            raw_files={rel_path: content},
+            git_head=git_head,
+            file_summaries=file_summaries,
+            file_languages=file_languages,
+            imports=file_imports,
+            context_metadata=ctx_metadata,
+            file_hashes={rel_path: file_hash},
+            file_mtimes={rel_path: file_mtime},
+        )
     if progress_cb:
         progress_cb(1, 1, rel_path)
 
@@ -187,6 +220,9 @@ def index_file(
         "indexed_at": updated.indexed_at if updated else "",
         "duration_seconds": round(time.monotonic() - t0, 2),
     }
+    if _is_branch_delta:
+        result["branch"] = _current_branch
+        result["branch_delta"] = True
     if warnings:
         result["warnings"] = warnings
     return result

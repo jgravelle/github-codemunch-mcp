@@ -34,7 +34,7 @@ from ..security import (
     SKIP_FILES
 )
 from ..storage import IndexStore
-from ..storage.index_store import _file_hash, _file_hash_bytes, _get_git_head
+from ..storage.index_store import _file_hash, _file_hash_bytes, _get_git_head, _get_git_branch
 from ..summarizer import summarize_symbols
 from ..reindex_state import WatcherChange
 from ..path_map import parse_path_map, remap
@@ -571,6 +571,17 @@ def index_folder(
             owner = "local"
             store = IndexStore(base_path=storage_path)
 
+            # Branch detection for watcher fast-path
+            _fast_branch = _get_git_branch(folder_path)
+            _fast_is_branch_delta = False
+            _fast_base_index = store.load_index(owner, repo_name)  # always load base for branch check
+            if _fast_base_index is not None and _fast_branch:
+                _fast_base_branch = getattr(_fast_base_index, "branch", "") or ""
+                if not _fast_base_branch:
+                    _fast_base_branch = _fast_branch
+                if _fast_branch != _fast_base_branch:
+                    _fast_is_branch_delta = True
+
             # Determine if watcher provided old_hash via WatcherChange objects.
             # If so, we can skip loading the index and use the memory-cached hashes.
             watcher_changes_with_hashes = [
@@ -579,7 +590,13 @@ def index_folder(
             ]
             use_memory_hash_cache = bool(watcher_changes_with_hashes)
 
-            existing_index = store.load_index(owner, repo_name) if not use_memory_hash_cache else None
+            if _fast_is_branch_delta:
+                # For branch delta mode, load the composed branch index for comparison
+                existing_index = store.load_index(owner, repo_name, branch=_fast_branch)
+            elif not use_memory_hash_cache:
+                existing_index = _fast_base_index
+            else:
+                existing_index = None
 
             # Build memory hash map from WatcherChange objects (from watcher memory cache)
             _old_hash_map: dict[str, str] = {}
@@ -755,19 +772,36 @@ def index_folder(
                 from ..reindex_state import _get_state
                 _deferred_gen = _get_state(_repo_full).deferred_generation
 
-                updated = store.incremental_save(
-                    owner=owner, name=repo_name,
-                    changed_files=changed_files, new_files=new_files, deleted_files=deleted_files,
-                    new_symbols=new_symbols,
-                    raw_files=raw_files_subset,
-                    git_head=git_head,
-                    file_summaries=incr_file_summaries,
-                    file_languages=incr_file_languages,
-                    imports=incr_file_imports,
-                    context_metadata=incr_context_metadata,
-                    file_hashes=subset_hashes,
-                    file_mtimes=all_mtimes,
-                )
+                if _fast_is_branch_delta:
+                    store.save_branch_delta(
+                        owner=owner, name=repo_name, branch=_fast_branch,
+                        changed_files=changed_files, new_files=new_files,
+                        deleted_files=deleted_files,
+                        new_symbols=new_symbols,
+                        raw_files=raw_files_subset,
+                        git_head=git_head,
+                        base_head=_fast_base_index.git_head if _fast_base_index else "",
+                        file_hashes=subset_hashes,
+                        file_mtimes=all_mtimes,
+                        file_languages=incr_file_languages,
+                        file_summaries=incr_file_summaries,
+                        file_imports=incr_file_imports,
+                    )
+                    updated = store.load_index(owner, repo_name, branch=_fast_branch)
+                else:
+                    updated = store.incremental_save(
+                        owner=owner, name=repo_name,
+                        changed_files=changed_files, new_files=new_files, deleted_files=deleted_files,
+                        new_symbols=new_symbols,
+                        raw_files=raw_files_subset,
+                        git_head=git_head,
+                        file_summaries=incr_file_summaries,
+                        file_languages=incr_file_languages,
+                        imports=incr_file_imports,
+                        context_metadata=incr_context_metadata,
+                        file_hashes=subset_hashes,
+                        file_mtimes=all_mtimes,
+                    )
 
                 # Fire daemon thread for deferred summarization — index is already saved
                 # with empty summaries; this fills them in without blocking the response.
@@ -800,6 +834,9 @@ def index_folder(
                     "indexed_at": updated.indexed_at if updated else "",
                     "duration_seconds": round(time.monotonic() - t0, 2),
                 }
+                if _fast_is_branch_delta:
+                    result["branch"] = _fast_branch
+                    result["branch_delta"] = True
                 if _summarization_deferred:
                     result["summarization_deferred"] = True
                     result["summarization_note"] = (
@@ -879,7 +916,33 @@ def index_folder(
         repo_name = _local_repo_name(Path(remap(str(folder_path), _pairs, reverse=True)))
         owner = "local"
         store = IndexStore(base_path=storage_path)
+
+        # ── Branch-aware indexing ──
+        # Detect current git branch. If a base index exists and we're on a
+        # different branch, save as a branch delta instead of overwriting the base.
+        _current_branch = _get_git_branch(folder_path)
+        _is_branch_delta = False
+        _base_branch: str = ""
+
+        # Always load the base index (branch="") to check if it exists
         existing_index = store.load_index(owner, repo_name)
+
+        if existing_index is not None and _current_branch:
+            # Read stored base_branch from meta — defaults to "" (first indexed branch)
+            _base_branch = getattr(existing_index, "branch", "") or ""
+            if not _base_branch:
+                # First time: the existing index becomes the base; record its branch
+                _base_branch = _current_branch  # base IS this branch
+
+            if _current_branch != _base_branch:
+                # We're on a non-base branch — use branch delta mode.
+                # Load the branch-composed index for incremental comparison.
+                _is_branch_delta = True
+                existing_index = store.load_index(owner, repo_name, branch=_current_branch)
+                logger.info(
+                    "Branch-aware indexing: current='%s', base='%s' → delta mode",
+                    _current_branch, _base_branch,
+                )
 
         if existing_index is None and store.has_index(owner, repo_name):
             logger.warning(
@@ -1033,19 +1096,38 @@ def index_folder(
             except Exception:
                 logger.debug("LSP enrichment skipped (incremental)", exc_info=True)
 
-            updated = store.incremental_save(
-                owner=owner, name=repo_name,
-                changed_files=changed, new_files=new, deleted_files=deleted,
-                new_symbols=new_symbols,
-                raw_files=raw_files_subset,
-                git_head=git_head,
-                file_summaries=incr_file_summaries,
-                file_languages=incr_file_languages,
-                imports=incr_file_imports,
-                context_metadata=incr_context_metadata,
-                file_hashes=subset_hashes,
-                file_mtimes=updated_mtimes,
-            )
+            if _is_branch_delta:
+                # Save as branch delta instead of overwriting the base index
+                base_index = store.load_index(owner, repo_name)  # base (no branch)
+                store.save_branch_delta(
+                    owner=owner, name=repo_name, branch=_current_branch,
+                    changed_files=changed, new_files=new, deleted_files=deleted,
+                    new_symbols=new_symbols,
+                    raw_files=raw_files_subset,
+                    git_head=git_head,
+                    base_head=base_index.git_head if base_index else "",
+                    file_hashes=subset_hashes,
+                    file_mtimes=updated_mtimes,
+                    file_languages=incr_file_languages,
+                    file_summaries=incr_file_summaries,
+                    file_imports=incr_file_imports,
+                )
+                # Load composed index for reporting
+                updated = store.load_index(owner, repo_name, branch=_current_branch)
+            else:
+                updated = store.incremental_save(
+                    owner=owner, name=repo_name,
+                    changed_files=changed, new_files=new, deleted_files=deleted,
+                    new_symbols=new_symbols,
+                    raw_files=raw_files_subset,
+                    git_head=git_head,
+                    file_summaries=incr_file_summaries,
+                    file_languages=incr_file_languages,
+                    imports=incr_file_imports,
+                    context_metadata=incr_context_metadata,
+                    file_hashes=subset_hashes,
+                    file_mtimes=updated_mtimes,
+                )
 
             result = {
                 "success": True,
@@ -1060,6 +1142,9 @@ def index_folder(
                 "no_symbols_count": len(incremental_no_symbols),
                 "no_symbols_files": incremental_no_symbols[:50],
             }
+            if _is_branch_delta:
+                result["branch"] = _current_branch
+                result["branch_delta"] = True
             if warnings:
                 result["warnings"] = warnings
             _maybe_apply_adaptive(folder_path, result)
@@ -1234,24 +1319,75 @@ def index_folder(
 
         # Save index — raw files already written to content dir above,
         # pass empty dict to skip duplicate writes.
-        index = store.save_index(
-            owner=owner,
-            name=repo_name,
-            source_files=source_file_list,
-            symbols=all_symbols,
-            raw_files={},
-            languages=languages,
-            file_hashes=file_hashes,
-            file_summaries=file_summaries,
-            git_head=_get_git_head(folder_path) or "",
-            source_root=str(folder_path),
-            file_languages=file_languages,
-            display_name=folder_path.name,
-            imports=file_imports,
-            context_metadata=full_context_metadata,
-            file_mtimes=file_mtimes,
-            package_names=_pkg_names,
-        )
+        git_head = _get_git_head(folder_path) or ""
+
+        if _is_branch_delta:
+            # Full index on a non-base branch — diff against base and save as delta.
+            base_index = store.load_index(owner, repo_name)  # base (no branch)
+            if base_index is not None:
+                base_files = set(base_index.source_files)
+                current_files_set = set(source_file_list)
+
+                delta_new = sorted(current_files_set - base_files)
+                delta_deleted = sorted(base_files - current_files_set)
+                delta_changed = sorted(
+                    f for f in (current_files_set & base_files)
+                    if file_hashes.get(f, "") != base_index.file_hashes.get(f, "")
+                )
+
+                # Gather symbols for changed/new files
+                delta_files = set(delta_changed) | set(delta_new)
+                from ..parser.symbols import Symbol as _SymClass
+                delta_symbols = [s for s in all_symbols if s.file in delta_files]
+
+                store.save_branch_delta(
+                    owner=owner, name=repo_name, branch=_current_branch,
+                    changed_files=delta_changed, new_files=delta_new,
+                    deleted_files=delta_deleted,
+                    new_symbols=delta_symbols,
+                    raw_files={},  # already written to content dir
+                    git_head=git_head,
+                    base_head=base_index.git_head,
+                    file_hashes={f: file_hashes[f] for f in delta_files if f in file_hashes},
+                    file_mtimes={f: file_mtimes[f] for f in delta_files if f in file_mtimes},
+                    file_languages={f: file_languages[f] for f in delta_files if f in file_languages},
+                    file_summaries={f: file_summaries[f] for f in delta_files if f in file_summaries},
+                    file_imports={f: file_imports[f] for f in delta_files if f in file_imports},
+                )
+                index = store.load_index(owner, repo_name, branch=_current_branch)
+                if index is None:
+                    index = base_index  # fallback
+            else:
+                # No base index — save as full (becomes the base)
+                index = store.save_index(
+                    owner=owner, name=repo_name,
+                    source_files=source_file_list, symbols=all_symbols,
+                    raw_files={}, languages=languages, file_hashes=file_hashes,
+                    file_summaries=file_summaries, git_head=git_head,
+                    source_root=str(folder_path), file_languages=file_languages,
+                    display_name=folder_path.name, imports=file_imports,
+                    context_metadata=full_context_metadata, file_mtimes=file_mtimes,
+                    package_names=_pkg_names,
+                )
+        else:
+            index = store.save_index(
+                owner=owner,
+                name=repo_name,
+                source_files=source_file_list,
+                symbols=all_symbols,
+                raw_files={},
+                languages=languages,
+                file_hashes=file_hashes,
+                file_summaries=file_summaries,
+                git_head=git_head,
+                source_root=str(folder_path),
+                file_languages=file_languages,
+                display_name=folder_path.name,
+                imports=file_imports,
+                context_metadata=full_context_metadata,
+                file_mtimes=file_mtimes,
+                package_names=_pkg_names,
+            )
 
         # Identify languages that were indexed (symbols found) but have no import extractor
         _missing_import_extractors = sorted(
@@ -1274,6 +1410,9 @@ def index_folder(
             "no_symbols_count": len(no_symbols_files),
             "no_symbols_files": no_symbols_files[:50],  # Show up to 50 for inspection
         }
+        if _is_branch_delta:
+            result["branch"] = _current_branch
+            result["branch_delta"] = True
         if _missing_import_extractors:
             result["missing_extractors"] = _missing_import_extractors
             result.setdefault("parse_warnings", []).append(

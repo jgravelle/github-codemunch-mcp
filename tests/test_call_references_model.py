@@ -60,7 +60,7 @@ class TestIndexVersionBump:
 
     def test_index_version_is_8(self):
         """INDEX_VERSION constant must be 8 after this change."""
-        assert INDEX_VERSION == 8
+        assert INDEX_VERSION == 9
 
 
 class TestCallersByNameIndex:

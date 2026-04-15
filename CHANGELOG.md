@@ -2,6 +2,11 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.50.0] — 2026-04-15
+
+### Added
+- **Branch-Aware Delta Indexing** — jcodemunch-mcp now maintains per-branch delta layers instead of re-indexing from scratch when you switch git branches. One base index (typically `main`/`master`) stores the full index; non-base branches save only what changed relative to the base (O(delta) storage). At query time, the delta is composed onto the base to produce the branch-specific view. All 55+ tools auto-detect the current branch via `git rev-parse --abbrev-ref HEAD` — no new parameters required. Supports detached HEAD (uses commit SHA), non-git folders (graceful no-op), and stale delta detection (warns when base was re-indexed after the delta was created). New storage: `branch_deltas` and `branch_meta` tables in the existing SQLite DB. `list_repos` now shows indexed branches. INDEX_VERSION bumped to 9 (auto-migration from v8).
+
 ## [1.49.0] — 2026-04-15
 
 ### Added

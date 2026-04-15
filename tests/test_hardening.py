@@ -804,7 +804,7 @@ class TestIndexVersioning:
         )
 
         assert index.index_version == INDEX_VERSION
-        assert index.index_version == 8
+        assert index.index_version == 9
 
     def test_load_preserves_version(self, tmp_path):
         store = IndexStore(base_path=str(tmp_path))

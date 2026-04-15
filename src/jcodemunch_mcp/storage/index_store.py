@@ -21,7 +21,7 @@ from .sqlite_store import SQLiteIndexStore, _VERIFIED_PATHS
 logger = logging.getLogger(__name__)
 
 # Bump this when the index schema changes in an incompatible way.
-INDEX_VERSION = 8
+INDEX_VERSION = 9
 
 
 @functools.lru_cache(maxsize=16)
@@ -67,6 +67,31 @@ def _get_git_head(repo_path: Path) -> Optional[str]:
     return None
 
 
+def _get_git_branch(repo_path: Path) -> Optional[str]:
+    """Get current branch name for a git repo, or None.
+
+    Returns the symbolic branch name (e.g. "main", "feature/foo").
+    For detached HEAD, returns the commit SHA instead.
+    Returns None for non-git directories.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=str(repo_path),
+            capture_output=True, text=True, timeout=5,
+            stdin=subprocess.DEVNULL,
+        )
+        if result.returncode == 0:
+            branch = result.stdout.strip()
+            if branch == "HEAD":
+                # Detached HEAD — use commit SHA as branch identifier
+                return _get_git_head(repo_path)
+            return branch
+    except Exception:
+        logger.debug("Failed to get git branch for %s", repo_path, exc_info=True)
+    return None
+
+
 @dataclass
 class CodeIndex:
     """Index for a repository's source code."""
@@ -92,6 +117,7 @@ class CodeIndex:
     alias_map: dict[str, list[str]] = field(default_factory=dict)  # tsconfig/jsconfig path aliases; auto-loaded from source_root
     psr4_map: dict[str, str] = field(default_factory=dict)  # PHP PSR-4 namespace map from composer.json; auto-loaded from source_root
     package_names: list[str] = field(default_factory=list)    # Package names published by this repo (from manifest files)
+    branch: str = ""                 # Git branch name at index time (empty = base/default branch or non-git)
 
     def __post_init__(self) -> None:
         if not self.display_name:
@@ -542,21 +568,26 @@ class IndexStore:
         """Return True if an index exists (SQLite or JSON)."""
         return self._sqlite.has_index(owner, name) or self._index_path(owner, name).exists()
 
-    def load_index(self, owner: str, name: str) -> Optional[CodeIndex]:
-        """Load index from storage. Prefers SQLite, auto-migrates from JSON."""
+    def load_index(self, owner: str, name: str, branch: str = "") -> Optional[CodeIndex]:
+        """Load index from storage. Prefers SQLite, auto-migrates from JSON.
+
+        When branch is non-empty and a branch delta exists, the base index
+        is composed with the delta to produce a branch-specific view.
+        """
         # Try SQLite first
-        result = self._sqlite.load_index(owner, name)
+        result = self._sqlite.load_index(owner, name, branch=branch)
         if result is not None:
             return result
 
-        # Try auto-migration from JSON
-        index_path = self._index_path(owner, name)
-        if index_path.exists():
-            logger.info("Auto-migrating %s/%s from JSON to SQLite", owner, name)
-            result = self._sqlite.migrate_from_json(index_path, owner, name)
-            if result is not None:
-                _invalidate_index_cache()
-                return result
+        # Try auto-migration from JSON (no branch support for legacy JSON)
+        if not branch:
+            index_path = self._index_path(owner, name)
+            if index_path.exists():
+                logger.info("Auto-migrating %s/%s from JSON to SQLite", owner, name)
+                result = self._sqlite.migrate_from_json(index_path, owner, name)
+                if result is not None:
+                    _invalidate_index_cache()
+                    return result
 
         return None
 
@@ -664,6 +695,18 @@ class IndexStore:
             file_blob_shas=file_blob_shas, file_hashes=file_hashes,
             file_mtimes=file_mtimes,
         )
+
+    def save_branch_delta(self, owner: str, name: str, branch: str, **kwargs) -> None:
+        """Save a branch delta layer. Delegates to SQLite backend."""
+        return self._sqlite.save_branch_delta(owner, name, branch, **kwargs)
+
+    def list_branches(self, owner: str, name: str) -> list[dict]:
+        """List indexed branches for a repo. Delegates to SQLite backend."""
+        return self._sqlite.list_branches(owner, name)
+
+    def delete_branch_delta(self, owner: str, name: str, branch: str) -> bool:
+        """Delete a branch delta. Delegates to SQLite backend."""
+        return self._sqlite.delete_branch_delta(owner, name, branch)
 
     def _languages_from_symbols(self, symbols: list[dict]) -> dict[str, int]:
         """Compute language->file_count from serialized symbols."""
