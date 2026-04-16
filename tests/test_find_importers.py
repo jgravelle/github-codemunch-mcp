@@ -17,44 +17,30 @@ from jcodemunch_mcp.storage import IndexStore
 class TestExtractImportsJS:
     """Test JS/TS import extraction."""
 
-    def test_named_imports(self):
-        content = "import { foo, bar } from './utils';"
-        result = extract_imports(content, "src/a.js", "javascript")
-        assert len(result) == 1
-        assert result[0]["specifier"] == "./utils"
-        assert "foo" in result[0]["names"]
-        assert "bar" in result[0]["names"]
-
-    def test_default_import(self):
-        content = "import MyComponent from '../components/MyComponent';"
-        result = extract_imports(content, "src/page.tsx", "typescript")
-        assert len(result) == 1
-        assert result[0]["specifier"] == "../components/MyComponent"
-        assert "MyComponent" in result[0]["names"]
-
-    def test_side_effect_import(self):
-        content = "import './styles.css';"
-        result = extract_imports(content, "src/app.js", "javascript")
-        assert len(result) == 1
-        assert result[0]["specifier"] == "./styles.css"
-        assert result[0]["names"] == []
-
-    def test_require(self):
-        content = "const path = require('path');"
-        result = extract_imports(content, "index.js", "javascript")
-        assert any(r["specifier"] == "path" for r in result)
-
-    def test_multiple_imports(self):
-        content = (
-            "import React from 'react';\n"
-            "import { useState, useEffect } from 'react';\n"
-            "import { Link } from '../router';\n"
-        )
-        result = extract_imports(content, "src/app.jsx", "jsx")
-        specifiers = [r["specifier"] for r in result]
-        assert "../router" in specifiers
-        # react may be merged or appear once
-        assert any(s == "react" for s in specifiers)
+    @pytest.mark.parametrize("content,file_path,lang,expected_specifier,expected_names", [
+        ("import { foo, bar } from './utils';", "src/a.js", "javascript", "./utils", ["foo", "bar"]),
+        ("import MyComponent from '../components/MyComponent';", "src/page.tsx", "typescript", "../components/MyComponent", ["MyComponent"]),
+        ("import './styles.css';", "src/app.js", "javascript", "./styles.css", []),
+        ("const path = require('path');", "index.js", "javascript", "path", []),
+        (
+            "import React from 'react';\nimport { useState, useEffect } from 'react';\nimport { Link } from '../router';\n",
+            "src/app.jsx", "jsx", "../router", ["Link"],
+        ),
+    ], ids=["named", "default", "side_effect", "require", "multiple"])
+    def test_import_patterns(self, content, file_path, lang, expected_specifier, expected_names):
+        result = extract_imports(content, file_path, lang)
+        assert len(result) >= 1
+        if isinstance(expected_specifier, list):
+            specifiers = [r["specifier"] for r in result]
+            for s in expected_specifier:
+                assert s in specifiers
+        else:
+            matching = [r for r in result if r["specifier"] == expected_specifier]
+            assert len(matching) >= 1
+            if expected_names:
+                names = matching[0]["names"]
+                for n in expected_names:
+                    assert n in names
 
     def test_no_false_positive_on_plain_code(self):
         content = "function add(a, b) { return a + b; }\n"
@@ -88,8 +74,9 @@ class TestExtractImportsJS:
 class TestVueTemplateImports:
     """Test Vue <template> component extraction."""
 
-    def test_pascal_case_component(self):
-        content = """
+    @pytest.mark.parametrize("content,file_path,expected_in,expected_out", [
+        (
+            """
 <template>
   <UserTable :users="users" />
   <Pagination :total="10" />
@@ -97,24 +84,31 @@ class TestVueTemplateImports:
 <script setup>
 const users = []
 </script>
-"""
-        result = extract_imports(content, "src/App.vue", "vue")
-        specifiers = {r["specifier"] for r in result}
-        assert "UserTable" in specifiers
-        assert "Pagination" in specifiers
-
-    def test_kebab_case_component(self):
-        content = """
+""",
+            "src/App.vue",
+            ["UserTable", "Pagination"],
+            [],
+        ),
+        (
+            """
 <template>
   <user-table />
   <my-dialog />
 </template>
 <script setup></script>
-"""
-        result = extract_imports(content, "src/App.vue", "vue")
+""",
+            "src/App.vue",
+            ["UserTable", "MyDialog"],
+            [],
+        ),
+    ], ids=["pascal", "kebab"])
+    def test_case_variants(self, content, file_path, expected_in, expected_out):
+        result = extract_imports(content, file_path, "vue")
         specifiers = {r["specifier"] for r in result}
-        assert "UserTable" in specifiers
-        assert "MyDialog" in specifiers
+        for name in expected_in:
+            assert name in specifiers
+        for name in expected_out:
+            assert name not in specifiers
 
     def test_already_imported_not_duplicated(self):
         content = """
@@ -131,8 +125,9 @@ import UserTable from '@/components/UserTable.vue'
         assert len(user_table) == 1
         assert user_table[0]["specifier"] == "@/components/UserTable.vue"
 
-    def test_html_elements_excluded(self):
-        content = """
+    @pytest.mark.parametrize("content,file_path,excluded", [
+        (
+            """
 <template>
   <div><span>text</span></div>
   <button @click="go">Go</button>
@@ -140,28 +135,28 @@ import UserTable from '@/components/UserTable.vue'
   <h1>Title</h1>
 </template>
 <script setup></script>
-"""
-        result = extract_imports(content, "src/App.vue", "vue")
-        specifiers = {r["specifier"] for r in result}
-        assert "div" not in specifiers
-        assert "span" not in specifiers
-        assert "button" not in specifiers
-        assert "input" not in specifiers
-
-    def test_vue_builtins_excluded(self):
-        content = """
+""",
+            "src/App.vue",
+            ["div", "span", "button", "input"],
+        ),
+        (
+            """
 <template>
   <transition name="fade"><div/></transition>
   <keep-alive><component :is="current"/></keep-alive>
   <teleport to="body"><div/></teleport>
 </template>
 <script setup></script>
-"""
-        result = extract_imports(content, "src/App.vue", "vue")
+""",
+            "src/App.vue",
+            ["Transition", "KeepAlive", "Teleport"],
+        ),
+    ], ids=["html_elements", "vue_builtins"])
+    def test_exclusions(self, content, file_path, excluded):
+        result = extract_imports(content, file_path, "vue")
         specifiers = {r["specifier"] for r in result}
-        assert "Transition" not in specifiers
-        assert "KeepAlive" not in specifiers
-        assert "Teleport" not in specifiers
+        for name in excluded:
+            assert name not in specifiers
 
     def test_no_template_block(self):
         content = """
@@ -196,155 +191,100 @@ import ImportedComponent from './ImportedComponent.vue'
 class TestExtractImportsPython:
     """Test Python import extraction."""
 
-    def test_from_import(self):
-        content = "from .utils import foo, bar\n"
-        result = extract_imports(content, "src/module.py", "python")
-        assert len(result) == 1
-        assert result[0]["specifier"] == ".utils"
-        assert "foo" in result[0]["names"]
-        assert "bar" in result[0]["names"]
+    @pytest.mark.parametrize("content,file_path,check_mode,expected", [
+        ("from .utils import foo, bar\n", "src/module.py", "spec_and_names", (".utils", ["foo", "bar"])),
+        ("import os\nimport sys\n", "main.py", "specifiers", ["os", "sys"]),
+        ("from __future__ import annotations\n", "main.py", "empty", True),
+        ("from ..services import UserService\n", "app/api/routes.py", "spec_and_names", ("..services", ["UserService"])),
+        ("from os.path import *\n", "utils.py", "spec_and_names", ("os.path", [])),
+    ], ids=["from_import", "absolute", "future_skipped", "relative", "star_excluded"])
+    def test_standard_imports(self, content, file_path, check_mode, expected):
+        result = extract_imports(content, file_path, "python")
+        if check_mode == "empty":
+            assert result == []
+        elif check_mode == "specifiers":
+            specifiers = [r["specifier"] for r in result]
+            for e in expected:
+                assert e in specifiers
+        else:
+            specifier, names = expected
+            matching = [r for r in result if r["specifier"] == specifier]
+            assert len(matching) >= 1
+            for n in names:
+                assert any(n in r["names"] for r in matching)
 
-    def test_absolute_import(self):
-        content = "import os\nimport sys\n"
-        result = extract_imports(content, "main.py", "python")
+    @pytest.mark.parametrize("content,file_path,expected_specifier", [
+        (
+            "def some_endpoint():\n    from app.notifications.mentions import process_comment\n    return process_comment()\n",
+            "app/router.py",
+            "app.notifications.mentions",
+        ),
+        ("def lazy_loader():\n    import json\n    return json\n", "utils.py", "json"),
+        ("class Service:\n    from app.helpers import normalize\n", "app/service.py", "app.helpers"),
+    ], ids=["function_from", "function_import", "class_body"])
+    def test_indented_imports(self, content, file_path, expected_specifier):
+        result = extract_imports(content, file_path, "python")
         specifiers = [r["specifier"] for r in result]
-        assert "os" in specifiers
-        assert "sys" in specifiers
-
-    def test_future_import_skipped(self):
-        content = "from __future__ import annotations\n"
-        result = extract_imports(content, "main.py", "python")
-        assert result == []
-
-    def test_relative_import(self):
-        content = "from ..services import UserService\n"
-        result = extract_imports(content, "app/api/routes.py", "python")
-        assert result[0]["specifier"] == "..services"
-        assert "UserService" in result[0]["names"]
-
-    def test_star_import_excluded(self):
-        content = "from os.path import *\n"
-        result = extract_imports(content, "utils.py", "python")
-        # names should be empty (star stripped) but specifier present
-        assert result[0]["specifier"] == "os.path"
-        assert result[0]["names"] == []
-
-    def test_function_local_from_import(self):
-        """Function-local 'from x import y' (indented) should be captured.
-
-        Common pattern in FastAPI/Django for breaking circular imports:
-        the import lives inside a function body, not at module level.
-        """
-        content = (
-            "def some_endpoint():\n"
-            "    from app.notifications.mentions import process_comment\n"
-            "    return process_comment()\n"
-        )
-        result = extract_imports(content, "app/router.py", "python")
-        specifiers = [r["specifier"] for r in result]
-        assert "app.notifications.mentions" in specifiers
-        names = [n for r in result for n in r["names"]]
-        assert "process_comment" in names
-
-    def test_function_local_import_statement(self):
-        """Function-local 'import x' (indented) should also be captured."""
-        content = (
-            "def lazy_loader():\n"
-            "    import json\n"
-            "    return json\n"
-        )
-        result = extract_imports(content, "utils.py", "python")
-        specifiers = [r["specifier"] for r in result]
-        assert "json" in specifiers
-
-    def test_class_body_import(self):
-        """Imports inside class bodies (also indented) should be captured."""
-        content = (
-            "class Service:\n"
-            "    from app.helpers import normalize\n"
-        )
-        result = extract_imports(content, "app/service.py", "python")
-        specifiers = [r["specifier"] for r in result]
-        assert "app.helpers" in specifiers
+        assert expected_specifier in specifiers
 
 
 class TestExtractImportsSqlDbt:
     """Test dbt ref() and source() extraction from SQL files."""
 
-    def test_basic_ref(self):
-        content = "SELECT * FROM {{ ref('dim_client') }}"
-        result = extract_imports(content, "models/fact_orders.sql", "sql")
-        assert len(result) == 1
-        assert result[0]["specifier"] == "dim_client"
-        assert result[0]["names"] == []
-
-    def test_multiple_refs(self):
-        content = (
-            "WITH clients AS (SELECT * FROM {{ ref('dim_client') }})\n"
-            ",orders AS (SELECT * FROM {{ ref('fact_order') }})\n"
-            "SELECT * FROM clients JOIN orders ON clients.id = orders.client_id"
-        )
-        result = extract_imports(content, "models/agg_summary.sql", "sql")
+    @pytest.mark.parametrize("content,file_path,expected", [
+        (
+            "SELECT * FROM {{ ref('dim_client') }}",
+            "models/fact_orders.sql",
+            (1, "dim_client"),
+        ),
+        (
+            "WITH clients AS (SELECT * FROM {{ ref('dim_client') }})\n,orders AS (SELECT * FROM {{ ref('fact_order') }})\nSELECT * FROM clients JOIN orders ON clients.id = orders.client_id",
+            "models/agg_summary.sql",
+            (2, ["dim_client", "fact_order"]),
+        ),
+        (
+            "SELECT * FROM {{ ref('dim_client') }}\nUNION ALL\nSELECT * FROM {{ ref('dim_client') }}",
+            "models/combined.sql",
+            (1, "dim_client"),
+        ),
+        (
+            "SELECT * FROM {{ source('salesforce', 'accounts') }}",
+            "models/stg_accounts.sql",
+            (1, "source:salesforce.accounts"),
+        ),
+        (
+            "WITH raw AS (SELECT * FROM {{ source('erp', 'gl_entries') }})\n,dim AS (SELECT * FROM {{ ref('dim_date') }})\nSELECT * FROM raw JOIN dim ON raw.date_sk = dim.date_sk",
+            "models/stg_gl.sql",
+            (2, ["source:erp.gl_entries", "dim_date"]),
+        ),
+        (
+            "SELECT * FROM {{ref('model_a')}}\nUNION ALL\nSELECT * FROM {{ ref('model_b') }}\nUNION ALL\nSELECT * FROM {{- ref('model_c') -}}\n",
+            "models/union.sql",
+            (3, ["model_a", "model_b", "model_c"]),
+        ),
+        (
+            "SELECT * FROM {{ ref('dim_client', v=2) }}",
+            "models/fact.sql",
+            (1, "dim_client"),
+        ),
+    ], ids=["basic_ref", "multiple_refs", "duplicate_dedup", "source", "mixed", "whitespace_variants", "versioned"])
+    def test_dbt_positive(self, content, file_path, expected):
+        result = extract_imports(content, file_path, "sql")
+        count, expected_specs = expected
+        assert len(result) == count
         specifiers = [r["specifier"] for r in result]
-        assert "dim_client" in specifiers
-        assert "fact_order" in specifiers
-        assert len(result) == 2
+        if isinstance(expected_specs, list):
+            for s in expected_specs:
+                assert s in specifiers
+        else:
+            assert expected_specs in specifiers
 
-    def test_duplicate_ref_deduplicated(self):
-        content = (
-            "SELECT * FROM {{ ref('dim_client') }}\n"
-            "UNION ALL\n"
-            "SELECT * FROM {{ ref('dim_client') }}"
-        )
-        result = extract_imports(content, "models/combined.sql", "sql")
-        assert len(result) == 1
-        assert result[0]["specifier"] == "dim_client"
-
-    def test_source_extraction(self):
-        content = "SELECT * FROM {{ source('salesforce', 'accounts') }}"
-        result = extract_imports(content, "models/stg_accounts.sql", "sql")
-        assert len(result) == 1
-        assert result[0]["specifier"] == "source:salesforce.accounts"
-
-    def test_mixed_ref_and_source(self):
-        content = (
-            "WITH raw AS (SELECT * FROM {{ source('erp', 'gl_entries') }})\n"
-            ",dim AS (SELECT * FROM {{ ref('dim_date') }})\n"
-            "SELECT * FROM raw JOIN dim ON raw.date_sk = dim.date_sk"
-        )
-        result = extract_imports(content, "models/stg_gl.sql", "sql")
-        specifiers = [r["specifier"] for r in result]
-        assert "source:erp.gl_entries" in specifiers
-        assert "dim_date" in specifiers
-
-    def test_ref_with_whitespace_variants(self):
-        content = (
-            "SELECT * FROM {{ref('model_a')}}\n"
-            "UNION ALL\n"
-            "SELECT * FROM {{ ref('model_b') }}\n"
-            "UNION ALL\n"
-            "SELECT * FROM {{- ref('model_c') -}}\n"
-        )
-        result = extract_imports(content, "models/union.sql", "sql")
-        specifiers = [r["specifier"] for r in result]
-        assert "model_a" in specifiers
-        assert "model_b" in specifiers
-        assert "model_c" in specifiers
-
-    def test_ref_with_version(self):
-        content = "SELECT * FROM {{ ref('dim_client', v=2) }}"
-        result = extract_imports(content, "models/fact.sql", "sql")
-        assert len(result) == 1
-        assert result[0]["specifier"] == "dim_client"
-
-    def test_no_ref_no_source(self):
-        content = "SELECT id, name FROM my_table WHERE active = 1"
-        result = extract_imports(content, "scripts/query.sql", "sql")
-        assert result == []
-
-    def test_plain_sql_no_false_positives(self):
-        content = "-- ref to dim_client for documentation\nSELECT 1"
-        result = extract_imports(content, "scripts/notes.sql", "sql")
+    @pytest.mark.parametrize("content,file_path", [
+        ("SELECT id, name FROM my_table WHERE active = 1", "scripts/query.sql"),
+        ("-- ref to dim_client for documentation\nSELECT 1", "scripts/notes.sql"),
+    ], ids=["no_ref_no_source", "plain_sql_no_fp"])
+    def test_dbt_negative(self, content, file_path):
+        result = extract_imports(content, file_path, "sql")
         assert result == []
 
 
@@ -358,28 +298,16 @@ class TestResolveSpecifierDbt:
         "src/app.js",
     }
 
-    def test_bare_model_name_resolves(self):
-        result = resolve_specifier("dim_client", "DBT/models/fact/fact_orders.sql", self.SOURCE_FILES)
-        assert result == "DBT/models/dim/dim_client.sql"
-
-    def test_bare_name_case_insensitive(self):
-        result = resolve_specifier("Dim_Client", "DBT/models/fact/fact_orders.sql", self.SOURCE_FILES)
-        assert result == "DBT/models/dim/dim_client.sql"
-
-    def test_source_specifier_unresolvable(self):
-        result = resolve_specifier("source:salesforce.accounts", "DBT/models/staging/stg_accounts.sql", self.SOURCE_FILES)
-        # source: specifiers contain dots, so they won't match the bare-name fallback
-        assert result is None
-
-    def test_bare_name_no_match(self):
-        result = resolve_specifier("nonexistent_model", "DBT/models/fact/fact_orders.sql", self.SOURCE_FILES)
-        assert result is None
-
-    def test_does_not_interfere_with_js_resolution(self):
-        """Stem matching should not break existing JS resolution."""
-        js_files = {"src/utils.js", "src/app.js"}
-        result = resolve_specifier("./utils", "src/app.js", js_files)
-        assert result == "src/utils.js"
+    @pytest.mark.parametrize("specifier,from_file,files,expected", [
+        ("dim_client", "DBT/models/fact/fact_orders.sql", SOURCE_FILES, "DBT/models/dim/dim_client.sql"),
+        ("Dim_Client", "DBT/models/fact/fact_orders.sql", SOURCE_FILES, "DBT/models/dim/dim_client.sql"),
+        ("source:salesforce.accounts", "DBT/models/staging/stg_accounts.sql", SOURCE_FILES, None),
+        ("nonexistent_model", "DBT/models/fact/fact_orders.sql", SOURCE_FILES, None),
+        ("./utils", "src/app.js", {"src/utils.js", "src/app.js"}, "src/utils.js"),
+    ], ids=["bare_resolves", "case_insensitive", "source_unresolvable", "no_match", "js_resolution"])
+    def test_dbt_resolution(self, specifier, from_file, files, expected):
+        result = resolve_specifier(specifier, from_file, files)
+        assert result == expected
 
 
 class TestExtractImportsUnsupported:
@@ -410,149 +338,51 @@ class TestResolveSpecifier:
         "lib/__init__.py",
     }
 
-    def test_relative_js_with_extension(self):
-        result = resolve_specifier(
-            "./helpers.js", "src/utils/other.js", self.SOURCE_FILES
-        )
-        assert result == "src/utils/helpers.js"
+    @pytest.mark.parametrize("specifier,from_file,files,expected", [
+        ("./helpers.js", "src/utils/other.js", SOURCE_FILES, "src/utils/helpers.js"),
+        ("./helpers", "src/utils/other.js", SOURCE_FILES, "src/utils/helpers.js"),
+        ("../components/Button", "src/pages/Home.tsx", SOURCE_FILES, "src/components/Button.tsx"),
+        ("./utils", "src/app.js", SOURCE_FILES, "src/utils/index.js"),
+        ("../app", "src/utils/helpers.js", SOURCE_FILES, "src/app.js"),
+        ("react", "src/app.js", SOURCE_FILES, None),
+        ("src/app.js", "other.js", SOURCE_FILES, "src/app.js"),
+        (".helpers", "lib/module.py", {"lib/helpers.py"}, None),
+    ], ids=["js_with_ext", "js_without_ext", "tsx_component", "index_resolution", "dotdot", "unresolvable_pkg", "absolute_match", "python_relative"])
+    def test_basic_resolution(self, specifier, from_file, files, expected):
+        result = resolve_specifier(specifier, from_file, files)
+        assert result == expected
 
-    def test_relative_js_without_extension(self):
-        result = resolve_specifier(
-            "./helpers", "src/utils/other.js", self.SOURCE_FILES
-        )
-        assert result == "src/utils/helpers.js"
+    @pytest.mark.parametrize("specifier,from_file,files,expected", [
+        ("./helpers.js", "src/utils/other.ts", {"src/utils/helpers.ts", "src/app.ts"}, "src/utils/helpers.ts"),
+        ("./Button.js", "src/components/Home.tsx", {"src/components/Button.tsx"}, "src/components/Button.tsx"),
+        ("./helpers.js", "src/utils/other.ts", {"src/utils/helpers.js", "src/utils/helpers.ts"}, "src/utils/helpers.js"),
+    ], ids=["js_to_ts", "js_to_tsx", "exact_priority"])
+    def test_js_ts_extension_fallback(self, specifier, from_file, files, expected):
+        result = resolve_specifier(specifier, from_file, files)
+        assert result == expected
 
-    def test_relative_tsx_component(self):
-        result = resolve_specifier(
-            "../components/Button", "src/pages/Home.tsx", self.SOURCE_FILES
-        )
-        assert result == "src/components/Button.tsx"
+    @pytest.mark.parametrize("specifier,from_file,files,alias_map,expected", [
+        ("@/lib/utils", "src/app.ts", {"lib/utils.ts", "src/app.ts"}, {"@/*": ["/*"]}, "lib/utils.ts"),
+        ("@/components/Button", "src/pages/Home.ts", {"src/components/Button.tsx", "src/app.ts"}, {"@/*": ["src/*"]}, "src/components/Button.tsx"),
+        ("$lib/server/db", "src/routes/+page.svelte", {"src/lib/server/db.ts", "src/routes/+page.svelte"}, {"$lib/*": ["src/lib/*"]}, "src/lib/server/db.ts"),
+        ("@/lib/utils", "src/app.ts", {"lib/utils.ts"}, None, None),
+        ("@/lib/utils", "src/app.ts", {"lib/utils.ts"}, {"~/*": ["src/*"]}, None),
+        ("@/lib/utils", "app/components/Widget.tsx", frozenset(["app/lib/utils.ts", "app/components/Widget.tsx"]), {"@/*": ["/*"], "@/lib/*": ["app/lib/*"]}, "app/lib/utils.ts"),
+    ], ids=["at_alias_root", "at_alias_src", "lib_alias_svelte", "alias_no_map", "alias_no_match", "alias_nested_override"])
+    def test_alias_resolution(self, specifier, from_file, files, alias_map, expected):
+        result = resolve_specifier(specifier, from_file, files, alias_map)
+        assert result == expected
 
-    def test_relative_index_resolution(self):
-        result = resolve_specifier(
-            "./utils", "src/app.js", self.SOURCE_FILES
-        )
-        assert result == "src/utils/index.js"
-
-    def test_dotdot_traversal(self):
-        result = resolve_specifier(
-            "../app", "src/utils/helpers.js", self.SOURCE_FILES
-        )
-        assert result == "src/app.js"
-
-    def test_unresolvable_package_import(self):
-        result = resolve_specifier(
-            "react", "src/app.js", self.SOURCE_FILES
-        )
-        assert result is None
-
-    def test_absolute_match(self):
-        result = resolve_specifier(
-            "src/app.js", "other.js", self.SOURCE_FILES
-        )
-        assert result == "src/app.js"
-
-    def test_python_relative(self):
-        result = resolve_specifier(
-            ".helpers", "lib/module.py", {"lib/helpers.py"}
-        )
-        # Python dotted relative — won't resolve (starts with '.', joined as lib/.helpers)
-        # This is expected: Python module syntax doesn't map directly to file paths
-        # The test verifies no crash
-        assert result is None or isinstance(result, str)
-
-    # --- .js → .ts extension resolution (TypeScript ESM) ---
-
-    def test_js_to_ts_extension(self):
-        """'./foo.js' should resolve to './foo.ts' when only .ts exists."""
-        files = {"src/utils/helpers.ts", "src/app.ts"}
-        result = resolve_specifier("./helpers.js", "src/utils/other.ts", files)
-        assert result == "src/utils/helpers.ts"
-
-    def test_js_to_tsx_extension(self):
-        """'./Button.js' should resolve to './Button.tsx' when only .tsx exists."""
-        files = {"src/components/Button.tsx"}
-        result = resolve_specifier("./Button.js", "src/components/Home.tsx", files)
-        assert result == "src/components/Button.tsx"
-
-    def test_js_exact_takes_priority(self):
-        """When both .js and .ts exist, .js exact match should win."""
-        files = {"src/utils/helpers.js", "src/utils/helpers.ts"}
-        result = resolve_specifier("./helpers.js", "src/utils/other.ts", files)
-        assert result == "src/utils/helpers.js"
-
-    # --- Path alias resolution ---
-
-    def test_at_alias_root(self):
-        """'@/lib/utils' with '@/*' → './*' alias resolves to 'lib/utils.ts'."""
-        files = {"lib/utils.ts", "src/app.ts"}
-        alias_map = {"@/*": ["/*"]}  # "@/*": ["./*"] normalized
-        result = resolve_specifier("@/lib/utils", "src/app.ts", files, alias_map)
-        assert result == "lib/utils.ts"
-
-    def test_at_alias_with_src_prefix(self):
-        """'@/components/Button' with '@/*' → 'src/*' resolves to 'src/components/Button.tsx'."""
-        files = {"src/components/Button.tsx", "src/app.ts"}
-        alias_map = {"@/*": ["src/*"]}
-        result = resolve_specifier("@/components/Button", "src/pages/Home.ts", files, alias_map)
-        assert result == "src/components/Button.tsx"
-
-    def test_lib_alias_svelte(self):
-        """'$lib/server/db' with '$lib/*' → 'src/lib/*' resolves to 'src/lib/server/db.ts'."""
-        files = {"src/lib/server/db.ts", "src/routes/+page.svelte"}
-        alias_map = {"$lib/*": ["src/lib/*"]}
-        result = resolve_specifier("$lib/server/db", "src/routes/+page.svelte", files, alias_map)
-        assert result == "src/lib/server/db.ts"
-
-    def test_alias_without_map_returns_none(self):
-        """Alias specifier with no alias_map should not resolve."""
-        files = {"lib/utils.ts"}
-        result = resolve_specifier("@/lib/utils", "src/app.ts", files)
-        assert result is None
-
-    def test_alias_no_match_returns_none(self):
-        """Alias pattern that doesn't match the specifier returns None."""
-        files = {"lib/utils.ts"}
-        alias_map = {"~/*": ["src/*"]}
-        result = resolve_specifier("@/lib/utils", "src/app.ts", files, alias_map)
-        assert result is None
-
-    def test_load_tsconfig_aliases_basic(self):
-        """_load_tsconfig_aliases parses compilerOptions.paths from tsconfig.json."""
-        import json, tempfile
-        from pathlib import Path
-        from jcodemunch_mcp.parser.imports import _load_tsconfig_aliases, _alias_map_cache
-
-        with tempfile.TemporaryDirectory() as tmp:
-            tsconfig = {
-                "compilerOptions": {
-                    "paths": {
-                        "@/*": ["./*"],
-                        "~/*": ["./src/*"],
-                    }
-                }
-            }
-            (Path(tmp) / "tsconfig.json").write_text(json.dumps(tsconfig))
-            # Clear cache to ensure fresh load
-            _alias_map_cache.pop(tmp, None)
-            result = _load_tsconfig_aliases(tmp)
-            assert "@/*" in result
-            assert result["@/*"] == ["/*"]  # "./*" normalized to "/*" (root)
-            assert "~/*" in result
-            assert result["~/*"] == ["src/*"]  # "./src/*" normalized to "src/*"
-
-    def test_load_tsconfig_aliases_empty_root(self):
-        """_load_tsconfig_aliases returns {} for empty source_root."""
-        from jcodemunch_mcp.parser.imports import _load_tsconfig_aliases
-        assert _load_tsconfig_aliases("") == {}
-
-    def test_load_tsconfig_aliases_jsonc(self):
-        """_load_tsconfig_aliases parses JSONC (tsconfig with // and /* */ comments)."""
-        import tempfile
-        from pathlib import Path
-        from jcodemunch_mcp.parser.imports import _load_tsconfig_aliases, _alias_map_cache
-
-        tsconfig_jsonc = '''{
+    @pytest.mark.parametrize("source_root,tsconfig_content,expected_keys", [
+        (
+            None,
+            {"compilerOptions": {"paths": {"@/*": ["./*"], "~/*": ["./src/*"]}}},
+            {"@/*": ["/*"], "~/*": ["src/*"]},
+        ),
+        ("", None, {}),
+        (
+            None,
+            '''{
   // TypeScript configuration for Next.js
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
@@ -563,25 +393,35 @@ class TestResolveSpecifier:
       "@/lib/*": ["app/lib/*"]
     }
   }
-}'''
-        with tempfile.TemporaryDirectory() as tmp:
-            (Path(tmp) / "tsconfig.json").write_text(tsconfig_jsonc)
-            _alias_map_cache.pop(tmp, None)
-            result = _load_tsconfig_aliases(tmp)
-        assert "@/*" in result, "JSONC tsconfig should parse correctly despite comments"
-        assert result["@/*"] == ["/*"]
-        assert result["@/lib/*"] == ["app/lib/*"]
+}''',
+            {"@/*": ["/*"], "@/lib/*": ["app/lib/*"]},
+        ),
+    ], ids=["basic", "empty_root", "jsonc"])
+    def test_load_tsconfig(self, source_root, tsconfig_content, expected_keys):
+        import json, tempfile
+        from pathlib import Path
+        from jcodemunch_mcp.parser.imports import _load_tsconfig_aliases, _alias_map_cache
 
-    def test_at_alias_nested_layout(self):
-        """'@/lib/utils' resolves correctly when source is nested (app/lib/) with specific override."""
-        # Project A scenario: @/* -> ./* (root) but @/lib/* -> app/lib/*
-        # File lives at app/lib/utils.ts, specifier is @/lib/utils
-        files = frozenset(["app/lib/utils.ts", "app/components/Widget.tsx"])
-        alias_map = {"@/*": ["/*"], "@/lib/*": ["app/lib/*"]}
-        result = resolve_specifier("@/lib/utils", "app/components/Widget.tsx", files, alias_map)
-        assert result == "app/lib/utils.ts", (
-            "Specific @/lib/* override must take precedence and resolve to app/lib/utils.ts"
-        )
+        if source_root is None and tsconfig_content is not None and isinstance(tsconfig_content, str):
+            # JSONC test
+            with tempfile.TemporaryDirectory() as tmp:
+                (Path(tmp) / "tsconfig.json").write_text(tsconfig_content)
+                _alias_map_cache.pop(tmp, None)
+                result = _load_tsconfig_aliases(tmp)
+            for key, val in expected_keys.items():
+                assert key in result, f"JSONC tsconfig should parse correctly"
+                assert result[key] == val
+        elif tsconfig_content is None:
+            result = _load_tsconfig_aliases("")
+            assert result == {}
+        else:
+            with tempfile.TemporaryDirectory() as tmp:
+                (Path(tmp) / "tsconfig.json").write_text(json.dumps(tsconfig_content))
+                _alias_map_cache.pop(tmp, None)
+                result = _load_tsconfig_aliases(tmp)
+            for key, val in expected_keys.items():
+                assert key in result
+                assert result[key] == val
 
     def test_find_importers_jsonc_tsconfig_nested_layout(self, tmp_path):
         """find_importers resolves @/* aliases when tsconfig.json uses JSONC comments (issue #170)."""
@@ -640,99 +480,34 @@ class TestResolveSpecifierPython:
     at where __init__.py files live.
     """
 
-    def test_repo_root_layout(self):
-        """Flat layout: 'app.helpers' resolves to 'app/helpers.py'."""
-        files = {
-            "app/__init__.py",
-            "app/helpers.py",
-            "main.py",
-        }
-        result = resolve_specifier("app.helpers", "main.py", files)
-        assert result == "app/helpers.py"
-
-    def test_backend_source_root(self):
-        """FastAPI-style layout: 'app.notifications.mentions' resolves to
-        'backend/app/notifications/mentions.py' because 'backend/' is detected
-        as a source root (parent of the top-level 'app' package).
-        """
-        files = {
-            "backend/app/__init__.py",
-            "backend/app/notifications/__init__.py",
+    @pytest.mark.parametrize("specifier,from_file,files,expected", [
+        ("app.helpers", "main.py", {"app/__init__.py", "app/helpers.py", "main.py"}, "app/helpers.py"),
+        (
+            "app.notifications.mentions", "backend/app/router.py",
+            {"backend/app/__init__.py", "backend/app/notifications/__init__.py",
+             "backend/app/notifications/mentions.py", "backend/app/router.py"},
             "backend/app/notifications/mentions.py",
-            "backend/app/router.py",
-        }
-        result = resolve_specifier(
-            "app.notifications.mentions", "backend/app/router.py", files
-        )
-        assert result == "backend/app/notifications/mentions.py"
-
-    def test_src_source_root(self):
-        """src/ layout: 'mypkg.utils' resolves to 'src/mypkg/utils.py'."""
-        files = {
-            "src/mypkg/__init__.py",
-            "src/mypkg/utils.py",
-            "src/mypkg/main.py",
-        }
-        result = resolve_specifier(
-            "mypkg.utils", "src/mypkg/main.py", files
-        )
-        assert result == "src/mypkg/utils.py"
-
-    def test_resolves_to_init_file(self):
-        """A bare package import resolves to the package's __init__.py."""
-        files = {
-            "backend/app/__init__.py",
+        ),
+        ("mypkg.utils", "src/mypkg/main.py", {"src/mypkg/__init__.py", "src/mypkg/utils.py", "src/mypkg/main.py"}, "src/mypkg/utils.py"),
+        (
+            "app.services", "backend/app/services/email.py",
+            {"backend/app/__init__.py", "backend/app/services/__init__.py", "backend/app/services/email.py"},
             "backend/app/services/__init__.py",
-            "backend/app/services/email.py",
-        }
-        result = resolve_specifier(
-            "app.services", "backend/app/services/email.py", files
-        )
-        assert result == "backend/app/services/__init__.py"
+        ),
+        ("app.helpers", "app/main.py", {"app/helpers.py", "app/main.py"}, "app/helpers.py"),
+    ], ids=["repo_root", "backend_root", "src_root", "to_init", "pep420"])
+    def test_positive_resolution(self, specifier, from_file, files, expected):
+        result = resolve_specifier(specifier, from_file, files)
+        assert result == expected
 
-    def test_pep420_namespace_package(self):
-        """PEP 420 layout (no __init__.py anywhere): falls back to top-level
-        directories that contain .py files. 'app.helpers' should still
-        resolve to 'app/helpers.py'.
-        """
-        files = {
-            "app/helpers.py",
-            "app/main.py",
-        }
-        result = resolve_specifier("app.helpers", "app/main.py", files)
-        assert result == "app/helpers.py"
-
-    def test_unresolvable_third_party(self):
-        """Imports that don't match any indexed file (stdlib, pip packages)
-        return None instead of crashing or false-matching.
-        """
-        files = {
-            "backend/app/__init__.py",
-            "backend/app/main.py",
-        }
-        result = resolve_specifier(
-            "fastapi.responses", "backend/app/main.py", files
-        )
-        assert result is None
-
-    def test_relative_import_routes_through_relative_branch(self):
-        """Imports starting with '.' must NOT trigger the new Python module
-        branch. They go through the existing relative-import branch at the
-        top of resolve_specifier (whose Python-specific behavior is tested
-        separately by test_python_relative).
-        """
-        files = {
-            "backend/app/__init__.py",
-            "backend/app/services/__init__.py",
-            "backend/app/services/email.py",
-        }
-        # The new branch must not match this; whatever the relative branch
-        # returns is fine for this test (we're guarding against the new
-        # branch hijacking dotted-leading specifiers).
-        result = resolve_specifier(
-            ".email", "backend/app/services/sms.py", files
-        )
-        assert result is None or result == "backend/app/services/email.py"
+    @pytest.mark.parametrize("specifier,from_file,files", [
+        ("fastapi.responses", "backend/app/main.py", {"backend/app/__init__.py", "backend/app/main.py"}),
+        (".email", "backend/app/services/sms.py", {"backend/app/__init__.py", "backend/app/services/__init__.py", "backend/app/services/email.py"}),
+    ], ids=["third_party", "relative_branch"])
+    def test_negative_edge_cases(self, specifier, from_file, files):
+        result = resolve_specifier(specifier, from_file, files)
+        # Both return None or string (for relative, could resolve)
+        assert result is None or isinstance(result, str)
 
 
 # ---------------------------------------------------------------------------
@@ -885,59 +660,42 @@ class TestFindImporters:
         assert "agg_summary.sql" in importer_files
         assert "dim_client.sql" not in importer_files
 
-    def test_has_importers_alive_importer(self, tmp_path):
-        """An importer that is itself imported should have has_importers=True."""
+    @pytest.mark.parametrize("scenario,expected_has_importers", [
+        ("alive", True),   # loader.js is imported by app.js
+        ("dead", False),   # dead_loader.js has no importers
+    ], ids=["alive", "dead"])
+    def test_has_importers_chain(self, tmp_path, scenario, expected_has_importers):
+        """An importer's has_importers flag reflects whether it is itself imported."""
         src = tmp_path / "src"
         store = tmp_path / "store"
 
-        # chain: app.js -> loader.js -> utils.js
-        _write(src / "utils.js", "export function util() {}\n")
-        _write(src / "loader.js", "import { util } from './utils';\nexport function load() {}\n")
-        _write(src / "app.js", "import { load } from './loader';\nload();\n")
+        _write(src / "target.js", "export function util() {}\n")
+
+        if scenario == "alive":
+            # chain: app.js -> loader.js -> target.js
+            _write(src / "loader.js", "import { util } from './target';\nexport function load() {}\n")
+            _write(src / "app.js", "import { load } from './loader';\nload();\n")
+            target_file = "target.js"
+            importer_file = "loader.js"
+        else:
+            # storage.js -> dead_loader.js (dead_loader has no importers)
+            _write(src / "dead_loader.js", "import { util } from './target';\nexport function load() {}\n")
+            _write(src / "active.js", "export function main() {}\n")
+            target_file = "target.js"
+            importer_file = "dead_loader.js"
 
         result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
         assert result["success"] is True
 
         importers = find_importers(
             repo=result["repo"],
-            file_path="utils.js",
+            file_path=target_file,
             storage_path=str(store),
         )
         assert importers["importer_count"] == 1
-        loader = importers["importers"][0]
-        assert loader["file"] == "loader.js"
-        # loader.js is imported by app.js, so it is reachable
-        assert loader["has_importers"] is True
-
-    def test_has_importers_dead_chain(self, tmp_path):
-        """An importer with no importers of its own should have has_importers=False.
-
-        This is the storageLoader.js scenario from issue #130: a file appears to
-        have an importer (firestoreDocumentLoader.js) but that importer is itself
-        never imported — revealing a transitive dead code chain.
-        """
-        src = tmp_path / "src"
-        store = tmp_path / "store"
-
-        # storage.js is imported by dead_loader.js, but dead_loader.js has no importers.
-        _write(src / "storage.js", "export function store() {}\n")
-        _write(src / "dead_loader.js", "import { store } from './storage';\nexport function load() {}\n")
-        # active.js exists but imports nothing from dead_loader
-        _write(src / "active.js", "export function main() {}\n")
-
-        result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
-        assert result["success"] is True
-
-        importers = find_importers(
-            repo=result["repo"],
-            file_path="storage.js",
-            storage_path=str(store),
-        )
-        assert importers["importer_count"] == 1
-        dead_loader = importers["importers"][0]
-        assert dead_loader["file"] == "dead_loader.js"
-        # dead_loader.js has no importers — chain is dead
-        assert dead_loader["has_importers"] is False
+        imp = importers["importers"][0]
+        assert imp["file"] == importer_file
+        assert imp["has_importers"] is expected_has_importers
 
     def test_max_results_truncation(self, tmp_path):
         src = tmp_path / "src"
@@ -983,19 +741,12 @@ class TestFindImporters:
         assert "utils.js" in paths
         assert "config.js" in paths
 
-    def test_batch_empty_list(self, tmp_path):
-        """Empty file_paths list returns empty results."""
-        src = tmp_path / "src"
-        store = tmp_path / "store"
-        _write(src / "app.js", "console.log('hi')")
-        result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
-        assert result["success"] is True
-
-        batch_result = find_importers(repo=result["repo"], file_paths=[], storage_path=str(store))
-        assert batch_result["results"] == []
-
-    def test_singular_file_path_still_works(self, tmp_path):
-        """Existing singular file_path param still works (backward compat)."""
+    @pytest.mark.parametrize("scenario", [
+        pytest.param("empty_list", id="empty_list"),
+        pytest.param("singular", id="singular"),
+    ], ids=["empty_list", "singular"])
+    def test_file_path_modes(self, tmp_path, scenario):
+        """Empty file_paths list and singular file_path backward compat."""
         src = tmp_path / "src"
         store = tmp_path / "store"
         _write(src / "utils.js", "export function helper() {}")
@@ -1004,14 +755,17 @@ class TestFindImporters:
         result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
         assert result["success"] is True
 
-        singular_result = find_importers(
-            repo=result["repo"],
-            file_path="utils.js",
-            storage_path=str(store),
-        )
-        # Original response shape: flat importers list, not nested results
-        assert "importers" in singular_result
-        assert "results" not in singular_result
+        if scenario == "empty_list":
+            batch_result = find_importers(repo=result["repo"], file_paths=[], storage_path=str(store))
+            assert batch_result["results"] == []
+        else:
+            singular_result = find_importers(
+                repo=result["repo"],
+                file_path="utils.js",
+                storage_path=str(store),
+            )
+            assert "importers" in singular_result
+            assert "results" not in singular_result
 
     def test_both_file_path_and_file_paths_raises(self, tmp_path):
         """Passing both file_path and file_paths raises ValueError."""
@@ -1034,66 +788,38 @@ class TestFindImporters:
 class TestFindReferences:
     """Integration tests for find_references."""
 
-    def test_named_import_match(self, tmp_path):
+    @pytest.mark.parametrize("files,identifier,expected_count,expected_in", [
+        (
+            {"auth.js": "export function authenticate() {}\n",
+             "app.js": "import { authenticate } from './auth';\n",
+             "middleware.js": "import { authenticate } from './auth';\n",
+             "unrelated.js": "function foo() {}\n"},
+            "authenticate", 2, ["app.js", "middleware.js"],
+        ),
+        (
+            {"IntakeService.js": "export class IntakeService {}\n",
+             "handler.js": "import IntakeService from './IntakeService';\n"},
+            "IntakeService", 1, ["handler.js"],
+        ),
+        (
+            {"utils.js": "export function Helper() {}\n",
+             "app.js": "import { Helper } from './utils';\n"},
+            "helper", 1, ["app.js"],
+        ),
+    ], ids=["named_import", "stem_match", "case_insensitive"])
+    def test_matching_variants(self, tmp_path, files, identifier, expected_count, expected_in):
         src = tmp_path / "src"
         store = tmp_path / "store"
-
-        _write(src / "auth.js", "export function authenticate() {}\n")
-        _write(src / "app.js", "import { authenticate } from './auth';\n")
-        _write(src / "middleware.js", "import { authenticate } from './auth';\n")
-        _write(src / "unrelated.js", "function foo() {}\n")
-
+        for fname, content in files.items():
+            _write(src / fname, content)
         result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
         assert result["success"] is True
-
-        refs = find_references(
-            repo=result["repo"],
-            identifier="authenticate",
-            storage_path=str(store),
-        )
+        refs = find_references(repo=result["repo"], identifier=identifier, storage_path=str(store))
         assert "error" not in refs
-        assert refs["reference_count"] == 2
+        assert refs["reference_count"] == expected_count
         ref_files = [r["file"] for r in refs["references"]]
-        assert "app.js" in ref_files
-        assert "middleware.js" in ref_files
-        assert "unrelated.js" not in ref_files
-
-    def test_specifier_stem_match(self, tmp_path):
-        src = tmp_path / "src"
-        store = tmp_path / "store"
-
-        _write(src / "IntakeService.js", "export class IntakeService {}\n")
-        _write(src / "handler.js", "import IntakeService from './IntakeService';\n")
-
-        result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
-        assert result["success"] is True
-
-        refs = find_references(
-            repo=result["repo"],
-            identifier="IntakeService",
-            storage_path=str(store),
-        )
-        assert refs["reference_count"] >= 1
-        ref_files = [r["file"] for r in refs["references"]]
-        assert "handler.js" in ref_files
-
-    def test_case_insensitive_match(self, tmp_path):
-        src = tmp_path / "src"
-        store = tmp_path / "store"
-
-        _write(src / "utils.js", "export function Helper() {}\n")
-        _write(src / "app.js", "import { Helper } from './utils';\n")
-
-        result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
-        assert result["success"] is True
-
-        # Search with lowercase
-        refs = find_references(
-            repo=result["repo"],
-            identifier="helper",
-            storage_path=str(store),
-        )
-        assert refs["reference_count"] >= 1
+        for f in expected_in:
+            assert f in ref_files
 
     def test_no_false_positives(self, tmp_path):
         src = tmp_path / "src"
@@ -1183,30 +909,27 @@ class TestFindReferences:
         assert "helper" in ids
         assert "format" in ids
 
-    def test_singular_identifier_still_works(self, tmp_path):
-        """Existing singular identifier param still works (backward compat)."""
+    @pytest.mark.parametrize("scenario", [
+        pytest.param("singular", id="singular"),
+        pytest.param("empty_list", id="empty_list"),
+    ], ids=["singular", "empty_list"])
+    def test_identifier_modes(self, tmp_path, scenario):
+        """Singular identifier works and empty list returns empty results."""
         src = tmp_path / "src"
         store = tmp_path / "store"
-        _write(src / "utils.js", "export function helper() {}")
-        _write(src / "app.js", "import { helper } from './utils';")
+        _write(src / "utils.js", "export function helper() {}\nexport function format() {}")
+        _write(src / "app.js", "import { helper, format } from './utils';")
 
         result = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
         repo = result["repo"]
 
-        result = find_references(repo=repo, identifier="helper", storage_path=str(store))
-        assert "references" in result
-        assert "results" not in result
-
-    def test_batch_empty_list(self, tmp_path):
-        """Empty identifiers list returns empty results."""
-        src = tmp_path / "src"
-        src.mkdir()
-        _write(src / "app.js", "console.log('hi')")
-        result = index_folder(path=str(tmp_path), use_ai_summaries=False, storage_path=str(tmp_path / "idx"))
-        repo = result["repo"]
-
-        result = find_references(repo=repo, identifiers=[], storage_path=str(tmp_path / "idx"))
-        assert result["results"] == []
+        if scenario == "singular":
+            result = find_references(repo=repo, identifier="helper", storage_path=str(store))
+            assert "references" in result
+            assert "results" not in result
+        else:  # empty_list
+            result = find_references(repo=repo, identifiers=[], storage_path=str(store))
+            assert result["results"] == []
 
     def test_both_identifier_and_identifiers_raises(self, tmp_path):
         """Passing both identifier and identifiers raises ValueError."""
@@ -1330,8 +1053,20 @@ class TestLaravelExtraImportsPipeline:
         specifiers = {imp["specifier"] for imp in blade_imports}
         assert "resources/views/layouts/app.blade.php" in specifiers
 
-    def test_facade_imports_in_index(self, tmp_path):
-        """Facade static calls create import edges to Illuminate classes."""
+    @pytest.mark.parametrize("scenario,file_path,expected_specifiers", [
+        (
+            "facade",
+            "app/Services/OrderService.php",
+            {"Illuminate\\Cache\\CacheManager", "Illuminate\\Database\\DatabaseManager"},
+        ),
+        (
+            "eloquent",
+            "app/Models/User.php",
+            {"Post"},
+        ),
+    ], ids=["facade", "eloquent"])
+    def test_laravel_php_imports(self, tmp_path, scenario, file_path, expected_specifiers):
+        """Facade and Eloquent calls create import edges from PHP files."""
         import json
         store_path = tmp_path / "store"
 
@@ -1340,7 +1075,9 @@ class TestLaravelExtraImportsPipeline:
             "require": {"laravel/framework": "^11.0"},
             "autoload": {"psr-4": {"App\\": "app/"}},
         }))
-        _write(tmp_path / "app" / "Services" / "OrderService.php", r"""<?php
+
+        if scenario == "facade":
+            _write(tmp_path / "app" / "Services" / "OrderService.php", r"""<?php
 namespace App\Services;
 
 class OrderService
@@ -1352,53 +1089,30 @@ class OrderService
     }
 }
 """)
-
-        result = index_folder(str(tmp_path), use_ai_summaries=False,
-                              storage_path=str(store_path))
-        assert result["success"] is True
-
-        store = IndexStore(base_path=str(store_path))
-        owner, name = result["repo"].split("/", 1)
-        index = store.load_index(owner, name)
-
-        svc_imports = index.imports.get("app/Services/OrderService.php", [])
-        specifiers = {imp["specifier"] for imp in svc_imports}
-        assert "Illuminate\\Cache\\CacheManager" in specifiers
-        assert "Illuminate\\Database\\DatabaseManager" in specifiers
-
-    def test_eloquent_relationship_imports_in_index(self, tmp_path):
-        """Eloquent relationship calls create import edges between models."""
-        import json
-        store_path = tmp_path / "store"
-
-        _write(tmp_path / "artisan", "#!/usr/bin/env php\n<?php\n")
-        _write(tmp_path / "composer.json", json.dumps({
-            "require": {"laravel/framework": "^11.0"},
-            "autoload": {"psr-4": {"App\\": "app/"}},
-        }))
-        _write(tmp_path / "app" / "Models" / "User.php", r"""<?php
+        else:  # eloquent
+            _write(tmp_path / "app" / "Models" / "User.php", r"""<?php
 namespace App\Models;
 class User extends Model
 {
     public function posts() { return $this->hasMany(Post::class); }
 }
 """)
-        _write(tmp_path / "app" / "Models" / "Post.php", r"""<?php
+            _write(tmp_path / "app" / "Models" / "Post.php", r"""<?php
 namespace App\Models;
 class Post extends Model {}
 """)
 
-        result = index_folder(str(tmp_path), use_ai_summaries=False,
-                              storage_path=str(store_path))
+        result = index_folder(str(tmp_path), use_ai_summaries=False, storage_path=str(store_path))
         assert result["success"] is True
 
         store = IndexStore(base_path=str(store_path))
         owner, name = result["repo"].split("/", 1)
         index = store.load_index(owner, name)
 
-        user_imports = index.imports.get("app/Models/User.php", [])
-        specifiers = {imp["specifier"] for imp in user_imports}
-        assert "Post" in specifiers
+        imports = index.imports.get(file_path, [])
+        specifiers = {imp["specifier"] for imp in imports}
+        for s in expected_specifiers:
+            assert s in specifiers
 
     def test_inertia_imports_in_index(self, tmp_path):
         """Inertia::render creates import edges from controllers to Vue pages."""

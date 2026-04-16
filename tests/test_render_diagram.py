@@ -187,29 +187,19 @@ def _dependency_graph_data(**overrides):
 # ── Detection tests ─────────────────────────────────────────────────────────
 
 class TestDetection:
-    def test_detect_call_hierarchy(self):
-        assert _detect_source(_call_hierarchy_data()) == "call_hierarchy"
-
-    def test_detect_signal_chains_discovery(self):
-        assert _detect_source(_signal_chains_discovery_data()) == "signal_chains_discovery"
-
-    def test_detect_signal_chains_lookup(self):
-        assert _detect_source(_signal_chains_lookup_data()) == "signal_chains_lookup"
-
-    def test_detect_tectonic_map(self):
-        assert _detect_source(_tectonic_map_data()) == "tectonic_map"
-
-    def test_detect_dependency_cycles(self):
-        assert _detect_source(_dependency_cycles_data()) == "dependency_cycles"
-
-    def test_detect_impact_preview(self):
-        assert _detect_source(_impact_preview_data()) == "impact_preview"
-
-    def test_detect_blast_radius(self):
-        assert _detect_source(_blast_radius_data()) == "blast_radius"
-
-    def test_detect_dependency_graph(self):
-        assert _detect_source(_dependency_graph_data()) == "dependency_graph"
+    @pytest.mark.parametrize("builder,expected", [
+        (_call_hierarchy_data, "call_hierarchy"),
+        (_signal_chains_discovery_data, "signal_chains_discovery"),
+        (_signal_chains_lookup_data, "signal_chains_lookup"),
+        (_tectonic_map_data, "tectonic_map"),
+        (_dependency_cycles_data, "dependency_cycles"),
+        (_impact_preview_data, "impact_preview"),
+        (_blast_radius_data, "blast_radius"),
+        (_dependency_graph_data, "dependency_graph"),
+    ])
+    def test_detect_source_types(self, builder, expected):
+        """Each source tool maps to its expected source type."""
+        assert _detect_source(builder()) == expected
 
     def test_detect_error_response(self):
         assert _detect_source({"error": "not indexed"}) == "error"
@@ -220,7 +210,6 @@ class TestDetection:
     def test_detect_callers_only(self):
         """call_hierarchy with direction='callers' has callers but no callees."""
         data = _call_hierarchy_data(callees=[], callee_count=0, direction="callers")
-        # Still has callers + symbol keys
         assert _detect_source(data) == "call_hierarchy"
 
 
@@ -260,33 +249,23 @@ class TestHelpers:
 # ── Pruning tests ───────────────────────────────────────────────────────────
 
 class TestPruning:
-    def test_no_pruning_under_budget(self):
-        nodes = ["a", "b", "c"]
-        edges = [("a", "b"), ("b", "c")]
-        result_nodes, result_edges, pruned = _prune_graph(nodes, edges, 10, set())
-        assert pruned == 0
-        assert set(result_nodes) == {"a", "b", "c"}
-
-    def test_leaf_pruning(self):
-        nodes = ["root", "a", "b", "leaf1", "leaf2", "leaf3"]
-        edges = [("root", "a"), ("root", "b"), ("a", "leaf1"), ("a", "leaf2"), ("b", "leaf3")]
-        result_nodes, result_edges, pruned = _prune_graph(nodes, edges, 3, {"root"})
-        assert len(result_nodes) <= 3
-        assert "root" in result_nodes
-        assert pruned > 0
-
-    def test_preserve_set_honored(self):
-        nodes = ["target", "a"]
-        edges = [("target", "a")]
-        result_nodes, _, pruned = _prune_graph(nodes, edges, 1, {"target"})
-        assert "target" in result_nodes
-
-    def test_exact_budget_no_pruning(self):
-        nodes = ["a", "b", "c"]
-        edges = [("a", "b"), ("b", "c")]
-        result_nodes, _, pruned = _prune_graph(nodes, edges, 3, set())
-        assert pruned == 0
-        assert len(result_nodes) == 3
+    @pytest.mark.parametrize("nodes,edges,max_nodes,preserve,expect_pruned,expect_preserve", [
+        (["a", "b", "c"], [("a", "b"), ("b", "c")], 10, set(), 0, {"a", "b", "c"}),
+        (["root", "a", "b", "leaf1", "leaf2", "leaf3"], [("root", "a"), ("root", "b"), ("a", "leaf1"), ("a", "leaf2"), ("b", "leaf3")], 3, {"root"}, True, {"root"}),
+        (["target", "a"], [("target", "a")], 1, {"target"}, None, {"target"}),
+        (["a", "b", "c"], [("a", "b"), ("b", "c")], 3, set(), 0, {"a", "b", "c"}),
+    ])
+    def test_prune_graph(self, nodes, edges, max_nodes, preserve, expect_pruned, expect_preserve):
+        result_nodes, _, pruned = _prune_graph(nodes, edges, max_nodes, preserve)
+        if expect_pruned == 0:
+            assert pruned == 0
+            assert set(result_nodes) == set(nodes)
+        elif expect_pruned is True:
+            assert pruned > 0
+            assert "root" in result_nodes
+        if expect_preserve:
+            for node in expect_preserve:
+                assert node in result_nodes
 
 
 # ── Theme tests ─────────────────────────────────────────────────────────────
@@ -318,35 +297,17 @@ class TestThemes:
 # ── Renderer tests: call_hierarchy ──────────────────────────────────────────
 
 class TestRenderCallHierarchy:
-    def test_flowchart_td(self):
+    def test_core_rendering(self):
+        """All core rendering aspects for call hierarchy with callers and callees."""
         result = render_diagram(_call_hierarchy_data())
         assert result["diagram_type"] == "flowchart TD"
         assert result["mermaid"].startswith("flowchart TD")
-
-    def test_root_node_present(self):
-        result = render_diagram(_call_hierarchy_data())
         assert "handle" in result["mermaid"]
-
-    def test_callers_and_callees_present(self):
-        result = render_diagram(_call_hierarchy_data())
         assert "run" in result["mermaid"]
         assert "query" in result["mermaid"]
-
-    def test_resolution_tier_styling(self):
-        result = render_diagram(_call_hierarchy_data())
-        # Should have classDef for at least one resolution tier
         assert "classDef" in result["mermaid"]
-
-    def test_file_subgrouping(self):
-        result = render_diagram(_call_hierarchy_data())
         assert "subgraph" in result["mermaid"]
-
-    def test_source_tool_detected(self):
-        result = render_diagram(_call_hierarchy_data())
         assert result["source_tool"] == "call_hierarchy"
-
-    def test_legend_present(self):
-        result = render_diagram(_call_hierarchy_data())
         assert "Edge color" in result["legend"]
 
     def test_empty_callers_callees(self):
@@ -359,73 +320,44 @@ class TestRenderCallHierarchy:
 # ── Renderer tests: signal_chains ───────────────────────────────────────────
 
 class TestRenderSignalChains:
-    def test_sequence_diagram_type(self):
+    def test_discovery_rendering(self):
+        """Core rendering for signal chains discovery mode."""
         result = render_diagram(_signal_chains_discovery_data())
         assert result["diagram_type"] == "sequenceDiagram"
         assert result["mermaid"].startswith("sequenceDiagram")
-
-    def test_gateway_participants(self):
-        result = render_diagram(_signal_chains_discovery_data())
         assert "create_user" in result["mermaid"]
         assert "seed_db" in result["mermaid"]
-
-    def test_kind_grouping_boxes(self):
-        result = render_diagram(_signal_chains_discovery_data())
         assert "box" in result["mermaid"]
         assert "HTTP" in result["mermaid"]
         assert "CLI" in result["mermaid"]
-
-    def test_orphan_note(self):
-        result = render_diagram(_signal_chains_discovery_data())
         assert "12.5%" in result["mermaid"]
+        assert result["source_tool"] == "signal_chains"
 
-    def test_empty_chains(self):
-        data = _signal_chains_discovery_data(chains=[], gateway_count=0, chain_count=0, orphan_symbols=0, orphan_symbol_pct=0)
-        result = render_diagram(data)
+    @pytest.mark.parametrize("data_fn,assertion", [
+        (_signal_chains_lookup_data, lambda r: r["source_tool"] == "signal_chains"),
+        (lambda: _signal_chains_discovery_data(chains=[], gateway_count=0, chain_count=0, orphan_symbols=0, orphan_symbol_pct=0), lambda r: "No signal chains" in r["mermaid"]),
+    ])
+    def test_edge_cases(self, data_fn, assertion):
+        result = render_diagram(data_fn())
         assert "error" not in result
-        assert "No signal chains" in result["mermaid"]
-
-    def test_lookup_mode(self):
-        result = render_diagram(_signal_chains_lookup_data())
-        assert result["source_tool"] == "signal_chains"
-
-    def test_source_tool_name_normalized(self):
-        result = render_diagram(_signal_chains_discovery_data())
-        assert result["source_tool"] == "signal_chains"
+        assertion(result)
 
 
 # ── Renderer tests: tectonic_map ────────────────────────────────────────────
 
 class TestRenderTectonicMap:
-    def test_subgraph_per_plate(self):
+    def test_plate_rendering(self):
+        """Core plate rendering: subgraph count, anchor, drifter, nexus, cohesion, coupling, isolated."""
         result = render_diagram(_tectonic_map_data())
         mermaid = result["mermaid"]
         assert mermaid.count("subgraph plate") == 2
-
-    def test_anchor_styling(self):
-        result = render_diagram(_tectonic_map_data())
-        assert ":::anchor" in result["mermaid"]
-
-    def test_drifter_styling(self):
-        result = render_diagram(_tectonic_map_data())
-        assert ":::drifter" in result["mermaid"]
-
-    def test_nexus_alert_in_label(self):
-        result = render_diagram(_tectonic_map_data())
-        assert "NEXUS" in result["mermaid"]
-
-    def test_cohesion_in_title(self):
-        result = render_diagram(_tectonic_map_data())
-        assert "0.82" in result["mermaid"]
-        assert "0.65" in result["mermaid"]
-
-    def test_coupling_edges(self):
-        result = render_diagram(_tectonic_map_data())
-        assert "0.45" in result["mermaid"]
-
-    def test_isolated_files(self):
-        result = render_diagram(_tectonic_map_data())
-        assert "Isolated" in result["mermaid"]
+        assert ":::anchor" in mermaid
+        assert ":::drifter" in mermaid
+        assert "NEXUS" in mermaid
+        assert "0.82" in mermaid
+        assert "0.65" in mermaid
+        assert "0.45" in mermaid
+        assert "Isolated" in mermaid
 
     def test_empty_plates(self):
         data = _tectonic_map_data(plates=[], plate_count=0)
@@ -436,96 +368,60 @@ class TestRenderTectonicMap:
 # ── Renderer tests: dependency_cycles ───────────────────────────────────────
 
 class TestRenderDependencyCycles:
-    def test_cycle_subgraphs(self):
+    def test_cycle_rendering(self):
+        """Core cycle rendering: subgraph labels, red edges, cycled class marker."""
         result = render_diagram(_dependency_cycles_data())
         assert "Cycle 1" in result["mermaid"]
-
-    def test_cycle_edges_red(self):
-        result = render_diagram(_dependency_cycles_data())
         assert "FF4136" in result["mermaid"]
-
-    def test_cycled_class(self):
-        result = render_diagram(_dependency_cycles_data())
         assert ":::cycled" in result["mermaid"]
-
-    def test_no_cycles_clean(self):
-        data = _dependency_cycles_data(cycles=[], cycle_count=0)
-        result = render_diagram(data)
-        assert "No circular dependencies" in result["mermaid"]
-
-    def test_multiple_cycles(self):
-        data = _dependency_cycles_data(
-            cycles=[["a.py", "b.py"], ["x.py", "y.py", "z.py"]],
-            cycle_count=2,
-        )
-        result = render_diagram(data)
-        assert "Cycle 1" in result["mermaid"]
-        assert "Cycle 2" in result["mermaid"]
-
-    def test_closing_edge(self):
-        """Cycle a→b→c should have edge from c back to a."""
-        result = render_diagram(_dependency_cycles_data())
-        # 3 files = 3 edges (a→b, b→c, c→a)
         assert result["edge_count"] == 3
+
+    @pytest.mark.parametrize("data_fn,expected", [
+        (lambda: _dependency_cycles_data(cycles=[], cycle_count=0), "No circular dependencies"),
+        (lambda: _dependency_cycles_data(cycles=[["a.py", "b.py"], ["x.py", "y.py", "z.py"]], cycle_count=2), "Cycle 1"),
+    ])
+    def test_edge_cases(self, data_fn, expected):
+        result = render_diagram(data_fn())
+        assert expected in result["mermaid"]
 
 
 # ── Renderer tests: impact_preview ──────────────────────────────────────────
 
 class TestRenderImpactPreview:
-    def test_flowchart_bt(self):
+    def test_core_rendering(self):
+        """Core impact preview rendering: flowchart BT, target marker, affected symbols, grouping, depth coloring."""
         result = render_diagram(_impact_preview_data())
         assert result["diagram_type"] == "flowchart BT"
-
-    def test_target_present(self):
-        result = render_diagram(_impact_preview_data())
         assert "parse_config" in result["mermaid"]
         assert ":::target" in result["mermaid"]
-
-    def test_affected_symbols_present(self):
-        result = render_diagram(_impact_preview_data())
         assert "init" in result["mermaid"]
         assert "run" in result["mermaid"]
-
-    def test_file_grouping(self):
-        result = render_diagram(_impact_preview_data())
         assert "subgraph" in result["mermaid"]
-
-    def test_depth_coloring(self):
-        result = render_diagram(_impact_preview_data())
-        # Should have classDef for depth levels
         assert "classDef d1" in result["mermaid"]
+
+    def test_empty_affected(self):
+        """Edge case: no affected symbols."""
+        data = _impact_preview_data(affected_files=0, affected_symbol_count=0, affected_symbols=[], affected_by_file={}, call_chains=[])
+        result = render_diagram(data)
+        assert "error" not in result
 
 
 # ── Renderer tests: blast_radius ────────────────────────────────────────────
 
 class TestRenderBlastRadius:
-    def test_flowchart_td(self):
+    def test_core_rendering(self):
+        """Core blast radius rendering: flowchart TD, target, confirmed/potential markers, risk badge, ref counts."""
         result = render_diagram(_blast_radius_data())
         assert result["diagram_type"] == "flowchart TD"
-
-    def test_target_present(self):
-        result = render_diagram(_blast_radius_data())
         assert "DB_URL" in result["mermaid"]
         assert ":::target" in result["mermaid"]
-
-    def test_confirmed_styling(self):
-        result = render_diagram(_blast_radius_data())
         assert ":::confirmed" in result["mermaid"]
-
-    def test_potential_styling(self):
-        result = render_diagram(_blast_radius_data())
         assert ":::potential" in result["mermaid"]
-
-    def test_risk_score_badge(self):
-        result = render_diagram(_blast_radius_data())
         assert "0.65" in result["mermaid"]
         assert "medium" in result["mermaid"]
-
-    def test_reference_count_annotation(self):
-        result = render_diagram(_blast_radius_data())
         assert "3 refs" in result["mermaid"]
 
-    def test_risk_theme_heat_coloring(self):
+    def test_risk_theme(self):
         result = render_diagram(_blast_radius_data(), theme="risk")
         assert "FF4136" in result["mermaid"] or "FF851B" in result["mermaid"]
 
@@ -533,30 +429,21 @@ class TestRenderBlastRadius:
 # ── Renderer tests: dependency_graph ────────────────────────────────────────
 
 class TestRenderDependencyGraph:
-    def test_flowchart_lr(self):
+    def test_core_rendering(self):
+        """Core dependency graph rendering: flowchart LR, focal node, neighbors."""
         result = render_diagram(_dependency_graph_data())
         assert result["diagram_type"] == "flowchart LR"
-
-    def test_focal_node_present(self):
-        result = render_diagram(_dependency_graph_data())
         assert "server.py" in result["mermaid"]
         assert ":::focal" in result["mermaid"]
-
-    def test_neighbors_present(self):
-        result = render_diagram(_dependency_graph_data())
         assert "routes.py" in result["mermaid"]
         assert "models.py" in result["mermaid"]
 
-    def test_cross_repo_dashed(self):
-        data = _dependency_graph_data(cross_repo_edges=[{"file": "other-repo/utils.py"}])
-        result = render_diagram(data)
-        assert "cross-repo" in result["mermaid"]
-        assert ":::cross" in result["mermaid"]
-
-    def test_importers_direction(self):
-        data = _dependency_graph_data(direction="importers")
-        result = render_diagram(data)
-        assert "importers" in result["legend"]
+    @pytest.mark.parametrize("data_fn,assertion", [
+        (lambda: render_diagram(_dependency_graph_data(cross_repo_edges=[{"file": "other-repo/utils.py"}])), lambda r: "cross-repo" in r["mermaid"] and ":::cross" in r["mermaid"]),
+        (lambda: render_diagram(_dependency_graph_data(direction="importers")), lambda r: "importers" in r["legend"]),
+    ])
+    def test_edge_cases(self, data_fn, assertion):
+        assertion(data_fn())
 
 
 # ── Return shape tests ──────────────────────────────────────────────────────

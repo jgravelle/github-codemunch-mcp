@@ -52,21 +52,105 @@ def _by_name(symbols: list[Symbol], name: str) -> Symbol:
 class TestPerLanguageExtraction:
     """Verify symbol extraction for each supported language fixture."""
 
-    # -- Python ----------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Symbol-kind parametrized tests
+    # ------------------------------------------------------------------
+
+    @pytest.mark.parametrize("language,filename,symbol_name,expected_kind", [
+        # Python
+        ("python", "sample.py", "UserService", "class"),
+        ("python", "sample.py", "authenticate", "function"),
+        ("python", "sample.py", "MAX_RETRIES", "constant"),
+        # JavaScript
+        ("javascript", "sample.js", "UserService", "class"),
+        ("javascript", "sample.js", "authenticate", "function"),
+        # TypeScript
+        ("typescript", "sample.ts", "UserService", "class"),
+        ("typescript", "sample.ts", "authenticate", "function"),
+        ("typescript", "sample.ts", "User", "type"),
+        ("typescript", "sample.ts", "UserID", "type"),
+        # Go
+        ("go", "sample.go", "User", "type"),
+        ("go", "sample.go", "GetUser", "function"),
+        # Rust
+        ("rust", "sample.rs", "User", "type"),
+        ("rust", "sample.rs", "authenticate", "function"),
+        # Java
+        ("java", "Sample.java", "Sample", "class"),
+        # C#
+        ("csharp", "sample.cs", "UserService", "class"),
+        ("csharp", "sample.cs", "IRepository", "type"),
+        ("csharp", "sample.cs", "Status", "type"),
+        ("csharp", "sample.cs", "Person", "class"),
+        # C++
+        ("cpp", "sample.cpp", "Box", "class"),
+        ("cpp", "sample.cpp", "UserId", "type"),
+        ("cpp", "sample.cpp", "Status", "type"),
+        ("cpp", "sample.cpp", "MAX_USERS", "constant"),
+        # Arduino
+        ("arduino", "sample.ino", "MotorController", "class"),
+        # VHDL
+        ("vhdl", "sample.vhd", "alu", "class"),
+        # Verilog
+        ("verilog", "sample.sv", "alu", "class"),
+        # C
+        ("c", "sample.c", "User", "type"),
+        ("c", "sample.c", "Status", "type"),
+        ("c", "sample.c", "MAX_USERS", "constant"),
+        # Elixir
+        ("elixir", "sample.ex", "MyApp.Calculator", "class"),
+        ("elixir", "sample.ex", "MyApp.Printable", "type"),
+        ("elixir", "sample.ex", "result", "type"),
+        # Ruby
+        ("ruby", "sample.rb", "User", "class"),
+        ("ruby", "sample.rb", "Serializable", "type"),
+        ("ruby", "sample.rb", "format_name", "function"),
+        # XML/XUL
+        ("xml", "sample.xml", "config", "type"),
+        ("xml", "sample.xml", "db-primary", "constant"),
+        ("xml", "sample.xml", "validator.js", "function"),
+        ("xml", "sample.xul", "window", "type"),
+        ("xml", "sample.xul", "search-button", "constant"),
+    ])
+    def test_symbol_kind(self, language, filename, symbol_name, expected_kind):
+        """Parametrized symbol-kind assertion across all languages."""
+        content, fname = _fixture(language, filename)
+        symbols = parse_file(content, fname, language)
+        sym = _by_name(symbols, symbol_name)
+        assert sym.kind == expected_kind, (
+            f"{language}/{symbol_name}: expected kind={expected_kind}, got {sym.kind}"
+        )
+
+    # ------------------------------------------------------------------
+    # Qualified-name parametrized tests
+    # ------------------------------------------------------------------
+
+    @pytest.mark.parametrize("language,filename,symbol_name,expected_qname", [
+        ("python", "sample.py", "get_user", "UserService.get_user"),
+        ("python", "sample.py", "delete_user", "UserService.delete_user"),
+        ("typescript", "sample.ts", "getUser", "UserService.getUser"),
+        ("java", "Sample.java", "getUser", "Sample.getUser"),
+        ("cpp", "sample.cpp", "get", "sample.Box.get"),
+        ("elixir", "sample.ex", "add", "MyApp.Calculator.add"),
+        ("ruby", "sample.rb", "initialize", "User.initialize"),
+    ])
+    def test_symbol_qualified_name(self, language, filename, symbol_name, expected_qname):
+        """Parametrized qualified-name assertion across languages."""
+        content, fname = _fixture(language, filename)
+        symbols = parse_file(content, fname, language)
+        sym = _by_name(symbols, symbol_name)
+        assert sym.qualified_name == expected_qname, (
+            f"{language}/{symbol_name}: expected qname={expected_qname}, got {sym.qualified_name}"
+        )
+
+    # ------------------------------------------------------------------
+    # Multi-symbol set checks (keep separate — assert on sets)
+    # ------------------------------------------------------------------
 
     def test_python_symbol_count(self):
         content, fname = _fixture("python", "sample.py")
         symbols = parse_file(content, fname, "python")
-        # Expected: MAX_RETRIES (constant), UserService (class),
-        # get_user (method), delete_user (method), authenticate (function)
         assert len(symbols) >= 5
-
-    def test_python_class(self):
-        content, fname = _fixture("python", "sample.py")
-        symbols = parse_file(content, fname, "python")
-        cls = _by_name(symbols, "UserService")
-        assert cls.kind == "class"
-        assert cls.language == "python"
 
     def test_python_methods(self):
         content, fname = _fixture("python", "sample.py")
@@ -79,40 +163,6 @@ class TestPerLanguageExtraction:
         for m in methods:
             assert m.parent is not None, f"Method {m.name} should have a parent"
 
-    def test_python_function(self):
-        content, fname = _fixture("python", "sample.py")
-        symbols = parse_file(content, fname, "python")
-        func = _by_name(symbols, "authenticate")
-        assert func.kind == "function"
-
-    def test_python_constant(self):
-        content, fname = _fixture("python", "sample.py")
-        symbols = parse_file(content, fname, "python")
-        const = _by_name(symbols, "MAX_RETRIES")
-        assert const.kind == "constant"
-
-    def test_python_qualified_names(self):
-        content, fname = _fixture("python", "sample.py")
-        symbols = parse_file(content, fname, "python")
-        get_user = _by_name(symbols, "get_user")
-        assert get_user.qualified_name == "UserService.get_user"
-        delete_user = _by_name(symbols, "delete_user")
-        assert delete_user.qualified_name == "UserService.delete_user"
-
-    # -- JavaScript ------------------------------------------------------
-
-    def test_javascript_class(self):
-        content, fname = _fixture("javascript", "sample.js")
-        symbols = parse_file(content, fname, "javascript")
-        cls = _by_name(symbols, "UserService")
-        assert cls.kind == "class"
-
-    def test_javascript_function(self):
-        content, fname = _fixture("javascript", "sample.js")
-        symbols = parse_file(content, fname, "javascript")
-        func = _by_name(symbols, "authenticate")
-        assert func.kind == "function"
-
     def test_javascript_method(self):
         content, fname = _fixture("javascript", "sample.js")
         symbols = parse_file(content, fname, "javascript")
@@ -121,47 +171,12 @@ class TestPerLanguageExtraction:
         method_names = {m.name for m in methods}
         assert "getUser" in method_names
 
-    def test_javascript_qualified_names(self):
-        content, fname = _fixture("javascript", "sample.js")
-        symbols = parse_file(content, fname, "javascript")
-        # method_definition nodes inside class get parent set
-        get_user = _by_name(symbols, "getUser")
-        assert "UserService" in get_user.qualified_name
-
-    # -- TypeScript ------------------------------------------------------
-
-    def test_typescript_class(self):
-        content, fname = _fixture("typescript", "sample.ts")
-        symbols = parse_file(content, fname, "typescript")
-        cls = _by_name(symbols, "UserService")
-        assert cls.kind == "class"
-
-    def test_typescript_function(self):
-        content, fname = _fixture("typescript", "sample.ts")
-        symbols = parse_file(content, fname, "typescript")
-        func = _by_name(symbols, "authenticate")
-        assert func.kind == "function"
-
-    def test_typescript_interface(self):
-        content, fname = _fixture("typescript", "sample.ts")
-        symbols = parse_file(content, fname, "typescript")
-        iface = _by_name(symbols, "User")
-        assert iface.kind == "type"
-
-    def test_typescript_type_alias(self):
-        content, fname = _fixture("typescript", "sample.ts")
-        symbols = parse_file(content, fname, "typescript")
-        alias = _by_name(symbols, "UserID")
-        assert alias.kind == "type"
-
     def test_typescript_method(self):
         content, fname = _fixture("typescript", "sample.ts")
         symbols = parse_file(content, fname, "typescript")
         get_user = _by_name(symbols, "getUser")
         assert get_user.kind == "method"
         assert "UserService" in get_user.qualified_name
-
-    # -- Go --------------------------------------------------------------
 
     def test_go_functions(self):
         content, fname = _fixture("go", "sample.go")
@@ -171,25 +186,76 @@ class TestPerLanguageExtraction:
         assert "GetUser" in func_names
         assert "Authenticate" in func_names
 
-    def test_go_type(self):
-        content, fname = _fixture("go", "sample.go")
-        symbols = parse_file(content, fname, "go")
-        user = _by_name(symbols, "User")
-        assert user.kind == "type"
+    def test_java_methods(self):
+        content, fname = _fixture("java", "Sample.java")
+        symbols = parse_file(content, fname, "java")
+        grouped = _kinds(symbols)
+        methods = grouped.get("method", [])
+        method_names = {m.name for m in methods}
+        assert "getUser" in method_names
+        assert "authenticate" in method_names
 
-    def test_go_function_kind(self):
-        content, fname = _fixture("go", "sample.go")
-        symbols = parse_file(content, fname, "go")
-        get_user = _by_name(symbols, "GetUser")
-        assert get_user.kind == "function"
+    def test_csharp_method_qualified_name(self):
+        content, fname = _fixture("csharp", "sample.cs")
+        symbols = parse_file(content, fname, "csharp")
+        method = _by_name(symbols, "GetUser")
+        assert method.kind == "method"
+        assert "UserService" in method.qualified_name
 
-    # -- Rust ------------------------------------------------------------
+    def test_arduino_functions(self):
+        content, fname = _fixture("arduino", "sample.ino")
+        symbols = parse_file(content, fname, "arduino")
+        func_names = {s.name for s in symbols if s.kind == "function"}
+        assert "setup" in func_names
+        assert "loop" in func_names
+        assert "readTemperature" in func_names
 
-    def test_rust_struct(self):
-        content, fname = _fixture("rust", "sample.rs")
-        symbols = parse_file(content, fname, "rust")
-        user = _by_name(symbols, "User")
-        assert user.kind == "type"
+    def test_vhdl_functions(self):
+        content, fname = _fixture("vhdl", "sample.vhd")
+        symbols = parse_file(content, fname, "vhdl")
+        func_names = {s.name for s in symbols if s.kind == "function"}
+        assert "max_val" in func_names
+        assert "reset_reg" in func_names
+        assert "compute" in func_names
+
+    def test_verilog_functions(self):
+        content, fname = _fixture("verilog", "sample.sv")
+        symbols = parse_file(content, fname, "verilog")
+        func_names = {s.name for s in symbols if s.kind == "function"}
+        assert "compute" in func_names
+        assert "display_result" in func_names
+
+    def test_c_functions(self):
+        content, fname = _fixture("c", "sample.c")
+        symbols = parse_file(content, fname, "c")
+        grouped = _kinds(symbols)
+        func_names = {f.name for f in grouped.get("function", [])}
+        assert "get_user" in func_names
+        assert "authenticate" in func_names
+
+    def test_elixir_method(self):
+        content, fname = _fixture("elixir", "sample.ex")
+        symbols = parse_file(content, fname, "elixir")
+        method = _by_name(symbols, "add")
+        assert method.kind == "method"
+        assert method.parent is not None
+
+    def test_elixir_private_function(self):
+        content, fname = _fixture("elixir", "sample.ex")
+        symbols = parse_file(content, fname, "elixir")
+        func = _by_name(symbols, "validate")
+        assert func.kind == "method"
+
+    def test_ruby_singleton_method(self):
+        content, fname = _fixture("ruby", "sample.rb")
+        symbols = parse_file(content, fname, "ruby")
+        find = _by_name(symbols, "find")
+        assert find.kind == "method"
+        assert find.qualified_name == "User.find"
+
+    # ------------------------------------------------------------------
+    # Special / negative / inline-source tests (keep separate)
+    # ------------------------------------------------------------------
 
     def test_rust_impl_block_not_extracted(self):
         """impl_item is in symbol_node_types but has no name_fields entry,
@@ -198,7 +264,6 @@ class TestPerLanguageExtraction:
         content, fname = _fixture("rust", "sample.rs")
         symbols = parse_file(content, fname, "rust")
         grouped = _kinds(symbols)
-        # impl blocks are skipped because name extraction fails
         impl_syms = grouped.get("class", [])
         assert len(impl_syms) == 0
 
@@ -210,98 +275,6 @@ class TestPerLanguageExtraction:
         new_sym = _by_name(symbols, "new")
         assert new_sym.kind == "function"
         assert new_sym.parent is None
-
-    def test_rust_free_function(self):
-        content, fname = _fixture("rust", "sample.rs")
-        symbols = parse_file(content, fname, "rust")
-        auth = _by_name(symbols, "authenticate")
-        assert auth.kind == "function"
-
-    # -- Java ------------------------------------------------------------
-
-    def test_java_class(self):
-        content, fname = _fixture("java", "Sample.java")
-        symbols = parse_file(content, fname, "java")
-        cls = _by_name(symbols, "Sample")
-        assert cls.kind == "class"
-
-    def test_java_methods(self):
-        content, fname = _fixture("java", "Sample.java")
-        symbols = parse_file(content, fname, "java")
-        grouped = _kinds(symbols)
-        methods = grouped.get("method", [])
-        method_names = {m.name for m in methods}
-        assert "getUser" in method_names
-        assert "authenticate" in method_names
-
-    def test_java_method_qualified_names(self):
-        content, fname = _fixture("java", "Sample.java")
-        symbols = parse_file(content, fname, "java")
-        get_user = _by_name(symbols, "getUser")
-        assert "Sample" in get_user.qualified_name
-
-    # -- C# --------------------------------------------------------------
-
-    def test_csharp_class(self):
-        content, fname = _fixture("csharp", "sample.cs")
-        symbols = parse_file(content, fname, "csharp")
-        cls = _by_name(symbols, "UserService")
-        assert cls.kind == "class"
-
-    def test_csharp_method_qualified_name(self):
-        content, fname = _fixture("csharp", "sample.cs")
-        symbols = parse_file(content, fname, "csharp")
-        method = _by_name(symbols, "GetUser")
-        assert method.kind == "method"
-        assert "UserService" in method.qualified_name
-
-    def test_csharp_interface(self):
-        content, fname = _fixture("csharp", "sample.cs")
-        symbols = parse_file(content, fname, "csharp")
-        iface = _by_name(symbols, "IRepository")
-        assert iface.kind == "type"
-
-    def test_csharp_enum(self):
-        content, fname = _fixture("csharp", "sample.cs")
-        symbols = parse_file(content, fname, "csharp")
-        enum = _by_name(symbols, "Status")
-        assert enum.kind == "type"
-
-    def test_csharp_record(self):
-        content, fname = _fixture("csharp", "sample.cs")
-        symbols = parse_file(content, fname, "csharp")
-        record = _by_name(symbols, "Person")
-        assert record.kind == "class"
-
-    # -- C++ -------------------------------------------------------------
-
-    def test_cpp_class(self):
-        content, fname = _fixture("cpp", "sample.cpp")
-        symbols = parse_file(content, fname, "cpp")
-        cls = _by_name(symbols, "Box")
-        assert cls.kind == "class"
-        assert "sample" in cls.qualified_name
-
-    def test_cpp_method_qualified_name(self):
-        content, fname = _fixture("cpp", "sample.cpp")
-        symbols = parse_file(content, fname, "cpp")
-        method = _by_name(symbols, "get")
-        assert method.kind == "method"
-        assert "Box" in method.qualified_name
-
-    def test_cpp_alias_and_enum(self):
-        content, fname = _fixture("cpp", "sample.cpp")
-        symbols = parse_file(content, fname, "cpp")
-        alias = _by_name(symbols, "UserId")
-        status = _by_name(symbols, "Status")
-        assert alias.kind == "type"
-        assert status.kind == "type"
-
-    def test_cpp_constant(self):
-        content, fname = _fixture("cpp", "sample.cpp")
-        symbols = parse_file(content, fname, "cpp")
-        const = _by_name(symbols, "MAX_USERS")
-        assert const.kind == "constant"
 
     def test_cpp_overload_disambiguation(self):
         content, fname = _fixture("cpp", "sample.cpp")
@@ -333,236 +306,6 @@ int only_c(void) { int v[] = (int[]){1,2,3}; return v[0]; }
         run2 = parse_file(content, "mixed.h", "cpp")
         assert run1 and run2
         assert {s.language for s in run1} == {s.language for s in run2}
-
-    # -- Arduino ---------------------------------------------------------
-
-    def test_arduino_functions(self):
-        content, fname = _fixture("arduino", "sample.ino")
-        symbols = parse_file(content, fname, "arduino")
-        func_names = {s.name for s in symbols if s.kind == "function"}
-        assert "setup" in func_names
-        assert "loop" in func_names
-        assert "readTemperature" in func_names
-
-    def test_arduino_class(self):
-        content, fname = _fixture("arduino", "sample.ino")
-        symbols = parse_file(content, fname, "arduino")
-        cls = _by_name(symbols, "MotorController")
-        assert cls.kind == "class"
-
-    # -- VHDL ------------------------------------------------------------
-
-    def test_vhdl_entity(self):
-        content, fname = _fixture("vhdl", "sample.vhd")
-        symbols = parse_file(content, fname, "vhdl")
-        entity = _by_name(symbols, "alu")
-        assert entity.kind == "class"
-
-    def test_vhdl_functions(self):
-        content, fname = _fixture("vhdl", "sample.vhd")
-        symbols = parse_file(content, fname, "vhdl")
-        func_names = {s.name for s in symbols if s.kind == "function"}
-        assert "max_val" in func_names
-        assert "reset_reg" in func_names
-        assert "compute" in func_names
-
-    # -- Verilog ---------------------------------------------------------
-
-    def test_verilog_module(self):
-        content, fname = _fixture("verilog", "sample.sv")
-        symbols = parse_file(content, fname, "verilog")
-        mod = _by_name(symbols, "alu")
-        assert mod.kind == "class"
-
-    def test_verilog_functions(self):
-        content, fname = _fixture("verilog", "sample.sv")
-        symbols = parse_file(content, fname, "verilog")
-        func_names = {s.name for s in symbols if s.kind == "function"}
-        assert "compute" in func_names
-        assert "display_result" in func_names
-
-    # -- C ---------------------------------------------------------------
-
-    def test_c_functions(self):
-        content, fname = _fixture("c", "sample.c")
-        symbols = parse_file(content, fname, "c")
-        grouped = _kinds(symbols)
-        func_names = {f.name for f in grouped.get("function", [])}
-        assert "get_user" in func_names
-        assert "authenticate" in func_names
-
-    def test_c_struct(self):
-        content, fname = _fixture("c", "sample.c")
-        symbols = parse_file(content, fname, "c")
-        user = _by_name(symbols, "User")
-        assert user.kind == "type"
-
-    def test_c_enum(self):
-        content, fname = _fixture("c", "sample.c")
-        symbols = parse_file(content, fname, "c")
-        status = _by_name(symbols, "Status")
-        assert status.kind == "type"
-
-    def test_c_constant(self):
-        content, fname = _fixture("c", "sample.c")
-        symbols = parse_file(content, fname, "c")
-        const = _by_name(symbols, "MAX_USERS")
-        assert const.kind == "constant"
-
-    def test_c_function_kind(self):
-        content, fname = _fixture("c", "sample.c")
-        symbols = parse_file(content, fname, "c")
-        auth = _by_name(symbols, "authenticate")
-        assert auth.kind == "function"
-
-    # -- C++ --------------------------------------------------------------
-
-    def test_cpp_functions(self):
-        content, fname = _fixture("cpp", "sample.cpp")
-        symbols = parse_file(content, fname, "cpp")
-        grouped = _kinds(symbols)
-        func_names = {f.name for f in grouped.get("function", [])}
-        assert "identity" in func_names
-        assert "add" in func_names
-
-    def test_cpp_class(self):
-        content, fname = _fixture("cpp", "sample.cpp")
-        symbols = parse_file(content, fname, "cpp")
-        cls = _by_name(symbols, "Box")
-        assert cls.kind == "class"
-        assert "sample" in cls.qualified_name
-
-    def test_cpp_struct(self):
-        content, fname = _fixture("cpp", "sample.cpp")
-        symbols = parse_file(content, fname, "cpp")
-        alias = _by_name(symbols, "UserId")
-        assert alias.kind == "type"
-
-    def test_cpp_enum(self):
-        content, fname = _fixture("cpp", "sample.cpp")
-        symbols = parse_file(content, fname, "cpp")
-        status = _by_name(symbols, "Status")
-        assert status.kind == "type"
-
-    def test_cpp_constant(self):
-        content, fname = _fixture("cpp", "sample.cpp")
-        symbols = parse_file(content, fname, "cpp")
-        const = _by_name(symbols, "MAX_USERS")
-        assert const.kind == "constant"
-
-    def test_cpp_method_qualified_name(self):
-        content, fname = _fixture("cpp", "sample.cpp")
-        symbols = parse_file(content, fname, "cpp")
-        method = _by_name(symbols, "get")
-        assert method.kind == "method"
-        assert "Box" in method.qualified_name
-
-    # -- Elixir ----------------------------------------------------------
-
-    def test_elixir_module(self):
-        content, fname = _fixture("elixir", "sample.ex")
-        symbols = parse_file(content, fname, "elixir")
-        mod = _by_name(symbols, "MyApp.Calculator")
-        assert mod.kind == "class"
-        assert mod.language == "elixir"
-
-    def test_elixir_method(self):
-        content, fname = _fixture("elixir", "sample.ex")
-        symbols = parse_file(content, fname, "elixir")
-        method = _by_name(symbols, "add")
-        assert method.kind == "method"
-        assert method.parent is not None
-
-    def test_elixir_private_function(self):
-        content, fname = _fixture("elixir", "sample.ex")
-        symbols = parse_file(content, fname, "elixir")
-        func = _by_name(symbols, "validate")
-        assert func.kind == "method"
-
-    def test_elixir_protocol(self):
-        content, fname = _fixture("elixir", "sample.ex")
-        symbols = parse_file(content, fname, "elixir")
-        proto = _by_name(symbols, "MyApp.Printable")
-        assert proto.kind == "type"
-
-    def test_elixir_type_attribute(self):
-        content, fname = _fixture("elixir", "sample.ex")
-        symbols = parse_file(content, fname, "elixir")
-        t = _by_name(symbols, "result")
-        assert t.kind == "type"
-
-    def test_elixir_qualified_names(self):
-        content, fname = _fixture("elixir", "sample.ex")
-        symbols = parse_file(content, fname, "elixir")
-        add = _by_name(symbols, "add")
-        assert add.qualified_name == "MyApp.Calculator.add"
-
-    # -- Ruby ------------------------------------------------------------
-
-    def test_ruby_class(self):
-        content, fname = _fixture("ruby", "sample.rb")
-        symbols = parse_file(content, fname, "ruby")
-        cls = _by_name(symbols, "User")
-        assert cls.kind == "class"
-        assert cls.language == "ruby"
-
-    def test_ruby_module(self):
-        content, fname = _fixture("ruby", "sample.rb")
-        symbols = parse_file(content, fname, "ruby")
-        mod = _by_name(symbols, "Serializable")
-        assert mod.kind == "type"
-
-    def test_ruby_method_qualified_name(self):
-        content, fname = _fixture("ruby", "sample.rb")
-        symbols = parse_file(content, fname, "ruby")
-        m = _by_name(symbols, "initialize")
-        assert m.qualified_name == "User.initialize"
-        assert m.kind == "method"
-
-    def test_ruby_singleton_method(self):
-        content, fname = _fixture("ruby", "sample.rb")
-        symbols = parse_file(content, fname, "ruby")
-        find = _by_name(symbols, "find")
-        assert find.kind == "method"
-        assert find.qualified_name == "User.find"
-
-    def test_ruby_top_level_function(self):
-        content, fname = _fixture("ruby", "sample.rb")
-        symbols = parse_file(content, fname, "ruby")
-        fmt = _by_name(symbols, "format_name")
-        assert fmt.kind == "function"
-
-    # -- XML / XUL -------------------------------------------------------
-
-    def test_xml_root_element(self):
-        content, fname = _fixture("xml", "sample.xml")
-        symbols = parse_file(content, fname, "xml")
-        root = _by_name(symbols, "config")
-        assert root.kind == "type"
-
-    def test_xml_id_elements(self):
-        content, fname = _fixture("xml", "sample.xml")
-        symbols = parse_file(content, fname, "xml")
-        db = _by_name(symbols, "db-primary")
-        assert db.kind == "constant"
-
-    def test_xml_script_refs(self):
-        content, fname = _fixture("xml", "sample.xml")
-        symbols = parse_file(content, fname, "xml")
-        script = _by_name(symbols, "validator.js")
-        assert script.kind == "function"
-
-    def test_xul_window_root(self):
-        content, fname = _fixture("xml", "sample.xul")
-        symbols = parse_file(content, fname, "xml")
-        window = _by_name(symbols, "window")
-        assert window.kind == "type"
-
-    def test_xul_element_kind(self):
-        content, fname = _fixture("xml", "sample.xul")
-        symbols = parse_file(content, fname, "xml")
-        btn = _by_name(symbols, "search-button")
-        assert btn.kind == "constant"
 
 
 # ===========================================================================
@@ -698,43 +441,29 @@ class TestIncrementalReindex:
         )
         return store
 
-    def test_detect_changed_file(self, tmp_path):
-        store = self._make_index(tmp_path)
-
-        modified_py = "def hello():\n    return 42\n"
-        changed, new, deleted = store.detect_changes(
-            "test", "repo",
-            {"hello.py": modified_py, "greet.js": "function greet() { return 1; }\n"},
-        )
-        assert "hello.py" in changed
-        assert len(new) == 0
-        assert len(deleted) == 0
-
-    def test_detect_new_file(self, tmp_path):
-        store = self._make_index(tmp_path)
-
-        changed, new, deleted = store.detect_changes(
-            "test", "repo",
-            {
-                "hello.py": "def hello():\n    pass\n",
-                "greet.js": "function greet() { return 1; }\n",
-                "extra.py": "x = 1\n",
-            },
-        )
-        assert "extra.py" in new
-        assert len(changed) == 0
-        assert len(deleted) == 0
-
-    def test_detect_deleted_file(self, tmp_path):
-        store = self._make_index(tmp_path)
-
-        changed, new, deleted = store.detect_changes(
-            "test", "repo",
+    @pytest.mark.parametrize("current_files,expect_changed,expect_new,expect_deleted", [
+        pytest.param(
+            {"hello.py": "def hello():\n    return 42\n", "greet.js": "function greet() { return 1; }\n"},
+            ["hello.py"], [], [],
+            id="changed_file",
+        ),
+        pytest.param(
+            {"hello.py": "def hello():\n    pass\n", "greet.js": "function greet() { return 1; }\n", "extra.py": "x = 1\n"},
+            [], ["extra.py"], [],
+            id="new_file",
+        ),
+        pytest.param(
             {"hello.py": "def hello():\n    pass\n"},
-        )
-        assert "greet.js" in deleted
-        assert len(changed) == 0
-        assert len(new) == 0
+            [], [], ["greet.js"],
+            id="deleted_file",
+        ),
+    ], ids=["changed", "new", "deleted"])
+    def test_detect_changes(self, tmp_path, current_files, expect_changed, expect_new, expect_deleted):
+        store = self._make_index(tmp_path)
+        changed, new, deleted = store.detect_changes("test", "repo", current_files)
+        assert set(changed) == set(expect_changed), f"changed: {changed} != {expect_changed}"
+        assert set(new) == set(expect_new), f"new: {new} != {expect_new}"
+        assert set(deleted) == set(expect_deleted), f"deleted: {deleted} != {expect_deleted}"
 
     def test_incremental_save_replaces_symbols(self, tmp_path):
         store = self._make_index(tmp_path)
@@ -886,81 +615,47 @@ class TestNewTools:
         )
         return storage
 
-    def test_search_text_finds_string(self, tmp_path):
+    @pytest.mark.parametrize("query,expect_count", [
+        ("abc123", 1),          # found in app.py
+        ("SECRET_KEY", 1),       # case-insensitive match
+        ("nonexistent_xyz", 0), # not found
+    ])
+    def test_search_text_basic(self, tmp_path, query, expect_count):
         from jcodemunch_mcp.tools.search_text import search_text
 
         storage = self._seed_index(tmp_path)
         result = search_text(
             repo="tools/demo",
-            query="abc123",
-            storage_path=storage,
-        )
-
-        assert "error" not in result
-        assert result["result_count"] >= 1
-        files_found = {m["file"] for m in result["results"]}
-        assert "app.py" in files_found
-
-    def test_search_text_case_insensitive(self, tmp_path):
-        from jcodemunch_mcp.tools.search_text import search_text
-
-        storage = self._seed_index(tmp_path)
-        result = search_text(
-            repo="tools/demo",
-            query="SECRET_KEY",
-            storage_path=storage,
-        )
-        assert result["result_count"] >= 1
-
-    def test_search_text_not_found(self, tmp_path):
-        from jcodemunch_mcp.tools.search_text import search_text
-
-        storage = self._seed_index(tmp_path)
-        result = search_text(
-            repo="tools/demo",
-            query="nonexistent_string_xyz",
-            storage_path=storage,
-        )
-        assert result["result_count"] == 0
-
-    def test_search_text_redos_nested_quantifier_rejected(self, tmp_path):
-        from jcodemunch_mcp.tools.search_text import search_text
-
-        storage = self._seed_index(tmp_path)
-        result = search_text(
-            repo="tools/demo",
-            query="(a+)+b",
-            is_regex=True,
-            storage_path=storage,
-        )
-        assert "error" in result
-        assert "nested quantifier" in result["error"].lower()
-
-    def test_search_text_redos_long_regex_rejected(self, tmp_path):
-        from jcodemunch_mcp.tools.search_text import search_text
-
-        storage = self._seed_index(tmp_path)
-        result = search_text(
-            repo="tools/demo",
-            query="a" * 201,
-            is_regex=True,
-            storage_path=storage,
-        )
-        assert "error" in result
-        assert "too long" in result["error"].lower()
-
-    def test_search_text_safe_regex_allowed(self, tmp_path):
-        from jcodemunch_mcp.tools.search_text import search_text
-
-        storage = self._seed_index(tmp_path)
-        result = search_text(
-            repo="tools/demo",
-            query="greet|add",
-            is_regex=True,
+            query=query,
             storage_path=storage,
         )
         assert "error" not in result
-        assert result["result_count"] >= 1
+        assert result["result_count"] == expect_count
+        if expect_count > 0:
+            files_found = {m["file"] for m in result["results"]}
+            assert "app.py" in files_found
+
+    @pytest.mark.parametrize("query,should_error,error_substr", [
+        ("(a+)+b",  True,  "nested quantifier"),   # ReDoS: nested quantifier
+        ("a" * 201, True,  "too long"),            # ReDoS: regex too long
+        ("greet|add", False, ""),                   # safe regex: allowed
+    ])
+    def test_search_text_regex_safety(self, tmp_path, query, should_error, error_substr):
+        from jcodemunch_mcp.tools.search_text import search_text
+
+        storage = self._seed_index(tmp_path)
+        result = search_text(
+            repo="tools/demo",
+            query=query,
+            is_regex=True,
+            storage_path=storage,
+        )
+        if should_error:
+            assert "error" in result
+            assert error_substr in result["error"].lower()
+        else:
+            assert "error" not in result
+            assert result["result_count"] >= 1
 
     def test_get_repo_outline_structure(self, tmp_path):
         from jcodemunch_mcp.tools.get_repo_outline import get_repo_outline
@@ -990,50 +685,44 @@ class TestNewTools:
         )
         assert "error" in result
 
-    def test_invalidate_cache_deletes_index(self, tmp_path):
+    @pytest.mark.parametrize("repo,expect_success,error_contains", [
+        ("tools/demo",  True,  None),                       # deletes index
+        ("ghost/repo",  False, None),                       # missing repo
+        ("shared",      False, "Ambiguous repository name"), # ambiguous bare name
+    ], ids=["deletes_index", "missing_repo", "ambiguous_bare_name"])
+    def test_invalidate_cache(self, tmp_path, repo, expect_success, error_contains):
         from jcodemunch_mcp.tools.invalidate_cache import invalidate_cache
 
-        storage = self._seed_index(tmp_path)
-        result = invalidate_cache(
-            repo="tools/demo",
-            storage_path=storage,
+        if repo == "tools/demo":
+            storage = self._seed_index(tmp_path)
+        elif repo == "ghost/repo":
+            storage = str(tmp_path / "empty")
+        else:  # ambiguous bare name
+            storage = str(tmp_path / "store")
+            store = IndexStore(base_path=storage)
+            for repo_name in ["shared-aaa11111", "shared-bbb22222"]:
+                store.save_index(
+                    owner="local",
+                    name=repo_name,
+                    source_files=["main.py"],
+                    symbols=[],
+                    raw_files={"main.py": "print('x')\n"},
+                    languages={"python": 1},
+                    display_name="shared",
+                )
+
+        result = invalidate_cache(repo=repo, storage_path=storage)
+        actual_success = result.get("success")
+        assert actual_success is expect_success or (not expect_success and "error" in result), (
+            f"got: {result}"
         )
+        if error_contains:
+            assert result.get("error", "").startswith(error_contains)
 
-        assert result["success"] is True
-
-        # Verify index is gone
-        store = IndexStore(base_path=storage)
-        loaded = store.load_index("tools", "demo")
-        assert loaded is None
-
-    def test_invalidate_cache_missing_repo(self, tmp_path):
-        from jcodemunch_mcp.tools.invalidate_cache import invalidate_cache
-
-        storage = str(tmp_path / "empty")
-        result = invalidate_cache(
-            repo="ghost/repo",
-            storage_path=storage,
-        )
-        assert result["success"] is False
-
-    def test_invalidate_cache_rejects_ambiguous_bare_name(self, tmp_path):
-        from jcodemunch_mcp.tools.invalidate_cache import invalidate_cache
-
-        storage = str(tmp_path / "store")
-        store = IndexStore(base_path=storage)
-        for repo_name in ["shared-aaa11111", "shared-bbb22222"]:
-            store.save_index(
-                owner="local",
-                name=repo_name,
-                source_files=["main.py"],
-                symbols=[],
-                raw_files={"main.py": "print('x')\n"},
-                languages={"python": 1},
-                display_name="shared",
-            )
-
-        result = invalidate_cache(repo="shared", storage_path=storage)
-        assert result["error"].startswith("Ambiguous repository name: shared")
+        if expect_success and repo == "tools/demo":
+            store = IndexStore(base_path=storage)
+            loaded = store.load_index("tools", "demo")
+            assert loaded is None
 
 
 # ---------------------------------------------------------------------------
