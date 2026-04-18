@@ -1016,6 +1016,7 @@ def render_diagram(
     source: dict,
     theme: str = "flow",
     max_nodes: int = 80,
+    open_in_viewer: bool = False,
 ) -> dict:
     """Render any graph-producing tool's output as annotated Mermaid markup.
 
@@ -1025,9 +1026,10 @@ def render_diagram(
     node shapes for symbol kind, subgraph grouping by file/plate/depth.
 
     Args:
-        source:    Raw output dict from any supported graph-producing tool.
-        theme:     Visual theme — 'flow' (default), 'risk', or 'minimal'.
-        max_nodes: Maximum nodes before smart pruning (default 80).
+        source:         Raw output dict from any supported graph-producing tool.
+        theme:          Visual theme — 'flow' (default), 'risk', or 'minimal'.
+        max_nodes:      Maximum nodes before smart pruning (default 80).
+        open_in_viewer: When true, also open the mermaid in mmd-viewer (config-gated).
 
     Returns:
         Dict with diagram_type, mermaid, node_count, edge_count,
@@ -1077,4 +1079,15 @@ def render_diagram(
         "max_nodes": max_nodes,
         "detection_result": detected,
     }
+
+    if open_in_viewer:
+        from .. import config as config_module
+        if config_module.get("render_diagram_viewer_enabled", False):
+            from .mermaid_viewer import open_diagram
+            viewer_result = open_diagram(result.get("mermaid", ""))
+            if not viewer_result.get("opened"):
+                result["viewer_error"] = viewer_result.get("error")
+            else:
+                result["viewer_path"] = viewer_result["path"]
+
     return result

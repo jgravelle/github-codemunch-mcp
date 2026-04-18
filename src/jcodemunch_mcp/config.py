@@ -316,6 +316,9 @@ DEFAULTS = {
     "agent_selector": {},
     # LSP enrichment
     "enrichment": {},
+    # Mermaid Viewer
+    "render_diagram_viewer_enabled": False,
+    "mermaid_viewer_path": "",
 }
 
 CONFIG_TYPES = {
@@ -384,6 +387,8 @@ CONFIG_TYPES = {
     "session_max_queries": int,
     "agent_selector": dict,
     "enrichment": dict,
+    "render_diagram_viewer_enabled": bool,
+    "mermaid_viewer_path": str,
 }
 
 
@@ -1456,5 +1461,24 @@ def generate_template() -> str:
   // "path_map": "",
   //   Cross-platform path remapping. Format: "orig1=new1,orig2=new2".
   //   Allows indexes built on Linux to work on Windows and vice versa.
+
+  // === Mermaid Viewer Integration ===
+  // "render_diagram_viewer_enabled": false,
+  //   When true, render_diagram exposes an extra boolean parameter
+  //   `open_in_viewer` in its tool schema. When the caller sets
+  //   open_in_viewer=true, the produced mermaid is written as a
+  //   self-contained HTML file under <index_path>/temp/mermaid/ and
+  //   opened with the viewer resolved via `mermaid_viewer_path`.
+  //   When false (default), the parameter is hidden from the schema.
+  //   The temp folder is cleaned on server startup and shutdown.
+
+  // "mermaid_viewer_path": "",
+  //   Absolute path to the mmd-viewer executable. Used only when
+  //   render_diagram_viewer_enabled is true and the caller requests
+  //   open_in_viewer=true.
+  //   - Explicit path: used as-is (e.g. "C:/tools/mmd-viewer.exe").
+  //   - Empty string: falls back to "mmd-viewer" on $PATH.
+  //   If neither resolves, render_diagram still returns the mermaid
+  //   markup and adds a non-fatal `viewer_error` field to the result.
 }}
 '''

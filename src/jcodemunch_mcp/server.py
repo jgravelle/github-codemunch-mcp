@@ -280,6 +280,36 @@ def _save_session_state() -> None:
 atexit.register(_save_session_state)
 
 
+def _cleanup_mermaid_temp_startup() -> None:
+    """Clean stale mermaid viewer temp files from previous sessions."""
+    if not config_module.get("render_diagram_viewer_enabled", False):
+        return
+    try:
+        from .tools.mermaid_viewer import cleanup_temp_dir
+        cleanup_temp_dir()
+    except Exception as e:
+        logger.debug("Mermaid temp startup cleanup failed: %s", e, exc_info=True)
+
+
+def _cleanup_mermaid_temp_shutdown() -> None:
+    """Clean mermaid viewer temp files only if viewer was used this session."""
+    if not config_module.get("render_diagram_viewer_enabled", False):
+        return
+    try:
+        from .tools.mermaid_viewer import cleanup_temp_dir, was_viewer_used
+        if not was_viewer_used():
+            return
+        cleanup_temp_dir()
+    except Exception as e:
+        logger.debug("Mermaid temp shutdown cleanup failed: %s", e, exc_info=True)
+
+
+# Startup: clean stale files from previous sessions.
+_cleanup_mermaid_temp_startup()
+# Shutdown: clean only if viewer was actually used this session.
+atexit.register(_cleanup_mermaid_temp_shutdown)
+
+
 def _parse_watcher_flag(value: Optional[str]) -> bool:
     """Parse the --watcher flag value.
 
@@ -2084,6 +2114,17 @@ def _build_tools_list() -> list[Tool]:
                         "description": "Maximum nodes before smart pruning (default 80, range 10–200).",
                         "default": 80,
                     },
+                    **({
+                        "open_in_viewer": {
+                            "type": "boolean",
+                            "description": (
+                                "When true, also open the rendered mermaid in the local mmd-viewer. "
+                                "The HTML file is written under <index_storage>/temp/mermaid/. "
+                                "Non-fatal: if the viewer is missing, mermaid is returned anyway."
+                            ),
+                            "default": False,
+                        },
+                    } if config_module.get("render_diagram_viewer_enabled", False) else {}),
                 },
                 "required": ["source"],
             },
@@ -3231,6 +3272,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     source=arguments["source"],
                     theme=arguments.get("theme", "flow"),
                     max_nodes=arguments.get("max_nodes", 80),
+                    open_in_viewer=arguments.get("open_in_viewer", False),
                 )
             )
         elif name == "get_project_intel":
