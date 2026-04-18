@@ -55,7 +55,7 @@ Always use jCodemunch-MCP tools for code navigation. Never fall back to Read, Gr
 ## Session-Aware Routing
 
 **Opening move for any task:**
-1. `plan_turn { "repo": "...", "query": "your task description" }` — get confidence + recommended files
+1. `plan_turn { "repo": "...", "query": "your task description", "model": "<your-model-id>" }` — get confidence + recommended files; the `model` parameter narrows the exposed tool list to match your capabilities at zero extra requests.
 2. Obey the confidence level:
    - `high` → go directly to recommended symbols, max 2 supplementary reads
    - `medium` → explore recommended files, max 5 supplementary reads
@@ -78,6 +78,18 @@ Always use jCodemunch-MCP tools for code navigation. Never fall back to Read, Gr
 - If `_meta` contains `budget_warning`: stop exploring and work with what you have
 - If `auto_compacted: true` appears: results were automatically compressed due to turn budget
 - Use `get_session_context` to check what you've already read — avoid re-reading the same files
+
+## Model-Driven Tool Tiering
+
+Your jcodemunch-mcp server narrows the exposed tool list based on the model you are running as. To avoid wasting requests on primitives when a composite would do, always include `model="<your-model-id>"` in your opening `plan_turn` call.
+
+Replace `<your-model-id>` with your active model:
+- Claude Opus variants → `claude-opus-4-7` (or any `claude-opus-*`)
+- Claude Sonnet variants → `claude-sonnet-4-6`
+- Claude Haiku variants → `claude-haiku-4-5`
+- GPT-4o / GPT-5 / o1 / Llama → use the model id as printed by your runner
+
+The `model=` parameter rides on the existing `plan_turn` call — it does **not** add a separate tool invocation. If `plan_turn` is not appropriate for a non-code task, call `announce_model(model="...")` once instead.
 """
 
 _MCP_ENTRY = {
@@ -496,6 +508,37 @@ def install_windsurf_rules(*, dry_run: bool = False, backup: bool = True) -> str
 
 
 # ---------------------------------------------------------------------------
+# AGENTS.md (OpenCode, Codex, etc.)
+# ---------------------------------------------------------------------------
+
+def install_agents_md(*, dry_run: bool = False, backup: bool = True) -> str:
+    """Write ./AGENTS.md with the plan_turn(model=...) directive.
+
+    OpenCode, Codex, and several other agent runners read AGENTS.md as
+    their per-project system-prompt augmentation. Mirrors CLAUDE.md
+    policy so agents swapped via those runners observe the same
+    tier-switching convention.
+    """
+    target = Path.cwd() / "AGENTS.md"
+    policy = _filter_policy_for_tools(_CLAUDE_MD_POLICY, _get_active_tools())
+    if target.exists():
+        existing = target.read_text(encoding="utf-8")
+        if _CLAUDE_MD_MARKER in existing:
+            return f"  already present in {target}"
+        if dry_run:
+            return f"  would append policy to {target}"
+        if backup:
+            shutil.copy2(target, target.with_suffix(".md.bak"))
+        target.write_text(existing.rstrip() + "\n\n" + policy + "\n", encoding="utf-8")
+    else:
+        if dry_run:
+            return f"  would create {target}"
+        target.write_text(policy + "\n", encoding="utf-8")
+
+    return f"  wrote {target}"
+
+
+# ---------------------------------------------------------------------------
 # Hooks injection
 # ---------------------------------------------------------------------------
 
@@ -830,6 +873,22 @@ def run_init(
                     "Append Code Exploration Policy to .windsurfrules",
                     "Windsurf Cascade would prefer jCodemunch tools over built-in search on every turn",
                 ))
+
+    # 2d: AGENTS.md (OpenCode, Codex, etc.)
+    do_agents_md = yes or not interactive
+    if interactive:
+        print()
+        do_agents_md = _prompt_yn(
+            "Install AGENTS.md (OpenCode/Codex policy)?",
+        )
+    if do_agents_md:
+        msg = install_agents_md(dry_run=dry_run, backup=backup)
+        print(f"  AGENTS.md:{msg}")
+        if demo and "would" in msg:
+            _demo_actions.append((
+                "Create AGENTS.md with Code Exploration Policy",
+                "OpenCode, Codex, and other AGENTS.md-reading agents would prefer jCodemunch tools over built-in search",
+            ))
 
     # ----- Step 3: Agent hooks -----
     do_hooks = hooks

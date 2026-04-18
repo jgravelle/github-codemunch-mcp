@@ -269,6 +269,52 @@ DEFAULTS = {
     "languages": None,  # None = all languages
     "languages_adaptive": False,
     "tool_profile": "full",  # "core", "standard", or "full"
+    "tool_tier_bundles": {
+        "core": [
+            "index_repo", "index_folder", "index_file",
+            "list_repos", "resolve_repo",
+            "get_repo_outline", "get_file_tree", "get_file_outline",
+            "search_symbols", "get_symbol_source", "get_file_content",
+            "search_text", "get_context_bundle", "get_ranked_context",
+            "find_importers", "find_references",
+        ],
+        "standard": [
+            # core ∪ these additional tools
+            "index_repo", "index_folder", "index_file",
+            "list_repos", "resolve_repo",
+            "get_repo_outline", "get_file_tree", "get_file_outline",
+            "search_symbols", "get_symbol_source", "get_file_content",
+            "search_text", "get_context_bundle", "get_ranked_context",
+            "find_importers", "find_references",
+            "summarize_repo", "embed_repo", "suggest_queries",
+            "search_columns", "check_references",
+            "get_dependency_graph", "get_class_hierarchy",
+            "get_related_symbols", "get_call_hierarchy",
+            "get_blast_radius", "check_rename_safe",
+            "get_impact_preview", "get_changed_symbols",
+            "get_symbol_diff", "get_symbol_provenance",
+            "get_pr_risk_profile", "get_symbol_complexity",
+            "get_churn_rate", "get_hotspots",
+            "get_symbol_importance", "find_dead_code",
+            "get_dead_code_v2", "get_untested_symbols",
+            "get_repo_health", "search_ast", "winnow_symbols",
+            "get_dependency_cycles", "get_coupling_metrics",
+            "get_layer_violations", "get_cross_repo_map",
+            "get_tectonic_map", "get_signal_chains", "render_diagram",
+            "get_project_intel", "invalidate_cache",
+        ],
+    },
+    "model_tier_map": {
+        "claude-opus": "full",
+        "claude-sonnet": "standard",
+        "claude-haiku": "core",
+        "gpt-4o": "standard",
+        "gpt-5": "full",
+        "o1": "full",
+        "llama": "core",
+        "*": "full",
+    },
+    "adaptive_tiering": False,
     "compact_schemas": False,
     "disabled_tools": ["test_summarizer"],
     "descriptions": {},
@@ -340,6 +386,9 @@ CONFIG_TYPES = {
     "languages": (list, type(None)),
     "languages_adaptive": bool,
     "tool_profile": str,
+    "tool_tier_bundles": dict,
+    "model_tier_map": dict,
+    "adaptive_tiering": bool,
     "compact_schemas": bool,
     "disabled_tools": list,
     "descriptions": dict,
@@ -1126,6 +1175,7 @@ def generate_template() -> str:
     # All available tools (for disabled_tools reference) - sorted alphabetically
     # Removed: wait_for_fresh (v1.12.0 - check_freshness and wait_for_fresh tools removed)
     all_tools = sorted([
+        "announce_model",
         "audit_agent_config",
         "check_references",
         "check_rename_safe",
@@ -1182,6 +1232,7 @@ def generate_template() -> str:
         "search_columns",
         "search_symbols",
         "search_text",
+        "set_tool_tier",
         "suggest_queries",
         "summarize_repo",
         "test_summarizer",
@@ -1322,6 +1373,74 @@ def generate_template() -> str:
     "test_summarizer",
   // {tools_str}
   ],
+
+  // === Tool Tier Bundles ===
+  // Which tools belong to each tier. Edit freely. Both tool_profile (below)
+  // and the runtime set_tool_tier / announce_model tools read from here.
+  // NOTE: disabled_tools applies AFTER tier filtering — a tool listed both
+  // in a bundle and in disabled_tools will not be exposed regardless of tier.
+  "tool_tier_bundles": {{
+    "core": [
+      "index_repo", "index_folder", "index_file",
+      "list_repos", "resolve_repo",
+      "get_repo_outline", "get_file_tree", "get_file_outline",
+      "search_symbols", "get_symbol_source", "get_file_content",
+      "search_text", "get_context_bundle", "get_ranked_context",
+      "find_importers", "find_references"
+    ],
+    "standard": [
+      "index_repo", "index_folder", "index_file",
+      "list_repos", "resolve_repo",
+      "get_repo_outline", "get_file_tree", "get_file_outline",
+      "search_symbols", "get_symbol_source", "get_file_content",
+      "search_text", "get_context_bundle", "get_ranked_context",
+      "find_importers", "find_references",
+      "summarize_repo", "embed_repo", "suggest_queries",
+      "search_columns", "check_references",
+      "get_dependency_graph", "get_class_hierarchy",
+      "get_related_symbols", "get_call_hierarchy",
+      "get_blast_radius", "check_rename_safe",
+      "get_impact_preview", "get_changed_symbols",
+      "get_symbol_diff", "get_symbol_provenance",
+      "get_pr_risk_profile", "get_symbol_complexity",
+      "get_churn_rate", "get_hotspots",
+      "get_symbol_importance", "find_dead_code",
+      "get_dead_code_v2", "get_untested_symbols",
+      "get_repo_health", "search_ast", "winnow_symbols",
+      "get_dependency_cycles", "get_coupling_metrics",
+      "get_layer_violations", "get_cross_repo_map",
+      "get_tectonic_map", "get_signal_chains", "render_diagram",
+      "get_project_intel", "invalidate_cache"
+    ]
+  }},
+
+  // === Model → Tier Map ===
+  // Maps model identifiers (self-reported by the agent via plan_turn(model=...)
+  // or announce_model) to a tier. Matching is fuzzy: normalize (lowercase,
+  // strip provider prefix / date suffix / bracket suffix), then try exact,
+  // glob, substring, "*", hardcoded "full" fallback in that order.
+  // Keep keys specific where possible: very short substrings (e.g. "o1") can
+  // over-match model ids that merely contain that token.
+  "model_tier_map": {{
+    "claude-opus": "full",
+    "claude-sonnet": "standard",
+    "claude-haiku": "core",
+    "gpt-4o": "standard",
+    "gpt-5": "full",
+    "o1": "full",
+    "llama": "core",
+    "*": "full"
+  }},
+
+  // === Adaptive Tiering (opt-in) ===
+  // When true, the exposed tool list narrows at runtime based on the model
+  // identifier self-reported by the agent via plan_turn(model=...) or
+  // announce_model(). When false (default), the static tool_profile above
+  // controls the exposed tools for the whole session — the runtime tools
+  // accept their arguments but do not switch tiers. set_tool_tier is always
+  // honored regardless of this flag (explicit user override, not automatic
+  // behavior).
+  // "adaptive_tiering": false,
 
   // === Descriptions ===
   // Append text to shortened tool/param descriptions.

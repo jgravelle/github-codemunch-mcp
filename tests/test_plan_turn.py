@@ -73,6 +73,36 @@ class TestPlanTurn:
 
         assert len(result["recommended_symbols"]) <= 1
 
+    def test_tied_scores_do_not_crash(self, tmp_path: Path):
+        """Equal-scored symbols should not crash heap ranking."""
+        from jcodemunch_mcp.tools.index_folder import index_folder
+        from jcodemunch_mcp.tools.plan_turn import plan_turn
+
+        (tmp_path / "alpha.py").write_text(
+            "def helper() -> int:\n"
+            "    '''Shared helper.'''\n"
+            "    return 1\n",
+            encoding="utf-8",
+        )
+        (tmp_path / "beta.py").write_text(
+            "def helper() -> int:\n"
+            "    '''Shared helper.'''\n"
+            "    return 2\n",
+            encoding="utf-8",
+        )
+        storage_path = str(tmp_path / "idx")
+        result = index_folder(path=str(tmp_path), use_ai_summaries=False, storage_path=storage_path)
+
+        planned = plan_turn(
+            repo=result["repo"],
+            query="helper",
+            max_recommended=2,
+            storage_path=storage_path,
+        )
+
+        assert len(planned["recommended_symbols"]) == 2
+        assert {sym["file"] for sym in planned["recommended_symbols"]} == {"alpha.py", "beta.py"}
+
     def test_max_supplementary_reads_varies(self, tmp_path: Path):
         """Low confidence >= high confidence for max_supplementary_reads."""
         from jcodemunch_mcp.tools.plan_turn import plan_turn

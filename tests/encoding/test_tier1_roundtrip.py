@@ -150,19 +150,126 @@ def test_get_dependency_cycles_round_trip():
 
 
 def test_search_text_round_trip():
+    # Mirrors the real shape of tools/search_text.py: results grouped by file,
+    # with matches nested inside each group.
     resp = {
         "result_count": 2,
         "query": "TODO",
         "results": [
-            {"file": "a.py", "line": 10, "line_content": "# TODO: fix"},
-            {"file": "a.py", "line": 22, "line_content": "# TODO: refactor"},
+            {
+                "file": "a.py",
+                "matches": [
+                    {"line": 10, "text": "# TODO: fix"},
+                    {"line": 22, "text": "# TODO: refactor"},
+                ],
+            },
         ],
         "_meta": {"timing_ms": 0.5, "files_searched": 30, "truncated": False},
     }
     out = _rt("search_text", resp)
-    assert len(out["results"]) == 2
+    assert len(out["results"]) == 1
     assert out["results"][0]["file"] == "a.py"
-    assert out["results"][0]["line_content"] == "# TODO: fix"
+    matches = out["results"][0]["matches"]
+    assert len(matches) == 2
+    assert matches[0]["line"] == 10
+    assert matches[0]["text"] == "# TODO: fix"
+    assert matches[1]["line"] == 22
+    # Typed scalars: ints, floats, bools survive the round trip.
+    assert out["result_count"] == 2
+    assert out["_meta"]["timing_ms"] == 0.5
+    assert out["_meta"]["files_searched"] == 30
+    assert out["_meta"]["truncated"] is False
+
+
+def test_search_text_round_trip_with_context_lines():
+    # context_lines>0 emits before/after arrays per match; must survive the
+    # nested→flat→nested transform without data loss.
+    resp = {
+        "result_count": 1,
+        "results": [
+            {
+                "file": "a.py",
+                "matches": [
+                    {
+                        "line": 10,
+                        "text": "target",
+                        "before": ["above_1", "above_2"],
+                        "after": ["below_1"],
+                    },
+                ],
+            },
+        ],
+        "_meta": {"timing_ms": 0.1, "files_searched": 1, "truncated": False},
+    }
+    out = _rt("search_text", resp)
+    m = out["results"][0]["matches"][0]
+    assert m["before"] == ["above_1", "above_2"]
+    assert m["after"] == ["below_1"]
+
+
+def test_search_text_round_trip_adversarial_cells_and_st1_compat():
+    """Round-trip adversarial CSV/JSON cell content and ensure st1 decode compatibility."""
+    tricky_text = 'target, with "quotes" and newline\nline_two'
+    tricky_before = [
+        'before,comma',
+        'before "quoted"',
+        "before multi\nline",
+    ]
+    tricky_after = [
+        'after, "mix"',
+        "after multi\nline",
+    ]
+    resp = {
+        "result_count": 1,
+        "results": [
+            {
+                "file": "a.py",
+                "matches": [
+                    {
+                        "line": 10,
+                        "text": tricky_text,
+                        "before": tricky_before,
+                        "after": tricky_after,
+                    },
+                ],
+            },
+        ],
+        "_meta": {"timing_ms": 0.1, "files_searched": 1, "truncated": False},
+    }
+
+    payload, meta = encode_response("search_text", resp, "compact")
+    assert isinstance(payload, str)
+    assert meta["encoding"] != "json"
+
+    # st2 current decode
+    out = decode(payload)
+    m = out["results"][0]["matches"][0]
+    assert m["text"] == tricky_text
+    assert m["before"] == tricky_before
+    assert m["after"] == tricky_after
+
+    # st1 compatibility decode path (legacy header id)
+    payload_st1 = payload.replace("enc=st2", "enc=st1", 1)
+    out_st1 = decode(payload_st1)
+    m_st1 = out_st1["results"][0]["matches"][0]
+    assert m_st1["text"] == tricky_text
+    assert m_st1["before"] == tricky_before
+    assert m_st1["after"] == tricky_after
+
+
+def test_search_text_round_trip_multi_file():
+    # Separate files must stay separate on regroup; order preserved.
+    resp = {
+        "result_count": 3,
+        "results": [
+            {"file": "a.py", "matches": [{"line": 1, "text": "x"}]},
+            {"file": "b.py", "matches": [{"line": 5, "text": "y"}, {"line": 9, "text": "z"}]},
+        ],
+        "_meta": {"timing_ms": 0.2, "files_searched": 2, "truncated": False},
+    }
+    out = _rt("search_text", resp)
+    assert [g["file"] for g in out["results"]] == ["a.py", "b.py"]
+    assert len(out["results"][1]["matches"]) == 2
 
 
 def test_search_symbols_round_trip():

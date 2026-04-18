@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 from .format import (
     Legends,
@@ -151,10 +151,12 @@ def decode(
     nested_dicts: dict[str, list[str]] | None = None,
     meta_keys: Iterable[str] = (),
     json_blobs: Iterable[str] = (),
+    scalar_types: Mapping[str, str] | None = None,
 ) -> dict:
     tables = list(tables)
     nested_dicts = nested_dicts or {}
     scalar_set = set(scalars)
+    stypes: dict[str, str] = dict(scalar_types or {})
 
     head, blocks = split_sections(payload)
     parse_header(head)
@@ -174,18 +176,19 @@ def decode(
     raw_scalars.pop("__tables", None)
 
     result: dict[str, Any] = {}
-    # Top-level scalars
+    # Top-level scalars — coerce per scalar_types hint when supplied,
+    # otherwise fall through as raw string (back-compat for schemas that
+    # don't declare types).
     for k, v in list(raw_scalars.items()):
         if k in scalar_set:
-            # Guess type from known keys or leave as string.
-            result[k] = _coerce(v, "str")
+            result[k] = _coerce(v, stypes.get(k, "str"))
     # Nested dicts
     for key, subkeys in nested_dicts.items():
         sub: dict[str, Any] = {}
         for sk in subkeys:
             prefixed = f"{key}.{sk}"
             if prefixed in raw_scalars:
-                sub[sk] = raw_scalars[prefixed]
+                sub[sk] = _coerce(raw_scalars[prefixed], stypes.get(prefixed, "str"))
         if sub:
             result[key] = sub
     # Meta
@@ -193,7 +196,7 @@ def decode(
     for k in meta_keys:
         prefixed = f"_meta.{k}"
         if prefixed in raw_scalars:
-            meta_out[k] = raw_scalars[prefixed]
+            meta_out[k] = _coerce(raw_scalars[prefixed], stypes.get(prefixed, "str"))
     if meta_out:
         result["_meta"] = meta_out
     # JSON blobs

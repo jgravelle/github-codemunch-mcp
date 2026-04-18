@@ -90,7 +90,7 @@ def plan_turn(
         candidates = index.symbols
 
     # Score and rank
-    heap: list[tuple[float, dict]] = []
+    heap: list[tuple[float, str, dict]] = []
     max_score = 0.0
     hits = 0
 
@@ -111,12 +111,12 @@ def plan_turn(
         }
 
         if len(heap) < max_recommended:
-            heapq.heappush(heap, (score, entry))
+            heapq.heappush(heap, (score, entry["id"], entry))
         elif score > heap[0][0]:
-            heapq.heapreplace(heap, (score, entry))
+            heapq.heapreplace(heap, (score, entry["id"], entry))
 
     # Sort by score descending
-    recommended_symbols = [entry for score, entry in sorted(heap, key=lambda x: x[0], reverse=True)]
+    recommended_symbols = [entry for score, _, entry in sorted(heap, key=lambda x: x[0], reverse=True)]
 
     # Determine confidence (config-driven thresholds)
     try:

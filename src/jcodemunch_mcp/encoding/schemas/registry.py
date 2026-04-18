@@ -24,10 +24,13 @@ def _discover() -> None:
             logger.debug("Failed to load encoder %s", mod_info.name, exc_info=True)
             continue
         enc_id = getattr(mod, "ENCODING_ID", None)
+        legacy_ids = getattr(mod, "LEGACY_ENCODING_IDS", ())
         tools = getattr(mod, "TOOLS", ())
         if not enc_id or not tools:
             continue
         _BY_ID[enc_id] = mod
+        for legacy_id in legacy_ids:
+            _BY_ID[legacy_id] = mod
         for t in tools:
             _BY_TOOL[t] = mod
 

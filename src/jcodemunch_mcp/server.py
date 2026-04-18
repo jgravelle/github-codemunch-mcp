@@ -73,6 +73,8 @@ _CANONICAL_TOOL_NAMES: tuple[str, ...] = (
     # Utilities
     "get_session_stats", "get_session_context", "get_session_snapshot", "plan_turn", "register_edit", "invalidate_cache", "test_summarizer",
     "audit_agent_config",
+    # Runtime tier switching
+    "set_tool_tier", "announce_model",
     # Composite retrieval
     "winnow_symbols",
 )
@@ -125,6 +127,161 @@ _PROFILE_TIERS: dict[str, frozenset[str] | None] = {
     "standard": _TOOL_TIER_STANDARD,
     "full": None,  # None = no filtering
 }
+
+# Tools that must always remain visible/callable for runtime tier control.
+_ALWAYS_PRESENT_TOOLS: frozenset[str] = frozenset({"set_tool_tier", "announce_model"})
+
+# --- Runtime session tier state -------------------------------------------- #
+import threading
+
+_session_tier_override: str | None = None
+_session_tier_lock = threading.Lock()
+
+
+def _set_session_tier(tier: str | None) -> None:
+    """Atomically set the session-level tier override. None clears it."""
+    global _session_tier_override
+    with _session_tier_lock:
+        _session_tier_override = tier
+
+
+def _effective_profile() -> str:
+    """Return the active tier, preferring session override over config."""
+    with _session_tier_lock:
+        override = _session_tier_override
+    if override is not None:
+        return override
+    return config_module.get("tool_profile", "full") or "full"
+
+
+def _resolve_tier_bundle(profile: str) -> frozenset[str] | None:
+    """Return the set of tool names allowed for the given profile.
+
+    Reads from config['tool_tier_bundles'] first, falls back to baked-in
+    _TOOL_TIER_CORE / _TOOL_TIER_STANDARD constants if the config key is
+    missing or malformed. 'full' returns None (no filter).
+    """
+    if profile == "full":
+        return None
+    bundles = config_module.get("tool_tier_bundles") or {}
+    if isinstance(bundles, dict) and isinstance(bundles.get(profile), list):
+        return frozenset(bundles[profile])
+    # Fallback to constants.
+    return _PROFILE_TIERS.get(profile)
+
+
+async def _emit_tools_list_changed() -> None:
+    """Send notifications/tools/list_changed to the client, best-effort.
+
+    No-op if the transport / SDK does not support it.
+    """
+    session = _get_mcp_session(server)
+    if session is None:
+        logger.debug("tools/list_changed skipped: no active MCP session")
+        return
+
+    send_fn = getattr(session, "send_tool_list_changed", None)
+    if send_fn is None:
+        logger.warning("tools/list_changed skipped: session has no send_tool_list_changed()")
+        return
+
+    try:
+        maybe_awaitable = send_fn()
+        if asyncio.iscoroutine(maybe_awaitable):
+            await maybe_awaitable
+    except (RuntimeError, TypeError, AttributeError) as exc:
+        logger.warning("tools/list_changed notification failed: %s", exc, exc_info=True)
+
+
+def _get_mcp_session(mcp_server: Server | None = None) -> Any | None:
+    """Best-effort session lookup from an MCP server instance.
+
+    Returns None when no request context/session is available.
+    """
+    srv = mcp_server if mcp_server is not None else globals().get("server")
+    if srv is None:
+        return None
+    try:
+        request_context = srv.request_context
+    except (LookupError, AttributeError):
+        return None
+    if request_context is None:
+        return None
+    return getattr(request_context, "session", None)
+
+
+def _warn_if_http_adaptive_tiering(transport: str) -> None:
+    """Warn about multi-client risk when adaptive_tiering is used over HTTP."""
+    if not config_module.get("adaptive_tiering", False):
+        return
+    logger.warning(
+        "adaptive_tiering is enabled with transport=%s. "
+        "Tier overrides are process-global and may leak across concurrent HTTP clients. "
+        "Use stdio for single-client sessions or disable adaptive_tiering for HTTP.",
+        transport,
+    )
+
+
+def _log_startup_validation_warnings() -> None:
+    """Emit WARNING logs for any bundle/disabled_tools overlap at startup."""
+    from .tier_resolver import validate_bundle_disabled_overlap
+    try:
+        cfg = {
+            "tool_tier_bundles": config_module.get("tool_tier_bundles") or {},
+            "disabled_tools": config_module.get("disabled_tools") or [],
+        }
+        for msg in validate_bundle_disabled_overlap(cfg):
+            logger.warning(msg)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("startup validation failed: %s", exc, exc_info=True)
+
+
+async def _apply_model_announcement(model: str) -> dict:
+    """Resolve model → tier, switch if changed, emit list_changed if changed.
+
+    Gated by the adaptive_tiering config flag. When the flag is false
+    (the default), this is a no-op: returns the current tier without
+    switching. set_tool_tier is not affected by this flag because it is
+    an explicit user invocation.
+    """
+    from .tier_resolver import resolve_model_to_tier
+    adaptive = bool(config_module.get("adaptive_tiering", False))
+    if not adaptive:
+        return {
+            "ok": True,
+            "tier": _effective_profile(),
+            "changed": False,
+            "adaptive_tiering": False,
+            "_meta": {
+                "hint": (
+                    "adaptive_tiering is disabled in config.jsonc — "
+                    "model self-report accepted but tier was not "
+                    "switched. Set adaptive_tiering: true to enable."
+                )
+            },
+        }
+
+    mp = config_module.get("model_tier_map") or {}
+    tier, match_reason = resolve_model_to_tier(model, mp)
+    prev = _effective_profile()
+    changed = tier != prev
+    res = {
+        "ok": True,
+        "tier": tier,
+        "changed": changed,
+        "match_reason": match_reason,
+        "adaptive_tiering": True,
+    }
+    if match_reason == "unmatched_fallback":
+        res.setdefault("_meta", {})["warning"] = (
+            f"model {model!r} did not match any entry in model_tier_map; "
+            f"falling back to 'full'. Add a pattern to model_tier_map to "
+            f"route this model explicitly."
+        )
+    if changed:
+        _set_session_tier(tier)
+        await _emit_tools_list_changed()
+    return res
 
 # Parameters stripped from tool schemas when compact_schemas is enabled.
 # These are advanced/rarely-used params that cost tokens every session but
@@ -409,7 +566,7 @@ async def list_tools() -> list[Tool]:
 
 def _build_tools_list() -> list[Tool]:
     """Build the full tool list, applying config-driven filtering and overrides."""
-    tools = [
+    all_tools = [
         Tool(
             name="index_repo",
             description="Index a GitHub repository's source code. Fetches files, parses ASTs, extracts symbols, and saves to local storage. Set JCODEMUNCH_USE_AI_SUMMARIES=false to disable AI summaries globally.",
@@ -1059,6 +1216,17 @@ def _build_tools_list() -> list[Tool]:
                         "type": "integer",
                         "description": "Maximum number of symbols to recommend.",
                         "default": 5,
+                    },
+                    "model": {
+                        "type": "string",
+                        "description": (
+                            "Optional. Your active model identifier (e.g. 'claude-haiku-4-5'). "
+                            "When supplied and adaptive_tiering is enabled, plan_turn invokes "
+                            "the tier-switch logic as a side effect — the exposed tool list is "
+                            "narrowed to the tier mapped to this model via config.jsonc:"
+                            "model_tier_map. Prefer this form over calling announce_model "
+                            "separately — it adds zero extra requests."
+                        ),
                     },
                 },
                 "required": ["repo", "query"],
@@ -2219,10 +2387,52 @@ def _build_tools_list() -> list[Tool]:
                 "required": ["repo", "criteria"],
             },
         ),
+        # --- Runtime tier-switch tools (always force-included below) ---------
+        Tool(
+            name="set_tool_tier",
+            description=(
+                "Explicit tier override for the current session. "
+                "Narrows or widens the exposed tool list to 'core' / 'standard' / 'full'. "
+                "Prefer plan_turn(model=...) for routine per-task use; use "
+                "set_tool_tier only when you need an explicit override (e.g. escalate "
+                "mid-task to 'full' after a capability-gated failure)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "tier": {
+                        "type": "string",
+                        "enum": ["core", "standard", "full"],
+                    },
+                },
+                "required": ["tier"],
+            },
+        ),
+        Tool(
+            name="announce_model",
+            description=(
+                "Agent self-reports its active model identifier. Server resolves to a "
+                "tier via model_tier_map (fuzzy: normalize → exact → glob → substring "
+                "→ '*' → 'full') and narrows the exposed tool list accordingly. "
+                "Idempotent: a second call with the same model is a cheap no-op. "
+                "Prefer calling plan_turn(model=...) for routine per-task use; use "
+                "announce_model as a fallback when plan_turn is not appropriate for "
+                "the current task."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string", "description": "Your active model identifier, e.g. 'claude-haiku-4-5'."},
+                },
+                "required": ["model"],
+            },
+        ),
     ]
+    # Start with a mutable copy for filtering.
+    tools = list(all_tools)
     # --- Profile filtering ---------------------------------------------------
-    profile = config_module.get("tool_profile", "full")
-    allowed = _PROFILE_TIERS.get(profile)
+    profile = _effective_profile()
+    allowed = _resolve_tier_bundle(profile)
     if allowed is not None:
         tools = [t for t in tools if t.name in allowed]
 
@@ -2230,6 +2440,13 @@ def _build_tools_list() -> list[Tool]:
     disabled = config_module.get("disabled_tools", [])
     if disabled:
         tools = [t for t in tools if t.name not in disabled]
+
+    # Force-include runtime tier-switch tools so users can never lose access
+    # to their own tier controls via config edits.
+    present_names = {t.name for t in tools}
+    missing = _ALWAYS_PRESENT_TOOLS - present_names
+    if missing:
+        tools.extend(t for t in all_tools if t.name in missing)
 
     # SQL gating: auto-disable search_columns when SQL not in languages
     languages = config_module.get("languages")
@@ -2557,7 +2774,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         # Project-level tool disabling: check if tool is disabled for this project
         # Global disabled tools are filtered out in list_tools() schema; project-level
         # rejection happens here since schema is global (can't be changed per-project).
-        if config_module.is_tool_disabled(name, repo=repo_arg):
+        if name not in _ALWAYS_PRESENT_TOOLS and config_module.is_tool_disabled(name, repo=repo_arg):
             return [TextContent(type="text", text=json.dumps({
                 "error": (
                     f"Tool '{name}' is disabled in this project's configuration. "
@@ -2880,6 +3097,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             )
         elif name == "plan_turn":
             from .tools.plan_turn import plan_turn
+            # Extract model for tier-switch piggyback before passing to plan_turn
+            model = arguments.pop("model", None) if isinstance(arguments, dict) else None
             result = await asyncio.to_thread(
                 functools.partial(
                     plan_turn,
@@ -2889,6 +3108,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     storage_path=storage_path,
                 )
             )
+            announcement = None
+            if isinstance(model, str) and model:
+                announcement = await _apply_model_announcement(model)
+            if announcement is not None and isinstance(result, dict):
+                result["tier_announcement"] = announcement
         elif name == "register_edit":
             from .tools.register_edit import register_edit
             result = await asyncio.to_thread(
@@ -3298,6 +3522,22 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     storage_path=storage_path,
                 )
             )
+        elif name == "set_tool_tier":
+            tier = arguments.get("tier")
+            if tier not in ("core", "standard", "full"):
+                result = {"error": f"invalid tier: {tier!r}"}
+            else:
+                prev = _effective_profile()
+                _set_session_tier(tier)
+                if tier != prev:
+                    await _emit_tools_list_changed()
+                result = {"ok": True, "tier": tier, "changed": tier != prev}
+        elif name == "announce_model":
+            model = arguments.get("model", "")
+            if not isinstance(model, str) or not model:
+                result = {"error": "model parameter is required and must be a non-empty string"}
+            else:
+                result = await _apply_model_announcement(model)
         else:
             result = {"error": f"Unknown tool: {name}"}
 
@@ -3502,9 +3742,17 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
     except KeyError as e:
         return [TextContent(type="text", text=json.dumps({"error": f"Missing required argument: {e}. Check the tool schema for correct parameter names."}, separators=(',', ':')))]
-    except Exception:
+    except Exception as exc:
         logger.error("call_tool %s failed", name, exc_info=True)
-        return [TextContent(type="text", text=json.dumps({"error": f"Internal error processing {name}"}, separators=(',', ':')))]
+        summary = " ".join((str(exc).strip().splitlines() or [""])[0].split())
+        summary = f"{type(exc).__name__}: {summary}" if summary else type(exc).__name__
+        if len(summary) > 200:
+            summary = f"{summary[:197].rstrip()}..."
+        payload = {
+            "error": f"Internal error processing {name}",
+            "summary": summary,
+        }
+        return [TextContent(type="text", text=json.dumps(payload, separators=(',', ':')))]
 
 
 async def _run_server_with_watcher(
@@ -3622,6 +3870,8 @@ async def run_stdio_server():
     )
     # Feature 10: Restore session state on startup
     _restore_session_state()
+    # Log tier bundle / disabled_tools overlap warnings
+    _log_startup_validation_warnings()
     try:
         async with stdio_server() as (read_stream, write_stream):
             await server.run(
@@ -3756,6 +4006,8 @@ async def run_sse_server(host: str, port: int):
         __version__, host, port,
         os.path.expanduser(os.environ.get("CODE_INDEX_PATH", "~/.code-index/")),
     )
+    _warn_if_http_adaptive_tiering("sse")
+    _log_startup_validation_warnings()
     # Feature 10: Restore session state on startup
     _restore_session_state()
     config = uvicorn.Config(starlette_app, host=host, port=port, log_level="warning")
@@ -3869,6 +4121,8 @@ async def run_streamable_http_server(host: str, port: int):
         __version__, host, port,
         os.path.expanduser(os.environ.get("CODE_INDEX_PATH", "~/.code-index/")),
     )
+    _warn_if_http_adaptive_tiering("streamable-http")
+    _log_startup_validation_warnings()
     # Feature 10: Restore session state on startup
     _restore_session_state()
     config = uvicorn.Config(starlette_app, host=host, port=port, log_level="warning")
@@ -3964,6 +4218,7 @@ def _generate_claude_md_snippet(missing_only: bool = False) -> str:
         ("Session-Aware Routing", ["plan_turn", "get_session_context", "get_session_snapshot", "register_edit"]),
         ("Utilities", ["get_session_stats", "invalidate_cache", "test_summarizer",
                         "audit_agent_config"]),
+        ("Runtime Tier Switching", ["set_tool_tier", "announce_model"]),
     ]
     from . import __version__ as _ver
     lines = [
@@ -4168,6 +4423,29 @@ def _run_config(check: bool = False, init: bool = False, upgrade: bool = False) 
     section("Disabled Tools")
     disabled = _cfg.get("disabled_tools", [])
     row("disabled_tools", _fmt_list(disabled) if disabled else dim("(none)"), _detect_source("disabled_tools", []))
+
+    # ── Tool Tiering ──────────────────────────────────────────────────────
+    section("Tool Tiering")
+    adaptive = _cfg.get("adaptive_tiering", False)
+    row("adaptive_tiering", green("enabled") if adaptive else dim("disabled"), _detect_source("adaptive_tiering", False))
+    bundles = _cfg.get("tool_tier_bundles") or {}
+    if isinstance(bundles, dict):
+        for tier_name in ("core", "standard"):
+            tools_in_tier = bundles.get(tier_name, [])
+            if isinstance(tools_in_tier, list):
+                row(f"  {tier_name} tier", f"{len(tools_in_tier)} tools", "config")
+    # Check for bundle/disabled overlap
+    from .tier_resolver import validate_bundle_disabled_overlap
+    overlap_cfg = {
+        "tool_tier_bundles": bundles,
+        "disabled_tools": disabled,
+    }
+    overlap_warnings = validate_bundle_disabled_overlap(overlap_cfg)
+    if overlap_warnings:
+        for msg in overlap_warnings:
+            print(f"  {WARN} {yellow(msg)}")
+    else:
+        print(f"  {CHECK} {green('No bundle/disabled_tools overlap')}")
 
     # ── Descriptions ──────────────────────────────────────────────────────
     section("Descriptions")

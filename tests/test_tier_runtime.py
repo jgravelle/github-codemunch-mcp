@@ -1,0 +1,481 @@
+"""Runtime tier state + tools/list_changed emission tests."""
+
+import asyncio
+import pytest
+
+from jcodemunch_mcp import server as server_mod
+from jcodemunch_mcp import config as config_mod
+
+
+class TestSessionTierState:
+    def setup_method(self):
+        server_mod._session_tier_override = None
+
+    def test_default_is_none(self):
+        assert server_mod._session_tier_override is None
+
+    def test_set_get_tier(self):
+        server_mod._set_session_tier("core")
+        assert server_mod._session_tier_override == "core"
+
+    def test_effective_profile_prefers_session(self, monkeypatch):
+        """When session tier is set, it overrides config tool_profile."""
+        monkeypatch.setattr(config_mod, "get", lambda k, *a, **kw: "full" if k == "tool_profile" else {})
+        server_mod._set_session_tier("core")
+        assert server_mod._effective_profile() == "core"
+
+    def test_effective_profile_falls_back_to_config(self, monkeypatch):
+        monkeypatch.setattr(
+            config_mod, "get",
+            lambda k, *a, **kw: "standard" if k == "tool_profile" else {}
+        )
+        server_mod._session_tier_override = None
+        assert server_mod._effective_profile() == "standard"
+
+
+class TestEmitToolsListChanged:
+    @pytest.mark.asyncio
+    async def test_emit_does_not_raise(self):
+        """Helper must be a no-op when MCP session isn't available."""
+        await server_mod._emit_tools_list_changed()  # must not raise
+
+    @pytest.mark.asyncio
+    async def test_emit_calls_session_send_tool_list_changed(self, monkeypatch):
+        """Integration-style check: use module server.request_context, not _get_mcp_session mocking."""
+
+        class _FakeSession:
+            def __init__(self):
+                self.called = False
+
+            async def send_tool_list_changed(self):
+                self.called = True
+
+        class _FakeRequestContext:
+            def __init__(self, session):
+                self.session = session
+
+        class _FakeServer:
+            def __init__(self, request_context):
+                self.request_context = request_context
+
+        fake_session = _FakeSession()
+        fake_server = _FakeServer(_FakeRequestContext(fake_session))
+        monkeypatch.setattr(server_mod, "server", fake_server)
+
+        await server_mod._emit_tools_list_changed()
+        assert fake_session.called is True
+
+    @pytest.mark.asyncio
+    async def test_emit_warns_when_session_has_no_send_method(self, caplog, monkeypatch):
+        class _FakeSession:
+            pass
+
+        class _FakeRequestContext:
+            def __init__(self, session):
+                self.session = session
+
+        class _FakeServer:
+            def __init__(self, request_context):
+                self.request_context = request_context
+
+        monkeypatch.setattr(server_mod, "server", _FakeServer(_FakeRequestContext(_FakeSession())))
+        caplog.set_level("WARNING")
+
+        await server_mod._emit_tools_list_changed()
+
+        msgs = [r.message for r in caplog.records]
+        assert any("send_tool_list_changed" in m for m in msgs)
+
+
+def test_startup_logs_bundle_disabled_overlap(caplog, monkeypatch):
+    monkeypatch.setattr(
+        config_mod, "get",
+        lambda k, *a, **kw: {
+            "tool_tier_bundles": {"core": ["search_symbols"]},
+            "disabled_tools": ["search_symbols"],
+        }.get(k, (a[0] if a else None)),
+    )
+    caplog.set_level("WARNING")
+    server_mod._log_startup_validation_warnings()
+    msgs = [r.message for r in caplog.records]
+    assert any("search_symbols" in m and "disabled_tools" in m for m in msgs)
+
+
+def test_warn_if_http_adaptive_tiering_logs_warning(caplog, monkeypatch):
+    real_get = config_mod.get
+
+    def _fake_get(key, *a, **kw):
+        if key == "adaptive_tiering":
+            return True
+        return real_get(key, *a, **kw)
+
+    monkeypatch.setattr(config_mod, "get", _fake_get)
+    caplog.set_level("WARNING")
+    server_mod._warn_if_http_adaptive_tiering("sse")
+    msgs = [r.message for r in caplog.records]
+    assert any("adaptive_tiering" in m and "transport=sse" in m for m in msgs)
+
+
+# --------------------------------------------------------------------------- #
+# set_tool_tier tool                                                           #
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.asyncio
+async def test_set_tool_tier_switches_session_tier():
+    from copy import deepcopy
+    from jcodemunch_mcp.server import call_tool
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+    server_mod._session_tier_override = None
+
+    try:
+        result = await call_tool("set_tool_tier", {"tier": "core"})
+        text = result[0].text if hasattr(result[0], 'text') else result[0]
+        import json
+        data = json.loads(text)
+        assert data.get("ok") is True
+        assert data.get("tier") == "core"
+        assert server_mod._session_tier_override == "core"
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+        server_mod._session_tier_override = None
+
+
+@pytest.mark.asyncio
+async def test_set_tool_tier_rejects_invalid_tier():
+    from copy import deepcopy
+    from jcodemunch_mcp.server import call_tool
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+
+    try:
+        result = await call_tool("set_tool_tier", {"tier": "enormous"})
+        text = result[0].text if hasattr(result[0], 'text') else result[0]
+        import json
+        data = json.loads(text)
+        assert "error" in data
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+
+
+# --------------------------------------------------------------------------- #
+# announce_model tool                                                          #
+# --------------------------------------------------------------------------- #
+
+@pytest.fixture
+def adaptive_on(monkeypatch):
+    """Enable adaptive_tiering for the duration of a test."""
+    real_get = config_mod.get
+
+    def fake_get(key, *a, **kw):
+        if key == "adaptive_tiering":
+            return True
+        return real_get(key, *a, **kw)
+
+    monkeypatch.setattr(config_mod, "get", fake_get)
+    yield
+
+
+@pytest.mark.asyncio
+async def test_announce_model_resolves_tier(adaptive_on):
+    from copy import deepcopy
+    from jcodemunch_mcp.server import call_tool
+    import json
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+    server_mod._session_tier_override = None
+
+    try:
+        result = await call_tool("announce_model", {"model": "claude-haiku-4-5"})
+        text = result[0].text if hasattr(result[0], 'text') else result[0]
+        data = json.loads(text)
+        assert data["ok"] is True
+        assert data["tier"] == "core"
+        assert data["changed"] is True
+        assert data["match_reason"].startswith("substring:")
+        assert server_mod._session_tier_override == "core"
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+        server_mod._session_tier_override = None
+
+
+@pytest.mark.asyncio
+async def test_announce_model_idempotent(adaptive_on):
+    from copy import deepcopy
+    from jcodemunch_mcp.server import call_tool
+    import json
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+    server_mod._session_tier_override = None
+
+    try:
+        await call_tool("announce_model", {"model": "claude-haiku-4-5"})
+        second = await call_tool("announce_model", {"model": "claude-haiku-4-5"})
+        text = second[0].text if hasattr(second[0], 'text') else second[0]
+        data = json.loads(text)
+        assert data["changed"] is False
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+        server_mod._session_tier_override = None
+
+
+@pytest.mark.asyncio
+async def test_announce_model_unknown_falls_back_full(adaptive_on):
+    from copy import deepcopy
+    from jcodemunch_mcp.server import call_tool
+    import json
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+    server_mod._session_tier_override = None
+
+    try:
+        result = await call_tool("announce_model", {"model": "totally-new-model-2030"})
+        text = result[0].text if hasattr(result[0], 'text') else result[0]
+        data = json.loads(text)
+        assert data["tier"] == "full"
+        assert data["match_reason"] == "wildcard"
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+        server_mod._session_tier_override = None
+
+
+@pytest.mark.asyncio
+async def test_announce_model_noop_when_adaptive_tiering_disabled():
+    """When adaptive_tiering is false (default), announce_model does not switch tier."""
+    from copy import deepcopy
+    from jcodemunch_mcp.server import call_tool
+    import json
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+    server_mod._session_tier_override = None
+
+    try:
+        result = await call_tool("announce_model", {"model": "claude-haiku-4-5"})
+        text = result[0].text if hasattr(result[0], 'text') else result[0]
+        data = json.loads(text)
+        assert data["ok"] is True
+        assert data["changed"] is False
+        assert data.get("adaptive_tiering") is False
+        assert server_mod._session_tier_override is None
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+        server_mod._session_tier_override = None
+
+
+# --------------------------------------------------------------------------- #
+# Force-include runtime tools in every tier                                    #
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.asyncio
+async def test_switch_tools_always_present_on_core():
+    """set_tool_tier + announce_model must be in tools/list regardless of tier."""
+    from copy import deepcopy
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+    config_mod._GLOBAL_CONFIG["tool_profile"] = "core"
+    config_mod._GLOBAL_CONFIG["disabled_tools"] = []
+    server_mod._session_tier_override = "core"
+
+    try:
+        from jcodemunch_mcp.server import list_tools
+        tools = await list_tools()
+        names = {t.name for t in tools}
+        assert "set_tool_tier" in names
+        assert "announce_model" in names
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+        server_mod._session_tier_override = None
+
+
+@pytest.mark.asyncio
+async def test_switch_tools_not_filterable_by_disabled():
+    """Even if user disables them via disabled_tools, they must stay exposed."""
+    from copy import deepcopy
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    orig_disabled = list(config_mod._GLOBAL_CONFIG.get("disabled_tools", []))
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+    config_mod._GLOBAL_CONFIG["disabled_tools"] = list(orig_disabled) + ["set_tool_tier", "announce_model"]
+
+    try:
+        from jcodemunch_mcp.server import list_tools
+        tools = await list_tools()
+        names = {t.name for t in tools}
+        assert "set_tool_tier" in names
+        assert "announce_model" in names
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+
+
+@pytest.mark.asyncio
+async def test_switch_tools_callable_even_when_is_tool_disabled_true(monkeypatch):
+    """Runtime switch tools are exempt from disabled gate at call-time."""
+    from jcodemunch_mcp.server import call_tool
+    import json
+
+    monkeypatch.setattr(
+        config_mod,
+        "is_tool_disabled",
+        lambda name, repo=None: name in {"set_tool_tier", "announce_model"},
+    )
+    server_mod._session_tier_override = None
+
+    try:
+        r1 = await call_tool("set_tool_tier", {"tier": "core"})
+        d1 = json.loads(r1[0].text if hasattr(r1[0], "text") else r1[0])
+        assert d1.get("ok") is True
+        assert d1.get("tier") == "core"
+
+        r2 = await call_tool("announce_model", {"model": "claude-haiku-4-5"})
+        d2 = json.loads(r2[0].text if hasattr(r2[0], "text") else r2[0])
+        assert "error" not in d2
+    finally:
+        server_mod._session_tier_override = None
+
+
+# --------------------------------------------------------------------------- #
+# plan_turn(model=...) piggyback                                               #
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.asyncio
+async def test_plan_turn_model_piggyback_switches_tier(adaptive_on):
+    """plan_turn(model=...) must flip the session tier as a side effect."""
+    from copy import deepcopy
+    from jcodemunch_mcp.server import call_tool
+    import json
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+    server_mod._session_tier_override = None
+
+    try:
+        args = {
+            "repo": "local/jcodemunch-mcp-384d867b",
+            "query": "anything",
+            "model": "claude-sonnet-4-6",
+        }
+        result = await call_tool("plan_turn", args)
+        text = result[0].text if hasattr(result[0], 'text') else result[0]
+        data = json.loads(text)
+        assert server_mod._session_tier_override == "standard"
+        ann = data.get("tier_announcement", {})
+        assert ann.get("tier") == "standard"
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+        server_mod._session_tier_override = None
+
+
+@pytest.mark.asyncio
+async def test_plan_turn_without_model_leaves_tier_untouched(adaptive_on):
+    from copy import deepcopy
+    from jcodemunch_mcp.server import call_tool
+    import json
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+    server_mod._session_tier_override = "core"
+
+    try:
+        await call_tool(
+            "plan_turn",
+            {"repo": "local/jcodemunch-mcp-384d867b", "query": "anything"},
+        )
+        assert server_mod._session_tier_override == "core"
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+        server_mod._session_tier_override = None
+
+
+@pytest.mark.asyncio
+async def test_plan_turn_model_noop_when_adaptive_tiering_disabled():
+    """With adaptive_tiering=false (default), plan_turn's model param is
+    accepted but the session tier is not switched."""
+    from copy import deepcopy
+    from jcodemunch_mcp.server import call_tool
+    import json
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+    server_mod._session_tier_override = None
+
+    try:
+        args = {
+            "repo": "local/jcodemunch-mcp-384d867b",
+            "query": "anything",
+            "model": "claude-haiku-4-5",
+        }
+        result = await call_tool("plan_turn", args)
+        text = result[0].text if hasattr(result[0], 'text') else result[0]
+        data = json.loads(text)
+        assert server_mod._session_tier_override is None
+        ann = data.get("tier_announcement", {})
+        assert ann.get("changed") is False
+        assert ann.get("adaptive_tiering") is False
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+        server_mod._session_tier_override = None
+
+
+@pytest.mark.asyncio
+async def test_plan_turn_model_does_not_switch_tier_when_plan_turn_errors(adaptive_on, monkeypatch):
+    """Model tier switch must not persist if plan_turn handler fails."""
+    from copy import deepcopy
+    from jcodemunch_mcp.server import call_tool
+    from jcodemunch_mcp.tools import plan_turn as plan_turn_module
+    import json
+
+    orig_config = config_mod._GLOBAL_CONFIG.copy()
+    config_mod._GLOBAL_CONFIG.clear()
+    config_mod._GLOBAL_CONFIG.update(deepcopy(config_mod.DEFAULTS))
+    server_mod._session_tier_override = None
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(plan_turn_module, "plan_turn", _boom)
+
+    try:
+        args = {
+            "repo": "local/jcodemunch-mcp-384d867b",
+            "query": "anything",
+            "model": "claude-haiku-4-5",
+        }
+        result = await call_tool("plan_turn", args)
+        text = result[0].text if hasattr(result[0], "text") else result[0]
+        data = json.loads(text)
+        assert "error" in data
+        assert data["summary"] == "RuntimeError: boom"
+        assert server_mod._session_tier_override is None
+    finally:
+        config_mod._GLOBAL_CONFIG.clear()
+        config_mod._GLOBAL_CONFIG.update(orig_config)
+        server_mod._session_tier_override = None
