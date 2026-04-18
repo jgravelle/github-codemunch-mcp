@@ -2,6 +2,11 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.59.0] — 2026-04-17
+
+### Added
+- **`render_diagram` optional `open_in_viewer` parameter (#245, @MariusAdrian88)** — opt-in integration with the companion [mmd-viewer](https://github.com/MariusAdrian88/mmd-viewer) binary for instant visual preview of rendered Mermaid diagrams. Fully gated behind two new config keys: `render_diagram_viewer_enabled` (default `false`) controls whether the `open_in_viewer` parameter is exposed in the tool schema at all, so LLM clients see no change unless the feature is enabled locally; `mermaid_viewer_path` points at the executable (empty = `$PATH` lookup). When enabled and invoked, the rendered Mermaid is written to a `jcm-`-prefixed `.mmd` file under `<index_storage>/temp/mermaid/` and piped to the viewer on stdin. Non-fatal by design: viewer-missing or spawn-failure adds a `viewer_error` field to the response but always returns the Mermaid markup. Cleanup is selective — only `jcm-`-prefixed files are removed, on both startup (stale files from prior sessions) and shutdown (only if the viewer was invoked this session). Windows file-lock aware with 500 ms retry on unlink.
+
 ## [1.58.0] — 2026-04-17
 
 ### Added
