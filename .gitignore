@@ -49,6 +49,7 @@ dmypy.json
 
 # Storage (don't commit test indexes)
 .code-index/
+.ab_bench_idx/
 
 # Claude Code local settings (may contain credentials from allowed commands)
 .claude/

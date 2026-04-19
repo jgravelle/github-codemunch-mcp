@@ -57,7 +57,7 @@ elif args.cmd == "index":
     t = args.target
     out(index_folder(t) if "/" not in t or t.startswith("/") or (len(t) > 1 and t[1] == ":") else index_repo(t))
 elif args.cmd == "outline":  out(get_file_outline(args.repo, args.file) if args.file else get_repo_outline(args.repo))
-elif args.cmd == "search":   out(search_symbols(args.repo, args.query, kind=args.kind, language=args.lang, max_results=args.n))
+elif args.cmd == "search":   out(search_symbols(args.repo, args.query, kind=args.kind, language=args.lang, max_results=args.n, detail_level="standard"))
 elif args.cmd == "get":      out(get_symbol(args.repo, args.symbol_id))
 elif args.cmd == "text":     out(search_text(args.repo, args.query, context_lines=args.context_lines))
 elif args.cmd == "file":     out(get_file_content(args.repo, args.file_path, start_line=args.start, end_line=args.end))

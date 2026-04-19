@@ -148,7 +148,9 @@ def measure_jmunch(repo_str: str, query: str) -> dict:
     """
     # 1. Search
     t0 = time.perf_counter()
-    search_result = search_symbols(repo=repo_str, query=query, max_results=SEARCH_MAX_RESULTS)
+    # v1.70.0: pin detail_level="standard" so benchmark numbers stay comparable
+    # to runs before the auto-default flip (baseline methodology preserved).
+    search_result = search_symbols(repo=repo_str, query=query, max_results=SEARCH_MAX_RESULTS, detail_level="standard")
     search_ms = (time.perf_counter() - t0) * 1000
 
     search_text = _serialize(search_result)

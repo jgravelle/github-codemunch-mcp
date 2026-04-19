@@ -52,7 +52,7 @@ jcodemunch-mcp config --check
 |-----|------|---------|-------------|
 | `max_folder_files` | int | `2000` | Maximum files indexed for local folders. Lower than repo default because folder indexing runs synchronously within the MCP timeout window. |
 | `max_index_files` | int | `10000` | Maximum files indexed for GitHub repos (async, no timeout constraint). |
-| `use_ai_summaries` | bool | `true` | Enable AI-generated symbol summaries. Requires an API key (Anthropic, Google, or local LLM). |
+| `use_ai_summaries` | bool or str | `"auto"` | Enable AI-generated symbol summaries. `"auto"` (default) uses AI when a provider is detected, else falls back to signature-only summaries. `true`/`false` force the choice. Requires an API key (Anthropic, Google, or local LLM). |
 | `summarizer_concurrency` | int | `4` | Parallel batch requests to the AI summarizer. |
 | `allow_remote_summarizer` | bool | `false` | Allow remote AI summarizer even when local LLM is configured. |
 | `extra_ignore_patterns` | list | `[]` | Additional gitignore-style patterns to exclude from indexing. Merged with per-call patterns. |
@@ -156,7 +156,7 @@ Controls the `_meta` envelope included in tool responses. Reducing meta fields s
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `meta_fields` | list or null | `null` | `null` = all fields. `[]` = strip `_meta` entirely. List = include only named fields. |
+| `meta_fields` | list or null | `[]` | `[]` (default, token-lean) = strip `_meta` entirely. `null` = include all fields. List = include only named fields. |
 
 **Example — keep only timing and savings:**
 

@@ -414,6 +414,24 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
+def _materialize_full_entry(entry: dict, index, store, owner: str, name: str) -> None:
+    """Inline source/docstring/end_line and update byte_length to reflect full content.
+
+    Mutates entry in place. Called before token-budget packing so the packer sees
+    real byte sizes rather than the pre-materialization signature-only skeleton.
+    Without this, full + token_budget can overshoot the budget by 5-20x (§1.2).
+    """
+    sym = index._get_symbol_raw(entry["id"])
+    if not sym:
+        return
+    source = store.get_symbol_content(owner, name, entry["id"], _index=index) or ""
+    docstring = sym.get("docstring", "") or ""
+    entry["end_line"] = sym.get("end_line", entry["line"])
+    entry["docstring"] = docstring
+    entry["source"] = source
+    entry["byte_length"] = (sym.get("byte_length", 0) or 0) + len(docstring.encode("utf-8")) + len(source.encode("utf-8"))
+
+
 def search_symbols(
     repo: str,
     query: str,
@@ -423,7 +441,7 @@ def search_symbols(
     decorator: Optional[str] = None,
     max_results: int = 10,
     token_budget: Optional[int] = None,
-    detail_level: str = "standard",
+    detail_level: str = "auto",
     debug: bool = False,
     fuzzy: bool = False,
     fuzzy_threshold: float = 0.4,
@@ -448,9 +466,14 @@ def search_symbols(
         max_results: Maximum results to return (ignored when token_budget is set).
         token_budget: Maximum tokens to consume. Results are greedily packed by
             score until the budget is exhausted. Overrides max_results.
-        detail_level: Controls result verbosity. "compact" returns id/name/kind/file/line
-            only (~15 tokens each, ideal for discovery). "standard" returns signatures
-            and summaries (default). "full" inlines source code, docstring, and end_line.
+        detail_level: Controls result verbosity.
+            "auto" (default) picks "compact" for broad discovery (no token_budget,
+            no debug, max_results >= 5) and "standard" otherwise. Explicitly-passed
+            values are always honored.
+            "compact" returns id/name/kind/file/line only (~15 tokens each, ideal
+            for discovery).
+            "standard" returns signatures and summaries.
+            "full" inlines source code, docstring, and end_line.
         debug: When True, include per-field score breakdown in each result.
         fuzzy: Enable fuzzy matching. When True (or when BM25 confidence is low),
             uses trigram overlap + edit distance as fallback. Fuzzy results carry
@@ -480,8 +503,8 @@ def search_symbols(
     Returns:
         Dict with search results and _meta envelope.
     """
-    if detail_level not in ("compact", "standard", "full"):
-        return {"error": f"Invalid detail_level '{detail_level}'. Must be 'compact', 'standard', or 'full'."}
+    if detail_level not in ("auto", "compact", "standard", "full"):
+        return {"error": f"Invalid detail_level '{detail_level}'. Must be 'auto', 'compact', 'standard', or 'full'."}
 
     if sort_by not in ("relevance", "centrality", "combined"):
         return {"error": f"Invalid sort_by '{sort_by}'. Must be 'relevance', 'centrality', or 'combined'."}
@@ -498,6 +521,14 @@ def search_symbols(
 
     start = time.perf_counter()
     max_results = max(1, min(max_results, 100))
+
+    # §1.1: Resolve "auto" to a concrete level BEFORE cache_key build so cache
+    # keys reflect what we'll actually materialize. Explicit values pass through.
+    if detail_level == "auto":
+        if token_budget is None and not debug and max_results >= 5:
+            detail_level = "compact"
+        else:
+            detail_level = "standard"
 
     try:
         owner, name = resolve_repo(repo, storage_path)
@@ -741,6 +772,13 @@ def search_symbols(
     scored_results = [entry for _, _, entry in sorted(heap, key=lambda x: x[0], reverse=True)]
     heap_count = len(scored_results)  # save before budget packing
 
+    # §1.2: Materialize full-detail payload BEFORE packing so byte_length reflects
+    # what will actually be returned. Prior to this fix, the packer saw the pre-full
+    # skeleton size and the token_budget could overshoot by 5-20x.
+    if detail_level == "full":
+        for entry in scored_results:
+            _materialize_full_entry(entry, index, store, owner, name)
+
     budget_truncated = False
     if token_budget is not None:
         packed, used_bytes = [], 0
@@ -821,17 +859,9 @@ def search_symbols(
             entry["edit_distance"] = ed
             if debug:
                 entry["score"] = 0.0
+            if detail_level == "full":
+                _materialize_full_entry(entry, index, store, owner, name)
             scored_results.append(entry)
-
-    # Full detail: inline source, docstring, end_line for each result
-    if detail_level == "full":
-        for entry in scored_results:
-            sym = index._get_symbol_raw(entry["id"])
-            if sym:
-                source = store.get_symbol_content(owner, name, entry["id"], _index=index)
-                entry["end_line"] = sym.get("end_line", entry["line"])
-                entry["docstring"] = sym.get("docstring", "")
-                entry["source"] = source or ""
 
     # Token savings: files containing matches vs symbol byte_lengths of results
     raw_bytes = 0
@@ -1087,6 +1117,12 @@ def _search_symbols_semantic(
             entry["score"] = round(score, 4)
         scored_results.append(entry)
 
+    # ── Full detail: materialize BEFORE packing (§1.2) ─────────────────────
+    # Semantic path had the same packer/materialization ordering bug.
+    if detail_level == "full":
+        for entry in scored_results:
+            _materialize_full_entry(entry, index, store, owner, name)
+
     # ── Token budget packing ───────────────────────────────────────────────
     if token_budget is not None:
         packed: list[dict] = []
@@ -1097,16 +1133,6 @@ def _search_symbols_semantic(
                 packed.append(entry)
                 used += b
         scored_results = packed
-
-    # ── Full detail: inline source + docstring ─────────────────────────────
-    if detail_level == "full":
-        for entry in scored_results:
-            sym_raw = index._get_symbol_raw(entry["id"])
-            if sym_raw:
-                src = store.get_symbol_content(owner, name, entry["id"], _index=index)
-                entry["end_line"] = sym_raw.get("end_line", entry["line"])
-                entry["docstring"] = sym_raw.get("docstring", "")
-                entry["source"] = src or ""
 
     # ── Meta ───────────────────────────────────────────────────────────────
     raw_bytes = 0
@@ -1332,6 +1358,11 @@ def _search_symbols_fusion(
             entry["channel_ranks"] = fr.channel_ranks
         scored_results.append(entry)
 
+    # Full detail: materialize BEFORE packing so byte_length reflects payload (§1.2).
+    if detail_level == "full":
+        for entry in scored_results:
+            _materialize_full_entry(entry, index, store, owner, name)
+
     # Budget packing
     budget_truncated = False
     if token_budget is not None:
@@ -1343,16 +1374,6 @@ def _search_symbols_fusion(
                 used_bytes += b
         budget_truncated = len(packed) < len(scored_results)
         scored_results = packed
-
-    # Full detail
-    if detail_level == "full":
-        for entry in scored_results:
-            sym = index._get_symbol_raw(entry["id"])
-            if sym:
-                source = store.get_symbol_content(owner, name, entry["id"], _index=index)
-                entry["end_line"] = sym.get("end_line", entry["line"])
-                entry["docstring"] = sym.get("docstring", "")
-                entry["source"] = source or ""
 
     # Token savings
     raw_bytes = 0

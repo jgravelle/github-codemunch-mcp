@@ -2,6 +2,60 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.70.0] — 2026-04-19
+
+Context-optimization release — default detail level and token-budget bug fix.
+Minor bump (not 2.0) because the changes are forward-compatible: explicit
+`detail_level` values still honored, `token_budget` semantics unchanged in
+signature. Agents that never passed `detail_level` see smaller responses on
+broad discovery queries.
+
+A/B benchmark (self-indexed, 16 discovery queries, `max_results=10`):
+- **21.3% total token savings** vs prior default (median 18.9%, max 33.7%)
+- **100% `token_budget` compliance** in full mode (was overshooting 5-20x)
+- **Narrow queries (`max_results<5`) identical** to prior behavior
+
+Results: `benchmarks/results_v1.70.0.md`. Reproduce: `PYTHONPATH=src python benchmarks/harness/ab_v1_70_0.py`.
+
+### Changed
+- **`search_symbols(detail_level=)` default is now `"auto"`.** Resolves to
+  `"compact"` for broad discovery (no `token_budget`, no `debug`, `max_results
+  >= 5`) and to `"standard"` otherwise. Explicit `detail_level` values are
+  always honored — never silently overridden. Agents that didn't pass
+  `detail_level` now get the cheapest representation by default for discovery
+  queries, matching the published guidance. CLI (`cli/cli.py`) and benchmark
+  harness pin `detail_level="standard"` explicitly to preserve output shape.
+- **`meta_fields` documented default corrected to `[]`.** Runtime default in
+  `config.py` has always been `[]` (strip `_meta` entirely). `CONFIGURATION.md`
+  previously showed `null`, which caused agents to emit `_meta` fields users
+  weren't opting into. Code is canonical; docs now match.
+- **`use_ai_summaries` documented default corrected to `"auto"`** with the
+  actual type (`bool or str`). Runtime accepts `"auto"`/`true`/`false`; docs
+  previously reported a stale `true` default.
+
+### Fixed
+- **`search_symbols` full-mode respects `token_budget`.** The packer previously
+  saw each result's pre-materialization `byte_length` (signature + summary
+  only), then full-mode appended `source`, `docstring`, and `end_line` AFTER
+  packing, overshooting declared budgets by 5-20x on real symbols. Full
+  payload is now materialized before packing via a shared
+  `_materialize_full_entry` helper; `byte_length` reflects the actual payload
+  the caller will see. Applied uniformly to the main BM25 path, the semantic
+  (embedding) path, and the fusion (WRR) path — all three had the same bug.
+  Fuzzy-path entries materialize inline instead of via a trailing pass.
+
+### Tests
+- `tests/test_search_symbols_defaults.py` (11 new tests) — auto-resolution
+  decision matrix, explicit-override honoring, full-mode budget adherence
+  across BM25/fusion paths, edge cases (empty query, zero results, cache warm).
+- `tests/test_docs_config_parity.py` — documented defaults in
+  `CONFIGURATION.md` now parity-checked against the `DEFAULTS` dict in
+  `config.py`. CI will fail if a default drifts between code and docs.
+- `tests/test_schema_budget.py` — schema-token count tracked per
+  `(tool_profile, compact_schemas)` against `benchmarks/schema_baseline.json`
+  with a 5% drift tolerance; `core + compact_schemas=True` asserted under
+  4000 tokens (v2-success-criterion guardrail).
+
 ## [1.63.1] — 2026-04-19
 
 Hotfix — `get_hotspots` (and therefore `get_repo_health`, which aggregates
