@@ -113,6 +113,14 @@ def encode(
     for k in json_blobs:
         if k in response:
             scalar_payload[f"__json.{k}"] = json.dumps(response[k], separators=(",", ":"))
+    scalar_types_out: dict[str, str] = {}
+    for k, v in scalar_payload.items():
+        if k.startswith("__"):
+            continue
+        if v is not None and not isinstance(v, str):
+            scalar_types_out[k] = _type_of(v)
+    if scalar_types_out:
+        scalar_payload["__stypes"] = "|".join(f"{k}:{t}" for k, t in scalar_types_out.items())
     # Encode the table schema into the payload so decode is self-sufficient.
     scalar_payload["__tables"] = ",".join(
         f"{t.tag}:{t.key}:{'|'.join(t.cols)}" for t in tables
@@ -174,6 +182,11 @@ def decode(
 
     raw_scalars = parse_scalars(scalar_block) if scalar_block else {}
     raw_scalars.pop("__tables", None)
+    stypes_text = raw_scalars.pop("__stypes", "")
+    for part in [p for p in stypes_text.split("|") if p]:
+        name, _, hint = part.partition(":")
+        if name and hint and name not in stypes:
+            stypes[name] = hint
 
     result: dict[str, Any] = {}
     # Top-level scalars — coerce per scalar_types hint when supplied,

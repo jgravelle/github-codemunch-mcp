@@ -3822,7 +3822,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         try:
             from .encoding import encode_response
             from .storage.token_tracker import record_encoding_savings
-            encoded, enc_meta = encode_response(name, result, _requested_format)
+            encoded, enc_meta = encode_response(name, result, _requested_format, repo=repo_arg)
             if enc_meta.get("encoding") != "json":
                 saved = enc_meta.get("encoding_tokens_saved", 0)
                 total_enc = record_encoding_savings(saved, base_path=storage_path, tool_name=name)

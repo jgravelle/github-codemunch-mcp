@@ -7,14 +7,19 @@ byte sizes. Threshold is configurable via env/config; default 15%.
 from __future__ import annotations
 
 import json
-import os
 
 DEFAULT_THRESHOLD = 0.15
 
 
-def threshold() -> float:
-    raw = os.environ.get("JCODEMUNCH_ENCODING_THRESHOLD")
-    if raw:
+def threshold(repo: str | None = None) -> float:
+    try:
+        from .. import config as app_config
+
+        raw = app_config.get("server_output_threshold", DEFAULT_THRESHOLD, repo=repo)
+    except Exception:
+        raw = DEFAULT_THRESHOLD
+
+    if raw is not None:
         try:
             return max(0.0, float(raw))
         except ValueError:
@@ -32,5 +37,5 @@ def savings_ratio(json_bytes: int, compact_bytes: int) -> float:
     return max(0.0, (json_bytes - compact_bytes) / json_bytes)
 
 
-def passes(json_bytes: int, compact_bytes: int) -> bool:
-    return savings_ratio(json_bytes, compact_bytes) >= threshold()
+def passes(json_bytes: int, compact_bytes: int, repo: str | None = None) -> bool:
+    return savings_ratio(json_bytes, compact_bytes) >= threshold(repo=repo)

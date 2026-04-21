@@ -114,7 +114,16 @@ class TestConfigDefaults:
         ("max_index_files", 10000),
         ("languages", None),
         ("disabled_tools", ["test_summarizer"]),
-    ], ids=["max_folder_files", "max_index_files", "languages_none", "disabled_tools"])
+        ("server_output", "adaptive"),
+        ("server_output_threshold", 0.15),
+    ], ids=[
+        "max_folder_files",
+        "max_index_files",
+        "languages_none",
+        "disabled_tools",
+        "server_output",
+        "server_output_threshold",
+    ])
     def test_default_values(self, key, expected):
         """Should have correct default values."""
         from src.jcodemunch_mcp.config import DEFAULTS
@@ -125,7 +134,16 @@ class TestConfigDefaults:
         ("summarizer_provider", str),
         ("embed_model", str),
         ("summarizer_model", str),
-    ], ids=["strict_timeout_ms", "summarizer_provider", "embed_model", "summarizer_model"])
+        ("server_output", str),
+        ("server_output_threshold", float),
+    ], ids=[
+        "strict_timeout_ms",
+        "summarizer_provider",
+        "embed_model",
+        "summarizer_model",
+        "server_output",
+        "server_output_threshold",
+    ])
     def test_default_types(self, key, expected_type):
         """Config types should match expected types."""
         from src.jcodemunch_mcp.config import CONFIG_TYPES
@@ -199,6 +217,30 @@ class TestConfigLoading:
 
             assert get("max_folder_files") == 5000
             assert get("use_ai_summaries") is False
+
+    @pytest.mark.parametrize(
+        "configured,expected",
+        [
+            ("adaptive", "adaptive"),
+            ("raw", "raw"),
+            ("encoded", "encoded"),
+            ("auto", "adaptive"),
+            ("json", "raw"),
+            ("compact", "encoded"),
+        ],
+        ids=["adaptive", "raw", "encoded", "alias_auto", "alias_json", "alias_compact"],
+    )
+    def test_server_output_normalizes_aliases(self, configured, expected):
+        """server_output should normalize legacy aliases to user-facing values."""
+        from src.jcodemunch_mcp.config import load_config, get, _GLOBAL_CONFIG
+
+        _GLOBAL_CONFIG.clear()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.jsonc"
+            config_path.write_text(f'{{"server_output": "{configured}"}}')
+            load_config(tmpdir)
+            assert get("server_output") == expected
 
     @pytest.mark.parametrize("value,expected", [
         ('null', None),
@@ -442,6 +484,14 @@ class TestTemplateGeneration:
         for tool in _CANONICAL_TOOL_NAMES:
             assert tool in template, f"Tool '{tool}' missing from config template"
 
+    def test_template_documents_server_output_controls(self):
+        """Template should document server_output and threshold keys."""
+        from src.jcodemunch_mcp.config import generate_template
+
+        template = generate_template()
+        assert '"server_output": "adaptive"' in template
+        assert '"server_output_threshold": 0.15' in template
+
 
 class TestGetDescriptions:
     """Test get_descriptions() function."""
@@ -609,6 +659,36 @@ class TestEnvVarFallback:
             assert not any(
                 "JCODEMUNCH_TRUSTED_FOLDERS" in rec.message for rec in caplog.records
             )
+
+    @pytest.mark.parametrize(
+        "env_key,env_value,expected_key,expected_value",
+        [
+            ("JCODEMUNCH_DEFAULT_FORMAT", "compact", "server_output", "encoded"),
+            ("JCODEMUNCH_ENCODING_THRESHOLD", "0.25", "server_output_threshold", 0.25),
+        ],
+        ids=["default_format_alias", "encoding_threshold"],
+    )
+    def test_legacy_encoding_env_vars_fallback(
+        self, monkeypatch, caplog, env_key, env_value, expected_key, expected_value
+    ):
+        """Legacy encoding env vars should map through config fallback."""
+        from src.jcodemunch_mcp.config import load_config, get, _GLOBAL_CONFIG, _DEPRECATED_ENV_VARS_LOGGED
+        import logging
+
+        _GLOBAL_CONFIG.clear()
+        _DEPRECATED_ENV_VARS_LOGGED.clear()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.jsonc"
+            config_path.write_text("{}")
+
+            monkeypatch.setenv(env_key, env_value)
+
+            with caplog.at_level(logging.WARNING):
+                load_config(tmpdir)
+
+            assert get(expected_key) == expected_value
+            assert any(env_key in rec.message for rec in caplog.records)
 
 
 class TestTrustedFoldersConfig:
@@ -1470,7 +1550,17 @@ class TestConfigTypeValidation:
         ("disabled_tools", '{"tool": "name"}', ["test_summarizer"]),  # Object instead of list
         ("extra_extensions", '[".lua"]', {}),     # List instead of dict
         ("meta_fields", '{"invalid": "dict"}', []),  # Dict instead of list
-    ], ids=["bool_string", "int_float", "list_object", "dict_list", "meta_fields_dict"])
+        ("server_output", '"banana"', "adaptive"),
+        ("server_output_threshold", '-0.25', 0.15),
+    ], ids=[
+        "bool_string",
+        "int_float",
+        "list_object",
+        "dict_list",
+        "meta_fields_dict",
+        "server_output_invalid",
+        "server_output_threshold_negative",
+    ])
     def test_type_mismatch_uses_default(self, key, bad_value, expected_default):
         """Type mismatch should fall back to default."""
         from src.jcodemunch_mcp.config import load_config, get, _GLOBAL_CONFIG
@@ -1645,18 +1735,25 @@ class TestAllConfigKeys:
     """Test that all config keys can be loaded correctly."""
 
     @pytest.mark.parametrize("key", [
-        "transport", "host", "freshness_mode", "log_level"
-    ], ids=["string_transport", "string_host", "string_freshness_mode", "string_log_level"])
+        "transport", "host", "freshness_mode", "log_level", "server_output"
+    ], ids=[
+        "string_transport",
+        "string_host",
+        "string_freshness_mode",
+        "string_log_level",
+        "string_server_output",
+    ])
     def test_all_string_keys(self, key):
         """Test all string-typed config keys."""
         from src.jcodemunch_mcp.config import load_config, get, _GLOBAL_CONFIG
 
         _GLOBAL_CONFIG.clear()
         with tempfile.TemporaryDirectory() as tmpdir:
+            value = "raw" if key == "server_output" else "test_value"
             config_path = Path(tmpdir) / "config.jsonc"
-            config_path.write_text(f'{{"{key}": "test_value"}}')
+            config_path.write_text(f'{{"{key}": "{value}"}}')
             load_config(tmpdir)
-            assert get(key) == "test_value", f"Key {key} failed"
+            assert get(key) == value, f"Key {key} failed"
 
     @pytest.mark.parametrize("key", [
         "max_folder_files", "max_index_files", "staleness_days",
@@ -1748,6 +1845,21 @@ class TestAllConfigKeys:
             config_path.write_text(f'{{"{key}": {{"nested": "value"}}}}')
             load_config(tmpdir)
             assert get(key) == {"nested": "value"}, f"Key {key} failed"
+
+    @pytest.mark.parametrize("key,value", [
+        ("claude_poll_interval", 1.25),
+        ("server_output_threshold", 0.2),
+    ], ids=["float_claude_poll_interval", "float_server_output_threshold"])
+    def test_all_float_keys(self, key, value):
+        """Test all float-typed config keys."""
+        from src.jcodemunch_mcp.config import load_config, get, _GLOBAL_CONFIG
+
+        _GLOBAL_CONFIG.clear()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.jsonc"
+            config_path.write_text(f'{{"{key}": {value}}}')
+            load_config(tmpdir)
+            assert get(key) == value, f"Key {key} failed"
 
     def test_all_nullable_keys(self):
         """Test all nullable config keys accept null."""
