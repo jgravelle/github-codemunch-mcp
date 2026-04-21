@@ -64,3 +64,84 @@ def test_auto_emits_compact_on_big_response():
 def test_json_decoder_falls_through_for_json_payloads():
     raw = json.dumps({"hello": 1})
     assert decode_munch(raw) == {"hello": 1}
+
+
+def test_user_facing_format_aliases_are_supported():
+    payload, meta = encode_response("demo", _big_response(), "encoded")
+    assert meta["encoding"] != "json"
+
+    payload, meta = encode_response("demo", _big_response(), "raw")
+    assert meta["encoding"] == "json"
+    assert isinstance(payload, dict)
+
+
+def test_default_format_uses_server_output_config():
+    import jcodemunch_mcp.config as cfg
+
+    snapshot = dict(cfg._GLOBAL_CONFIG)
+    try:
+        cfg._GLOBAL_CONFIG.clear()
+        cfg._GLOBAL_CONFIG.update({"server_output": "raw", "server_output_threshold": 0.15})
+        payload, meta = encode_response("demo", _big_response())
+        assert meta["encoding"] == "json"
+
+        cfg._GLOBAL_CONFIG["server_output"] = "encoded"
+        payload, meta = encode_response("demo", _big_response())
+        assert meta["encoding"] != "json"
+    finally:
+        cfg._GLOBAL_CONFIG.clear()
+        cfg._GLOBAL_CONFIG.update(snapshot)
+
+
+def test_project_server_output_overrides_global_when_repo_provided():
+    import jcodemunch_mcp.config as cfg
+
+    repo_key = "D:/tmp/project-a"
+    g_snapshot = dict(cfg._GLOBAL_CONFIG)
+    p_snapshot = dict(cfg._PROJECT_CONFIGS)
+    try:
+        cfg._GLOBAL_CONFIG.clear()
+        cfg._GLOBAL_CONFIG.update({"server_output": "encoded", "server_output_threshold": 0.15})
+        cfg._PROJECT_CONFIGS.clear()
+        project_cfg = dict(cfg._GLOBAL_CONFIG)
+        project_cfg["server_output"] = "raw"
+        cfg._PROJECT_CONFIGS[repo_key] = project_cfg
+
+        payload, meta = encode_response("demo", _big_response(), repo=repo_key)
+        assert meta["encoding"] == "json"
+
+        payload, meta = encode_response("demo", _big_response())
+        assert meta["encoding"] != "json"
+    finally:
+        cfg._GLOBAL_CONFIG.clear()
+        cfg._GLOBAL_CONFIG.update(g_snapshot)
+        cfg._PROJECT_CONFIGS.clear()
+        cfg._PROJECT_CONFIGS.update(p_snapshot)
+
+
+def test_project_threshold_overrides_global_when_repo_provided():
+    import jcodemunch_mcp.config as cfg
+
+    repo_key = "D:/tmp/project-b"
+    g_snapshot = dict(cfg._GLOBAL_CONFIG)
+    p_snapshot = dict(cfg._PROJECT_CONFIGS)
+    try:
+        cfg._GLOBAL_CONFIG.clear()
+        cfg._GLOBAL_CONFIG.update({"server_output": "adaptive", "server_output_threshold": 1.0})
+        cfg._PROJECT_CONFIGS.clear()
+        project_cfg = dict(cfg._GLOBAL_CONFIG)
+        project_cfg["server_output_threshold"] = 0.0
+        cfg._PROJECT_CONFIGS[repo_key] = project_cfg
+
+        big = _big_response()
+        big["references"] *= 10
+        payload, meta = encode_response("demo", big, repo=repo_key)
+        assert meta["encoding"] != "json"
+
+        payload, meta = encode_response("demo", big)
+        assert meta["encoding"] == "json"
+    finally:
+        cfg._GLOBAL_CONFIG.clear()
+        cfg._GLOBAL_CONFIG.update(g_snapshot)
+        cfg._PROJECT_CONFIGS.clear()
+        cfg._PROJECT_CONFIGS.update(p_snapshot)

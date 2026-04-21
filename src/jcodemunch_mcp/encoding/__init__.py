@@ -14,14 +14,15 @@ Usage from server.py:
     else:
         text = payload
 
-`requested_format` is one of: "auto" (default), "compact", "json".
+`requested_format` supports both canonical and user-facing aliases:
+- canonical: "auto", "compact", "json"
+- aliases: "adaptive", "encoded", "raw"
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any
 
 from . import gate, generic
@@ -30,17 +31,37 @@ from .schemas import registry
 logger = logging.getLogger(__name__)
 
 _FORMATS = ("auto", "compact", "json")
+_FORMAT_ALIASES = {
+    "auto": "auto",
+    "compact": "compact",
+    "json": "json",
+    "adaptive": "auto",
+    "encoded": "compact",
+    "raw": "json",
+}
 
 
-def default_format() -> str:
-    raw = os.environ.get("JCODEMUNCH_DEFAULT_FORMAT", "auto").lower()
-    return raw if raw in _FORMATS else "auto"
+def _normalize_format(raw: str | None, fallback: str) -> str:
+    if not isinstance(raw, str):
+        return fallback
+    return _FORMAT_ALIASES.get(raw.strip().lower(), fallback)
+
+
+def default_format(repo: str | None = None) -> str:
+    try:
+        from .. import config as app_config
+
+        configured = app_config.get("server_output", "adaptive", repo=repo)
+    except Exception:
+        configured = "adaptive"
+    return _normalize_format(configured, "auto")
 
 
 def encode_response(
     tool_name: str,
     response: Any,
     requested_format: str | None = None,
+    repo: str | None = None,
 ) -> tuple[Any, dict]:
     """Return (payload, meta).
 
@@ -48,9 +69,7 @@ def encode_response(
     meta is a dict with keys: encoding, json_bytes, encoded_bytes,
     encoding_tokens_saved.
     """
-    fmt = (requested_format or default_format()).lower()
-    if fmt not in _FORMATS:
-        fmt = "auto"
+    fmt = _normalize_format(requested_format, default_format(repo=repo))
 
     if fmt == "json" or not isinstance(response, dict):
         return response, {"encoding": "json"}
@@ -68,7 +87,7 @@ def encode_response(
         return response, {"encoding": "json", "json_bytes": json_bytes}
 
     encoded_bytes = len(payload)
-    if fmt == "auto" and not gate.passes(json_bytes, encoded_bytes):
+    if fmt == "auto" and not gate.passes(json_bytes, encoded_bytes, repo=repo):
         return response, {
             "encoding": "json",
             "json_bytes": json_bytes,

@@ -59,7 +59,24 @@ ENV_VAR_MAPPING = {
     "JCODEMUNCH_PATH_MAP": "path_map",
     "JCODEMUNCH_TRUSTED_FOLDERS_ENV": "trusted_folders",
     "JCODEMUNCH_CROSS_REPO_DEFAULT": "cross_repo_default",
+    "JCODEMUNCH_DEFAULT_FORMAT": "server_output",
+    "JCODEMUNCH_ENCODING_THRESHOLD": "server_output_threshold",
 }
+
+_SERVER_OUTPUT_ALIASES = {
+    "raw": "raw",
+    "encoded": "encoded",
+    "adaptive": "adaptive",
+    # Legacy aliases kept for backward compatibility.
+    "json": "raw",
+    "compact": "encoded",
+    "auto": "adaptive",
+}
+
+
+def _normalize_server_output(value: str) -> str | None:
+    """Normalize server_output/format aliases to canonical config values."""
+    return _SERVER_OUTPUT_ALIASES.get(value.strip().lower())
 
 
 def _global_config_path() -> Path:
@@ -316,6 +333,8 @@ DEFAULTS = {
     },
     "adaptive_tiering": False,
     "compact_schemas": False,
+    "server_output": "adaptive",  # "raw", "encoded", or "adaptive"
+    "server_output_threshold": 0.15,  # Minimum savings ratio for adaptive mode
     "disabled_tools": ["test_summarizer"],
     "descriptions": {},
     "transport": "stdio",
@@ -390,6 +409,8 @@ CONFIG_TYPES = {
     "model_tier_map": dict,
     "adaptive_tiering": bool,
     "compact_schemas": bool,
+    "server_output": str,
+    "server_output_threshold": float,
     "disabled_tools": list,
     "descriptions": dict,
     "transport": str,
@@ -551,6 +572,10 @@ def _validate_type(key: str, value: Any, expected_type: type | tuple) -> bool:
         if isinstance(value, str):
             return value.lower() in {"true", "false", "auto"}
         return False
+    if key == "server_output":
+        return isinstance(value, str) and _normalize_server_output(value) is not None
+    if key == "server_output_threshold":
+        return isinstance(value, (int, float)) and 0.0 <= float(value) <= 1.0
     if isinstance(expected_type, tuple):
         return isinstance(value, expected_type)
     return isinstance(value, expected_type)
@@ -615,6 +640,10 @@ def load_config(storage_path: str | None = None) -> None:
                                     )
 
                             _GLOBAL_CONFIG[key] = list(valid_folders)
+                        elif key == "server_output" and isinstance(value, str):
+                            normalized = _normalize_server_output(value)
+                            if normalized is not None:
+                                _GLOBAL_CONFIG[key] = normalized
                         else:
                             _GLOBAL_CONFIG[key] = value
                         _explicit_keys.add(key)  # Track explicitly set keys
@@ -647,6 +676,8 @@ def _parse_env_value(value: str, expected_type: type | tuple, key: str | None = 
     # generic bool parsing would coerce "auto" to False.
     if key == "use_ai_summaries":
         return value.strip().lower()
+    if key == "server_output":
+        return _normalize_server_output(value)
     try:
         if isinstance(expected_type, tuple):
             for t in expected_type:
@@ -869,6 +900,10 @@ def load_project_config(source_root: str) -> None:
                                         )
                                     valid_folders.add(expanded_folder)
                                 merged[key] = list(valid_folders)
+                            elif key == "server_output" and isinstance(value, str):
+                                normalized = _normalize_server_output(value)
+                                if normalized is not None:
+                                    merged[key] = normalized
                             else:
                                 merged[key] = value
                         else:
@@ -1361,6 +1396,18 @@ def generate_template() -> str:
   // fuzzy_*, etc.) from tool schemas. The server still accepts them — they're just
   // hidden from the LLM to save tokens. Saves ~1-2k tokens on top of any profile.
   // "compact_schemas": false,
+
+  // === Server Output ===
+  // Controls how tool responses are emitted:
+  //   "raw"      - always emit JSON output.
+  //   "encoded"  - always emit MUNCH-encoded output.
+  //   "adaptive" - compare JSON vs MUNCH size and encode only when savings clear
+  //                the threshold below (default).
+  // Legacy aliases "json"/"compact"/"auto" are still accepted.
+  // "server_output": "adaptive",
+  // "server_output_threshold": 0.15,
+  //   Minimum savings ratio required for adaptive mode to emit MUNCH.
+  //   Example: 0.15 means encoded output must be at least 15% smaller.
 
   // === Disabled Tools ===
   // Global: tools listed here are removed from the schema entirely.
