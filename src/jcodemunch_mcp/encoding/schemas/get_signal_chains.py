@@ -3,31 +3,46 @@
 from .. import schema_driven as sd
 
 TOOLS = ("get_signal_chains",)
-ENCODING_ID = "sc1"
+ENCODING_ID = "sc2"
 
 _TABLES = [
     sd.TableSpec(
         key="chains",
         tag="c",
-        cols=["gateway", "gateway_kind", "leaves", "depth", "symbol_path"],
+        cols=[
+            "gateway", "gateway_name", "kind", "label", "depth", "reach",
+            "file_count", "chain_reach", "depth_from_gateway",
+        ],
         intern=["gateway"],
-        types={"depth": "int"},
+        types={"depth": "int", "reach": "int", "file_count": "int", "chain_reach": "int", "depth_from_gateway": "int"},
     ),
 ]
 _SCALARS = (
     "repo", "gateway_count", "chain_count", "orphan_symbols", "orphan_symbol_pct",
+    "symbol", "symbol_id", "on_no_chain", "gateway_warning",
 )
-_META = (
+_DISCOVERY_META = (
     "timing_ms", "max_depth", "include_tests",
     "symbols_on_chains", "total_functions_methods",
 )
+_LOOKUP_META = ("timing_ms", "total_gateways")
+_NO_GATEWAY_META = ("timing_ms",)
+_META = tuple(dict.fromkeys(_DISCOVERY_META + _LOOKUP_META + _NO_GATEWAY_META))
 _JSON = ("kind_summary",)
+
+
+def _meta_keys(response: dict) -> tuple[str, ...]:
+    if "gateway_warning" in response:
+        return _NO_GATEWAY_META
+    if "symbol" in response or "symbol_id" in response:
+        return _LOOKUP_META
+    return _DISCOVERY_META
 
 
 def encode(tool: str, response: dict) -> tuple[str, str]:
     return sd.encode(
         tool, response, ENCODING_ID, _TABLES, _SCALARS,
-        meta_keys=_META, json_blobs=_JSON,
+        meta_keys=_meta_keys(response), json_blobs=_JSON,
     )
 
 

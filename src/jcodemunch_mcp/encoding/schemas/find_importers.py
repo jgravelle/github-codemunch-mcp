@@ -3,31 +3,25 @@
 from .. import schema_driven as sd
 
 TOOLS = ("find_importers",)
-ENCODING_ID = "fi1"
+ENCODING_ID = "fi2"
 
 _TABLES = [
     sd.TableSpec(
         key="importers",
         tag="i",
-        cols=["file", "specifier", "line", "column"],
+        cols=["file", "specifier", "has_importers"],
         intern=["file", "specifier"],
-        types={"line": "int", "column": "int"},
-    ),
-    sd.TableSpec(
-        key="results",
-        tag="b",
-        cols=["file", "importer_count"],
-        intern=["file"],
-        types={"importer_count": "int"},
+        types={"has_importers": "bool"},
     ),
 ]
-_SCALARS = ("repo", "file", "importer_count", "note")
+_SCALARS = ("repo", "file_path", "importer_count", "note")
 _META = ("timing_ms", "truncated", "tokens_saved", "total_tokens_saved")
+_JSON = ("results",)
 
 
 def encode(tool: str, response: dict) -> tuple[str, str]:
-    return sd.encode(tool, response, ENCODING_ID, _TABLES, _SCALARS, meta_keys=_META)
+    return sd.encode(tool, response, ENCODING_ID, _TABLES, _SCALARS, meta_keys=_META, json_blobs=_JSON)
 
 
 def decode(payload: str) -> dict:
-    return sd.decode(payload, _TABLES, _SCALARS, meta_keys=_META)
+    return sd.decode(payload, _TABLES, _SCALARS, meta_keys=_META, json_blobs=_JSON)

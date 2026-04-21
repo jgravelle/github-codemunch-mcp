@@ -34,37 +34,114 @@ def test_find_references_round_trip():
     resp = {
         "repo": "acme/app",
         "identifier": "get_user",
-        "reference_count": 3,
+        "reference_count": 2,
         "references": [
-            {"file": "src/a.py", "line": 10, "column": 4, "specifier": "models.user", "kind": "import"},
-            {"file": "src/a.py", "line": 22, "column": 4, "specifier": "models.user", "kind": "import"},
-            {"file": "src/b.py", "line": 5, "column": 0, "specifier": "models.user", "kind": "import"},
+            {
+                "file": "src/a.py",
+                "matches": [
+                    {"specifier": "models.user", "match_type": "named"},
+                    {"specifier": "models.user", "match_type": "specifier_stem"},
+                ],
+            },
+            {
+                "file": "src/b.py",
+                "matches": [
+                    {"specifier": "models.user", "match_type": "named"},
+                ],
+            },
         ],
         "_meta": {"timing_ms": 3.1, "truncated": False},
     }
     out = _rt("find_references", resp)
     assert out["repo"] == "acme/app"
     assert out["identifier"] == "get_user"
-    assert len(out["references"]) == 3
+    assert isinstance(out["reference_count"], int)
+    assert out["reference_count"] == 2
+    assert len(out["references"]) == 2
     assert out["references"][0]["file"] == "src/a.py"
-    assert out["references"][0]["line"] == 10
+    assert len(out["references"][0]["matches"]) == 2
+    assert len(out["references"][1]["matches"]) == 1
+
+
+def test_find_references_empty_matches_round_trip():
+    resp = {
+        "repo": "acme/app",
+        "identifier": "get_user",
+        "reference_count": 2,
+        "references": [
+            {"file": "src/a.py", "matches": []},
+            {"file": "src/b.py", "matches": [{"specifier": "models.user", "match_type": "named"}]},
+        ],
+        "_meta": {"timing_ms": 1.0, "truncated": False},
+    }
+    out = _rt("find_references", resp)
+    assert len(out["references"]) == 2
+    assert out["references"][0]["file"] == "src/a.py"
+    assert out["references"][0]["matches"] == []
+    assert out["references"][1]["matches"][0]["match_type"] == "named"
+
+
+def test_find_references_batch_round_trip():
+    resp = {
+        "repo": "acme/app",
+        "results": [
+            {
+                "identifier": "get_user",
+                "reference_count": 2,
+                "references": [
+                    {"file": "src/a.py", "specifier": "models.user", "match_type": "named"},
+                    {"file": "src/b.py", "specifier": "models.user", "match_type": "named"},
+                ],
+            },
+        ],
+        "_meta": {"timing_ms": 2.0},
+    }
+    out = _rt("find_references", resp)
+    assert isinstance(out["results"], list)
+    assert len(out["results"]) == 1
+    assert out["results"][0]["identifier"] == "get_user"
+    assert len(out["results"][0]["references"]) == 2
 
 
 def test_find_importers_round_trip():
     resp = {
         "repo": "acme/app",
-        "file": "src/models/user.py",
+        "file_path": "src/models/user.py",
         "importer_count": 2,
         "importers": [
-            {"file": "src/api/handlers.py", "specifier": "models.user", "line": 4, "column": 0},
-            {"file": "src/api/routes.py", "specifier": "models.user", "line": 6, "column": 0},
+            {"file": "src/api/handlers.py", "specifier": "models.user", "has_importers": True},
+            {"file": "src/api/routes.py", "specifier": "models.user", "has_importers": False},
         ],
-        "_meta": {"timing_ms": 1.2},
+        "_meta": {"timing_ms": 1.2, "truncated": False},
     }
     out = _rt("find_importers", resp)
-    assert out["importer_count"] == "2"  # scalars decode as strings; acceptable
+    assert out["file_path"] == "src/models/user.py"
+    assert isinstance(out["importer_count"], int)
+    assert out["importer_count"] == 2
     assert len(out["importers"]) == 2
     assert out["importers"][0]["file"] == "src/api/handlers.py"
+    assert out["importers"][0]["has_importers"] is True
+
+
+def test_find_importers_batch_round_trip():
+    resp = {
+        "repo": "acme/app",
+        "results": [
+            {
+                "file_path": "src/models/user.py",
+                "importer_count": 1,
+                "importers": [
+                    {"file": "src/api/handlers.py", "specifier": "models.user", "has_importers": True},
+                ],
+            },
+        ],
+        "_meta": {"timing_ms": 0.9},
+    }
+    out = _rt("find_importers", resp)
+    assert isinstance(out["results"], list)
+    assert len(out["results"]) == 1
+    assert out["results"][0]["file_path"] == "src/models/user.py"
+    assert out["results"][0]["importers"][0]["has_importers"] is True
 
 
 def test_get_call_hierarchy_round_trip():
@@ -141,19 +218,22 @@ def test_get_blast_radius_round_trip():
     assert len(out["potential"]) == 1
     assert out["potential"][0]["file"] == "utils.py"
     assert out["symbol"]["name"] == "get_user"
-    assert out["overall_risk_score"] == "0.75"
+    assert isinstance(out["overall_risk_score"], float)
+    assert out["overall_risk_score"] == 0.75
 
 
 def test_get_dependency_cycles_round_trip():
     resp = {
         "repo": "acme/app",
         "cycle_count": 1,
-        "cycles": [{"length": 3, "files": "a.py->b.py->c.py->a.py"}],
+        "cycles": [["a.py", "b->c.py", "c.py"]],
         "_meta": {"timing_ms": 1.0},
     }
     out = _rt("get_dependency_cycles", resp)
     assert len(out["cycles"]) == 1
-    assert out["cycles"][0]["length"] == 3
+    assert isinstance(out["cycle_count"], int)
+    assert out["cycle_count"] == 1
+    assert out["cycles"][0] == ["a.py", "b->c.py", "c.py"]
 
 
 def test_search_text_round_trip():
@@ -345,10 +425,42 @@ def test_get_repo_outline_round_trip():
         "orphan_symbols": 0,
         "orphan_symbol_pct": 0.0,
         "chains": [
-            {"gateway": "api.handler", "gateway_kind": "http", "leaves": "svc.run", "depth": 2, "symbol_path": "api.handler->svc.run"},
-            {"gateway": "api.handler", "gateway_kind": "http", "leaves": "svc.exec", "depth": 2, "symbol_path": "api.handler->svc.exec"},
+            {
+                "gateway": "routes.py::create_user",
+                "gateway_name": "create_user",
+                "kind": "http",
+                "label": "POST /api/users",
+                "depth": 3,
+                "reach": 4,
+                "symbols": ["create_user", "validate", "save", "notify"],
+                "files_touched": ["routes.py", "validators.py", "repo.py", "mailer.py"],
+                "file_count": 4,
+            },
+            {
+                "gateway": "cli.py::seed_db",
+                "gateway_name": "seed_db",
+                "kind": "cli",
+                "label": "cli:seed-db",
+                "depth": 2,
+                "reach": 3,
+                "symbols": ["seed_db", "generate", "insert"],
+                "files_touched": ["cli.py", "factory.py", "repo.py"],
+                "file_count": 3,
+            },
         ],
-        "_meta": {"timing_ms": 5.0, "max_depth": 5},
+        "kind_summary": {"http": 1, "cli": 1},
+        "_meta": {"timing_ms": 5.0, "max_depth": 5, "include_tests": True, "symbols_on_chains": 6, "total_functions_methods": 12},
+    }),
+    ("get_signal_chains", {
+        "repo": "a/b",
+        "symbol": "validate",
+        "symbol_id": "validators.py::validate",
+        "chain_count": 1,
+        "chains": [
+            {"gateway": "routes.py::create_user", "gateway_name": "create_user", "kind": "http", "label": "POST /api/users", "chain_reach": 4, "depth_from_gateway": 1},
+        ],
+        "on_no_chain": False,
+        "_meta": {"timing_ms": 3.0, "max_depth": 5, "include_tests": False, "symbols_on_chains": 1, "total_functions_methods": 8, "total_gateways": 1},
     }),
     ("search_ast", {
         "result_count": 1,
@@ -373,9 +485,10 @@ def test_get_repo_outline_round_trip():
         "repo": "a/b",
         "plate_count": 1,
         "file_count": 2,
-        "plates": [{"label": "core", "file_count": 2, "representative": "src/core.py"}],
-        "drifter_summary": [],
-        "isolated_files": [],
+        "plates": [{"plate_id": 0, "anchor": "src/core.py", "file_count": 2, "cohesion": 0.82, "majority_directory": "src", "drifter_count": 0, "nexus_alert": False}],
+        "drifter_summary": [{"file": "src/config/loader.py", "current_directory": "src/config", "belongs_with": "src", "plate_anchor": "src/core.py"}],
+        "isolated_files": ["README.md"],
+        "signals_used": ["structural", "behavioral", "temporal"],
         "_meta": {"timing_ms": 3.0, "methodology": "tectonic"},
     }),
 ])
@@ -385,3 +498,121 @@ def test_remaining_tier1_round_trip(tool, resp):
     for table_key in ("affected_symbols", "chains", "results", "context_items", "plates"):
         if table_key in resp:
             assert table_key in out, f"{tool} lost {table_key}"
+
+
+def test_get_signal_chains_lookup_round_trip():
+    resp = {
+        "repo": "a/b",
+        "symbol": "validate",
+        "symbol_id": "validators.py::validate",
+        "chain_count": 1,
+        "chains": [
+            {"gateway": "routes.py::create_user", "gateway_name": "create_user", "kind": "http", "label": "POST /api/users", "chain_reach": 4, "depth_from_gateway": 1},
+        ],
+        "on_no_chain": False,
+        "_meta": {"timing_ms": 3.0, "max_depth": 5, "include_tests": False, "symbols_on_chains": 1, "total_functions_methods": 8, "total_gateways": 1},
+    }
+    out = _rt("get_signal_chains", resp)
+    assert out["symbol"] == "validate"
+    assert out["symbol_id"] == "validators.py::validate"
+    assert out["on_no_chain"] is False
+    assert out["chains"][0]["chain_reach"] == 4
+    assert out["chains"][0]["depth_from_gateway"] == 1
+    assert out["_meta"] == {"timing_ms": 3.0, "total_gateways": 1}
+
+
+def test_get_signal_chains_discovery_meta_shape():
+    resp = {
+        "repo": "a/b",
+        "gateway_count": 1,
+        "chain_count": 2,
+        "orphan_symbols": 0,
+        "orphan_symbol_pct": 0.0,
+        "chains": [
+            {
+                "gateway": "routes.py::create_user",
+                "gateway_name": "create_user",
+                "kind": "http",
+                "label": "POST /api/users",
+                "depth": 3,
+                "reach": 4,
+                "symbols": ["create_user", "validate", "save", "notify"],
+                "files_touched": ["routes.py", "validators.py", "repo.py", "mailer.py"],
+                "file_count": 4,
+            },
+        ],
+        "kind_summary": {"http": 1},
+        "_meta": {"timing_ms": 5.0, "max_depth": 5, "include_tests": True, "symbols_on_chains": 4, "total_functions_methods": 12},
+    }
+    out = _rt("get_signal_chains", resp)
+    assert out["_meta"] == {
+        "timing_ms": 5.0,
+        "max_depth": 5,
+        "include_tests": True,
+        "symbols_on_chains": 4,
+        "total_functions_methods": 12,
+    }
+
+
+def test_get_signal_chains_no_gateway_round_trip():
+    resp = {
+        "repo": "a/b",
+        "gateway_count": 0,
+        "chain_count": 0,
+        "chains": [],
+        "gateway_warning": "No gateways detected.",
+        "_meta": {"timing_ms": 1.0},
+    }
+    out = _rt("get_signal_chains", resp)
+    assert out["gateway_count"] == 0
+    assert out["chain_count"] == 0
+    assert out["gateway_warning"] == "No gateways detected."
+    assert isinstance(out["chains"], list)
+    assert out["chains"] == []
+    assert out["_meta"] == {"timing_ms": 1.0}
+
+
+def test_get_tectonic_map_round_trip_realistic():
+    resp = {
+        "repo": "test/repo",
+        "plate_count": 2,
+        "file_count": 6,
+        "plates": [
+            {
+                "plate_id": 0,
+                "anchor": "src/api/server.py",
+                "file_count": 3,
+                "cohesion": 0.82,
+                "files": ["src/api/server.py", "src/api/routes.py", "src/api/middleware.py"],
+                "majority_directory": "src/api",
+            },
+            {
+                "plate_id": 1,
+                "anchor": "src/db/models.py",
+                "file_count": 3,
+                "cohesion": 0.65,
+                "files": ["src/db/models.py", "src/db/queries.py", "src/config/loader.py"],
+                "majority_directory": "src/db",
+                "drifters": ["src/config/loader.py"],
+                "drifter_count": 1,
+                "nexus_alert": True,
+                "nexus_coupling_count": 4,
+                "coupled_to": {"src/api/server.py": 0.45},
+            },
+        ],
+        "isolated_files": ["README.md"],
+        "signals_used": ["structural", "behavioral", "temporal"],
+        "drifter_summary": [{"file": "src/config/loader.py", "current_directory": "src/config", "belongs_with": "src/db", "plate_anchor": "src/db/models.py"}],
+        "_meta": {"timing_ms": 15.0, "methodology": "tectonic"},
+    }
+    out = _rt("get_tectonic_map", resp)
+    assert len(out["plates"]) == 2
+    assert out["plates"][0]["plate_id"] == 0
+    assert isinstance(out["plates"][0]["cohesion"], float)
+    assert "drifter_count" not in out["plates"][0]
+    assert "nexus_alert" not in out["plates"][0]
+    assert out["plates"][1]["drifter_count"] == 1
+    assert out["plates"][1]["nexus_alert"] is True
+    assert out["drifter_summary"][0]["plate_anchor"] == "src/db/models.py"
+    assert out["isolated_files"] == ["README.md"]
+    assert out["signals_used"] == ["structural", "behavioral", "temporal"]
