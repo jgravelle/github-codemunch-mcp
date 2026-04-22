@@ -520,6 +520,62 @@ class TestSQLiteCallReferencesRoundTrip:
         assert "Corrupted decorators JSON for symbol build_pane" in caplog.text
         assert "Corrupted keywords JSON for symbol build_pane" in caplog.text
 
+    def test_v8_row_with_corrupt_data_json_keeps_row_metadata(self, tmp_path, caplog):
+        """Corrupt v8 data JSON should still fall back to row metadata columns."""
+        from jcodemunch_mcp.storage.sqlite_store import SQLiteIndexStore
+
+        store = SQLiteIndexStore(base_path=str(tmp_path / "store"))
+        db_path = tmp_path / "test.db"
+        conn = store._connect(db_path)
+
+        conn.execute(
+            "INSERT INTO symbols (id, file, name, kind, signature, summary, docstring, "
+            "line, end_line, byte_offset, byte_length, parent, qualified_name, language, "
+            "decorators, keywords, content_hash, ecosystem_context, data, cyclomatic, "
+            "max_nesting, param_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "src/ui.py::UIContainer.build_pane#method",
+                "src/ui.py",
+                "build_pane",
+                "method",
+                "def build_pane(self)",
+                "",
+                "",
+                10,
+                20,
+                0,
+                100,
+                "UIContainer",
+                "UIContainer.build_pane",
+                "python",
+                '["@cached"]',
+                '["pane"]',
+                "abc123",
+                '{"ui": "left-pane"}',
+                "{not valid json",
+                None,
+                None,
+                None,
+            ),
+        )
+        conn.commit()
+
+        rows = conn.execute("SELECT * FROM symbols").fetchall()
+        col_names = [description[0] for description in conn.execute("SELECT * FROM symbols").description]
+
+        with caplog.at_level("WARNING"):
+            row_dict = dict(zip(col_names, rows[0]))
+            result = store._row_to_symbol_dict(row_dict)
+
+        assert result["qualified_name"] == "UIContainer.build_pane"
+        assert result["language"] == "python"
+        assert result["decorators"] == ["@cached"]
+        assert result["keywords"] == ["pane"]
+        assert result["content_hash"] == "abc123"
+        assert result["ecosystem_context"] == '{"ui": "left-pane"}'
+        assert result["call_references"] == []
+        assert "Corrupted JSON in symbol data column for row build_pane" in caplog.text
+
     def test_v7_index_loads_with_call_references_defaulting_to_empty(self, tmp_path):
         """Old v7 index (no call_references field) loads with call_references=[]."""
         from jcodemunch_mcp.storage.sqlite_store import SQLiteIndexStore

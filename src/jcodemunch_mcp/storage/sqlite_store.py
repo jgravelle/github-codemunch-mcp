@@ -1651,7 +1651,8 @@ class SQLiteIndexStore:
                 data = json.loads(row["data"])
             except (json.JSONDecodeError, ValueError):
                 logger.warning("Corrupted JSON in symbol data column for row %s, skipping legacy fields", row["name"])
-                data = {}
+                # Keep corrupt v8 rows on the array path so row-backed metadata still loads.
+                data = []
             if isinstance(data, list):
                 # v8: data column contains call_references as JSON array
                 # Read metadata from row columns (not from data, which is an array)
