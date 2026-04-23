@@ -2,6 +2,18 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.73.1] — 2026-04-23
+
+### Fixed
+- **Register `get_watch_status` in tier bundles, config template, and CLAUDE.md
+  snippet.** v1.73.0 added the tool to `_CANONICAL_TOOL_NAMES` and
+  `_TOOL_TIER_STANDARD` but missed `DEFAULTS["tool_tier_bundles"]["standard"]`,
+  `generate_template()`'s `all_tools` list, and the Utilities category in
+  `_generate_claude_md_snippet()`. Effect on 1.73.0 users: `get_watch_status`
+  was invisible in the `standard` tier, absent from new config templates, and
+  absent from generated CLAUDE.md snippets. CI now guards this via
+  `test_all_canonical_tools_accounted_in_tier_bundles`.
+
 ## [1.73.0] — 2026-04-23
 
 ### Added
