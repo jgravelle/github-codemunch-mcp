@@ -71,7 +71,7 @@ def _matches_any_pattern(file_path: str, patterns: list[str]) -> bool:
 
 def _has_entry_point_decorator(sym: dict) -> bool:
     for dec in sym.get("decorators") or []:
-        if _ENTRY_POINT_DECORATOR_RE.search(str(dec)):
+        if ENTRY_POINT_DECORATOR_RE.search(str(dec)):
             return True
     return False
 

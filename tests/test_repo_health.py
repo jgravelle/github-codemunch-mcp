@@ -89,3 +89,25 @@ class TestGetRepoHealth:
         result = get_repo_health(repo=repo, storage_path=store)
         assert "fn_method_count" in result
         assert result["fn_method_count"] >= 0
+
+    def test_no_nameerror_when_decorators_present(self, tmp_path):
+        """Regression: v1.73.1 raised NameError on _ENTRY_POINT_DECORATOR_RE
+        when any symbol carried a decorator. Fixture must trigger the
+        decorator-skip branch in dead-code analysis."""
+        src = tmp_path / "src"
+        src.mkdir()
+        store = tmp_path / "store"
+        store.mkdir()
+        (src / "app.py").write_text(
+            "from flask import Flask\n"
+            "app = Flask(__name__)\n\n"
+            "@app.route('/health')\n"
+            "def health():\n    return 'ok'\n\n"
+            "@app.route('/items')\n"
+            "def items():\n    return []\n"
+        )
+        r = index_folder(str(src), use_ai_summaries=False, storage_path=str(store))
+        assert r["success"] is True
+        result = get_repo_health(repo=r["repo"], storage_path=str(store))
+        assert "error" not in result, result
+        assert "summary" in result

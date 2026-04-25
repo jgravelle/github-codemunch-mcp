@@ -211,7 +211,7 @@ def get_dead_code_v2(
             continue
 
         # Skip symbols with entry-point decorators
-        if any(_ENTRY_POINT_DECORATOR_RE.search(str(d)) for d in (sym.get("decorators") or [])):
+        if any(ENTRY_POINT_DECORATOR_RE.search(str(d)) for d in (sym.get("decorators") or [])):
             continue
 
         signals: list[str] = []

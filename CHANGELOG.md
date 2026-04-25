@@ -2,6 +2,19 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.73.2] — 2026-04-25
+
+### Fixed
+- **`get_repo_health` raised `NameError: _ENTRY_POINT_DECORATOR_RE is not defined`
+  whenever any analysed symbol carried a decorator.** The constant was imported
+  correctly as `ENTRY_POINT_DECORATOR_RE` (no leading underscore) from
+  `parser/context/_route_utils.py`, but two call sites referenced
+  `_ENTRY_POINT_DECORATOR_RE` (typo). Fixed in
+  `tools/find_dead_code.py:74` and `tools/get_dead_code_v2.py:214`.
+  Existing tests didn't catch the regression because their fixtures used
+  bare functions; new test `test_no_nameerror_when_decorators_present`
+  exercises the decorator-skip branch with an `@app.route` symbol.
+
 ## [1.73.1] — 2026-04-23
 
 ### Fixed
