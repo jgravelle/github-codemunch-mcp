@@ -4287,21 +4287,30 @@ async def run_streamable_http_server(host: str, port: int):
     _sessions: dict[str, StreamableHTTPServerTransport] = {}
     _session_tasks: dict[str, asyncio.Task] = {}  # type: ignore[type-arg]
 
-    async def handle_mcp(scope, receive, send):
-        request = Request(scope, receive, send)
+    # Sentinel response: transport.handle_request() already wrote to the ASGI
+    # send callable, so Starlette's endpoint wrapper must not send anything
+    # else.  Returning this instead of None prevents the "NoneType is not
+    # callable" TypeError.
+    class _AlreadySent:
+        async def __call__(self, scope, receive, send):
+            pass
+
+    _ALREADY_SENT = _AlreadySent()
+
+    async def handle_mcp(request: Request):
         session_id = request.headers.get(MCP_SESSION_ID_HEADER)
 
         # Route to existing session if client sent a session ID we recognise.
         if session_id and session_id in _sessions:
             transport = _sessions[session_id]
-            await transport.handle_request(scope, receive, send)
+            await transport.handle_request(request.scope, request.receive, request._send)
             # Clean up terminated sessions (e.g. after DELETE).
             if transport._terminated:
                 _sessions.pop(session_id, None)
                 task = _session_tasks.pop(session_id, None)
                 if task and not task.done():
                     task.cancel()
-            return
+            return _ALREADY_SENT
 
         # New session — generate a unique ID so the transport enforces it on
         # all subsequent requests, preventing cross-session pollution.
@@ -4340,15 +4349,14 @@ async def run_streamable_http_server(host: str, port: int):
             _sessions.pop(new_id, None)
             _session_tasks.pop(new_id, None)
             from starlette.responses import Response as StarletteResponse
-            err = StarletteResponse("Session setup timed out", status_code=500)
-            await err(scope, receive, send)
-            return
+            return StarletteResponse("Session setup timed out", status_code=500)
 
         try:
-            await transport.handle_request(scope, receive, send)
+            await transport.handle_request(request.scope, request.receive, request._send)
         except Exception:
             task.cancel()
             raise
+        return _ALREADY_SENT
 
     middleware = []
     auth_mw = _make_auth_middleware()
@@ -4360,7 +4368,7 @@ async def run_streamable_http_server(host: str, port: int):
 
     starlette_app = Starlette(
         routes=[
-            Route("/mcp", app=handle_mcp),
+            Route("/mcp", endpoint=handle_mcp, methods=["GET", "POST", "DELETE"]),
         ],
         middleware=middleware,
     )
