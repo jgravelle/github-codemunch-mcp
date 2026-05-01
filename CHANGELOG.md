@@ -2,6 +2,27 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.80.3] — 2026-04-30 — WorktreeRemove hook fix (PR #270)
+
+### Fixed
+- **`WorktreeRemove` hook never actually removed the worktree** (#269,
+  DrHayt). Two independent bugs in `cli/hook_event.py`:
+  1. The legacy early-return for `worktree_path` in the payload skipped
+     git commands entirely on `remove` — only the manifest was written.
+     The legacy contract ("caller already owns the worktree, just record
+     it") only ever made sense for `create`. Fix: gate the early-return
+     on `event_type == "create"`.
+  2. `git -C cwd worktree remove` ran from inside the worktree being
+     removed, because Claude Code's session `cwd` *is* the worktree.
+     git refuses to remove a worktree from inside itself. Fix: new
+     `_resolve_main_repo()` helper resolves the main repo via
+     `git rev-parse --path-format=absolute --git-common-dir`, falls back
+     to `cwd` on failure. Both `git worktree remove` and `git branch -D`
+     now run from the main repo root.
+- When `worktree_path` is provided without `name`, the branch name
+  (`worktree-<name>`) is derived from the path basename for cleanup.
+- Two new tests in `tests/test_watch_claude.py` pin both regressions.
+
 ## [1.80.2] — 2026-04-30 — streamable-http TypeError fix (PR #268)
 
 ### Fixed
