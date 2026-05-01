@@ -4287,13 +4287,14 @@ async def run_streamable_http_server(host: str, port: int):
     _sessions: dict[str, StreamableHTTPServerTransport] = {}
     _session_tasks: dict[str, asyncio.Task] = {}  # type: ignore[type-arg]
 
-    async def handle_mcp(request: Request):
+    async def handle_mcp(scope, receive, send):
+        request = Request(scope, receive, send)
         session_id = request.headers.get(MCP_SESSION_ID_HEADER)
 
         # Route to existing session if client sent a session ID we recognise.
         if session_id and session_id in _sessions:
             transport = _sessions[session_id]
-            await transport.handle_request(request.scope, request.receive, request._send)
+            await transport.handle_request(scope, receive, send)
             # Clean up terminated sessions (e.g. after DELETE).
             if transport._terminated:
                 _sessions.pop(session_id, None)
@@ -4340,11 +4341,11 @@ async def run_streamable_http_server(host: str, port: int):
             _session_tasks.pop(new_id, None)
             from starlette.responses import Response as StarletteResponse
             err = StarletteResponse("Session setup timed out", status_code=500)
-            await err(request.scope, request.receive, request._send)
+            await err(scope, receive, send)
             return
 
         try:
-            await transport.handle_request(request.scope, request.receive, request._send)
+            await transport.handle_request(scope, receive, send)
         except Exception:
             task.cancel()
             raise
@@ -4359,7 +4360,7 @@ async def run_streamable_http_server(host: str, port: int):
 
     starlette_app = Starlette(
         routes=[
-            Route("/mcp", endpoint=handle_mcp, methods=["GET", "POST", "DELETE"]),
+            Route("/mcp", app=handle_mcp, methods=["GET", "POST", "DELETE"]),
         ],
         middleware=middleware,
     )
