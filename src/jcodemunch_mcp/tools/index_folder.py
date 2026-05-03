@@ -200,6 +200,77 @@ from ._indexing_pipeline import (
 from .package_registry import extract_package_names as _extract_package_names
 
 
+def _scan_package_json_forced_paths(folder_path: Path) -> set[str]:
+    """Pre-scan ``package.json`` files under ``folder_path`` to collect the
+    absolute paths of files referenced by ``main``/``module``/``exports``/
+    ``bin``. These paths are exempted from the per-file size cap during
+    indexing so a JS library's own entry point can never be silently
+    skipped for being too large (issue #25 / lodash 4.x: ``lodash.js`` is
+    548 KB and was excluded by the 500 KB default cap, leaving the package
+    invisible to dead-code analysis).
+    """
+    import json as _json
+    forced: set[str] = set()
+    try:
+        for pkg in folder_path.rglob("package.json"):
+            # Skip nested node_modules — only honour first-party manifests.
+            if "node_modules" in pkg.parts:
+                continue
+            try:
+                content = pkg.read_text(encoding="utf-8", errors="replace")
+                data = _json.loads(content)
+            except (OSError, ValueError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            candidates: list[str] = []
+            for key in ("main", "module", "browser"):
+                v = data.get(key)
+                if isinstance(v, str):
+                    candidates.append(v)
+            exports = data.get("exports")
+            if isinstance(exports, str):
+                candidates.append(exports)
+            elif isinstance(exports, dict):
+                def _walk_exports(node):
+                    if isinstance(node, str):
+                        candidates.append(node)
+                    elif isinstance(node, dict):
+                        for v in node.values():
+                            _walk_exports(v)
+                _walk_exports(exports)
+            bins = data.get("bin")
+            if isinstance(bins, str):
+                candidates.append(bins)
+            elif isinstance(bins, dict):
+                candidates.extend(v for v in bins.values()
+                                  if isinstance(v, str))
+            pkg_dir = pkg.parent
+            for cand in candidates:
+                cand = cand.lstrip("./")
+                target = (pkg_dir / cand).resolve()
+                # If extension-less, try common JS/TS extensions and index
+                # variants so we resolve to a concrete file on disk.
+                if target.is_file():
+                    forced.add(str(target))
+                    continue
+                for ext in (".js", ".ts", ".mjs", ".cjs", ".jsx", ".tsx"):
+                    trial = pkg_dir / f"{cand}{ext}"
+                    if trial.is_file():
+                        forced.add(str(trial.resolve()))
+                        break
+                else:
+                    for sub in ("/index.js", "/index.ts", "/index.mjs",
+                                "/index.cjs"):
+                        trial = pkg_dir / f"{cand}{sub}"
+                        if trial.is_file():
+                            forced.add(str(trial.resolve()))
+                            break
+    except OSError:
+        pass
+    return forced
+
+
 def discover_local_files(
     folder_path: Path,
     max_files: Optional[int] = None,
@@ -262,6 +333,10 @@ def discover_local_files(
             extra_spec = pathspec.PathSpec.from_lines("gitignore", effective_extra)
         except Exception:
             pass
+
+    # Pre-scan package.json files; their `main`/`module`/`exports`/`bin`
+    # targets get the size-cap exemption. Built once before the walk.
+    forced_paths = _scan_package_json_forced_paths(root)
 
     skip_dirs_regex = _build_skip_dirs_regex()
     for dirpath, dirnames, filenames in os.walk(str(root), followlinks=False):
@@ -358,9 +433,11 @@ def discover_local_files(
                 logger.debug("SKIP wrong_extension: %s", rel_path)
                 continue
 
-            # Size limit
+            # Size limit — exempt files referenced by a package.json
+            # main/module/exports/bin field (issue #25).
             try:
-                if file_path.stat().st_size > max_size:
+                size = file_path.stat().st_size
+                if size > max_size and resolved_str not in forced_paths:
                     skip_counts["too_large"] += 1
                     logger.debug("SKIP too_large: %s", rel_path)
                     continue

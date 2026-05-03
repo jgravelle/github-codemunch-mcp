@@ -2,6 +2,49 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.80.9] — 2026-05-03 — Lodash-class repos: force-include + call-graph fallback
+
+### Fixed
+- **Files referenced by `package.json` `main`/`module`/`exports`/`bin`
+  are now indexed regardless of the per-file size cap.** Surfaced by
+  the sverklo bench rerun (issue #25, lodash recall=0). Lodash 4.17.21
+  ships as a single 17K-line UMD/IIFE; `lodash.js` is 548 KB; the
+  500 KB default cap silently excluded it from the index, leaving every
+  published method invisible to dead-code analysis. New
+  `_scan_package_json_forced_paths` helper pre-scans manifests under the
+  index root (skipping `node_modules`), resolves `main`/`module`/`exports`/
+  `bin` targets (handles string, conditional, subpath, and bin-dict
+  shapes), and exempts those files from `discover_local_files`'s size
+  check.
+- **`get_dead_code_v2` no longer errors out when `index.imports` is
+  empty.** Single-file projects, pre-bundled libraries, and monolithic
+  IIFEs have no inter-file imports — the standard 3-signal analyzer has
+  no graph to walk. Pre-1.80.9 returned `{"error": "No import data..."}`,
+  which rendered the tool useless on these repos. Now falls through to
+  a call-graph-only mode (`_call_graph_only_dead_code`): symbols whose
+  names appear in nobody's `call_references` are flagged with a single
+  `no_callers` signal at fixed 0.5 confidence. `_meta.mode =
+  "call_graph_only"` + an explanatory `_meta.warning` make the weaker
+  evidence visible to callers.
+
+### Tests
+- 9 new regression tests in `tests/test_v1_80_9_lodash_class.py`:
+  `_scan_package_json_forced_paths` covers `main`, extension-less paths,
+  `exports` dict, `bin` dict, `node_modules` skip, malformed-JSON
+  resilience; `TestSizeCapExemption` verifies a 600 KB main file is
+  indexed despite the 500 KB cap; `TestCallGraphOnlyFallback` covers
+  the no-error guarantee end-to-end and the helper's signal/confidence
+  output via a synthetic index.
+- Suite: **3724 passing** (+9 from 3715), 7 skipped.
+
+### Verified against lodash 4.17.21
+- v1.80.8: 26 files, 213 symbols, `lodash.js` skipped, 89 mostly-noise
+  dead candidates from `fp/_baseConvert.js`.
+- v1.80.9: 27 files, 706 symbols (+493), `lodash.js` indexed via
+  package.json forced path, 89 dead candidates now meaningful (perf
+  benchmarking helpers, build-script utilities) — published methods no
+  longer in the dead list.
+
 ## [1.80.8] — 2026-05-03 — find_dead_code v1: package.json entry-point parity
 
 ### Fixed

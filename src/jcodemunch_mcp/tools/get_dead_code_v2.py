@@ -305,7 +305,17 @@ def get_dead_code_v2(
     if index is None:
         return {"error": f"No index found for {repo!r}. Run index_folder first."}
     if not index.imports:
-        return {"error": "No import data in index. Re-index with a recent version."}
+        # 1.80.9+: when there's no import graph (single-file libs like
+        # pre-bundled lodash 4.x, monolithic IIFEs, etc.), fall through
+        # to call-graph-only mode rather than erroring out. Reports
+        # symbols whose names appear nowhere in any indexed function's
+        # call_references.
+        return _call_graph_only_dead_code(
+            index, owner, name, t0,
+            include_tests=include_tests,
+            max_results=max_results,
+            file_pattern=file_pattern,
+        )
 
     source_files = frozenset(index.source_files)
     alias_map = getattr(index, "alias_map", {}) or {}
@@ -477,3 +487,115 @@ def _is_test_file(file_path: str) -> bool:
         or fn.startswith("test_") or fn.endswith("_test.py")
         or fn == "conftest.py"
     )
+
+
+def _call_graph_only_dead_code(
+    index,
+    owner: str,
+    name: str,
+    t0: float,
+    include_tests: bool = False,
+    max_results: int = 100,
+    file_pattern: Optional[str] = None,
+) -> dict:
+    """Fallback dead-code detection when ``index.imports`` is empty.
+
+    Single-file libraries (pre-bundled lodash 4.x, monolithic IIFEs,
+    minified-then-indexed bundles) have no inter-file imports — the
+    main 3-signal analyzer can't run. This mode falls back to the
+    call-graph signal: a function whose name appears nowhere in any
+    indexed function's ``call_references`` is a dead candidate.
+
+    The result is intentionally lower-confidence than the 3-signal
+    output; ``_meta.mode = "call_graph_only"`` flags this so callers
+    can interpret. Each returned symbol has a single signal
+    (``no_callers``); ``confidence`` is fixed at 0.5 to reflect the
+    weaker evidence (cf. 3-signal where each signal is worth 1/3).
+    """
+    import fnmatch
+
+    get_callers = getattr(index, "get_callers_by_name", None)
+    if not get_callers:
+        return {
+            "repo": f"{owner}/{name}",
+            "dead_symbols": [],
+            "total_analysed": 0,
+            "_meta": {
+                "mode": "unavailable",
+                "warning": (
+                    "No import data and no call-references index. "
+                    "Re-index with jcodemunch-mcp >= 1.78.0 (INDEX_VERSION 8) "
+                    "to enable AST call-reference indexing."
+                ),
+                "timing_ms": round((time.monotonic() - t0) * 1000, 1),
+            },
+        }
+
+    callers_by_name = get_callers() or {}
+    # Names that have at least one caller in the indexed call graph.
+    called_names: set[str] = {ref for (_caller_file, ref) in callers_by_name.keys()}
+
+    dead_symbols: list[dict] = []
+    seen: set[str] = set()
+    total_analysed = 0
+
+    for sym in index.symbols:
+        if sym.get("kind") not in ("function", "method"):
+            continue
+        sid = sym.get("id", "")
+        if not sid or sid in seen:
+            continue
+        sym_file = sym.get("file", "")
+        sym_name = sym.get("name", "")
+        if not sym_name or not sym_file:
+            continue
+        if not include_tests and _is_test_file(sym_file):
+            continue
+        if file_pattern and not fnmatch.fnmatch(sym_file, file_pattern):
+            continue
+        # Skip entry-point decorated symbols (Flask routes, click commands etc.)
+        if any(ENTRY_POINT_DECORATOR_RE.search(str(d))
+               for d in (sym.get("decorators") or [])):
+            continue
+        total_analysed += 1
+        if sym_name in called_names:
+            continue
+        seen.add(sid)
+        dead_symbols.append({
+            "id": sid,
+            "name": sym_name,
+            "kind": sym.get("kind", ""),
+            "file": sym_file,
+            "line": sym.get("line", 0),
+            "confidence": 0.5,
+            "signals": ["no_callers"],
+        })
+
+    dead_symbols.sort(key=lambda x: (x["file"], x["line"]))
+
+    total_matches = len(dead_symbols)
+    truncated = False
+    if max_results and max_results > 0 and total_matches > max_results:
+        dead_symbols = dead_symbols[:max_results]
+        truncated = True
+
+    return {
+        "repo": f"{owner}/{name}",
+        "dead_symbols": dead_symbols,
+        "total_analysed": total_analysed,
+        "_meta": {
+            "mode": "call_graph_only",
+            "warning": (
+                "Import graph is empty (single-file project, monolithic "
+                "bundle, or pre-tree-shaken library). Falling back to "
+                "call-graph-only analysis: a function with no callers "
+                "elsewhere in the indexed call graph is treated as a dead "
+                "candidate. Confidence is fixed at 0.5 to reflect the "
+                "single-signal nature; expect more false positives than "
+                "the standard 3-signal mode."
+            ),
+            "timing_ms": round((time.monotonic() - t0) * 1000, 1),
+            "total_matches": total_matches,
+            "truncated": truncated,
+        },
+    }
