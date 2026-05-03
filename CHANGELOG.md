@@ -2,6 +2,22 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.80.6] — 2026-05-03 — config --check accepts the documented one-line form
+
+### Fixed
+- **`config --check` flagged the README's documented one-line CLAUDE.md
+  setup as invalid (issue #271).** The README recommends a single line —
+  `Call the jcodemunch_guide tool and strictly follow its instructions.` —
+  because the `jcodemunch_guide` tool returns the version-pinned tool
+  policy at runtime. The drift checker, however, was greping CLAUDE.md
+  for every canonical tool name and reporting 65 missing tools, pushing
+  users back toward the large generated snippet.
+- The CLAUDE.md drift check now treats any mention of `jcodemunch_guide`
+  in CLAUDE.md as a valid one-line setup and skips the per-tool grep.
+  When the full canonical list **is** missing and the one-line form is
+  also absent, the warning now also mentions the one-line alternative.
+- New regression test: `test_check_passes_with_one_line_jcodemunch_guide_form`.
+
 ## [1.80.5] — 2026-05-02 — Hook PATH fix on macOS/Linux
 
 ### Fixed

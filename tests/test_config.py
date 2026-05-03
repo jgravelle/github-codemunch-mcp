@@ -1203,6 +1203,24 @@ class TestClaudeMdDriftCheck:
             assert "not mentioned in CLAUDE.md" in out
             assert "claude-md --generate" in out
 
+    def test_check_passes_with_one_line_jcodemunch_guide_form(self, capsys, monkeypatch):
+        """check should pass when CLAUDE.md uses the documented one-line form
+        ('Call the jcodemunch_guide tool ...') without listing every tool — the
+        guide returns the version-pinned policy at runtime. Issue #271."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fn = self._run_check(
+                monkeypatch, tmpdir,
+                claude_md_content=(
+                    "Call the jcodemunch_guide tool and "
+                    "strictly follow its instructions.\n"
+                ),
+            )
+            fn(check=True)
+            out = capsys.readouterr().out
+            assert "All checks passed" in out
+            assert "not mentioned in CLAUDE.md" not in out
+            assert "one-line form" in out
+
     def test_check_warns_when_claude_md_absent(self, capsys, monkeypatch):
         """check should warn (not error) when CLAUDE.md is not found."""
         with tempfile.TemporaryDirectory() as tmpdir:

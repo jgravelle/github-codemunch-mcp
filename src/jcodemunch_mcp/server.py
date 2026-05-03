@@ -4892,17 +4892,26 @@ def _run_config(check: bool = False, init: bool = False, upgrade: bool = False) 
         if claude_md_path.exists():
             try:
                 cm_content = claude_md_path.read_text(encoding="utf-8", errors="replace")
-                missing_in_cm = [t for t in canonical_tools if t not in cm_content]
-                if missing_in_cm:
-                    # Wrap into ~60-char lines for readability
-                    _wrapped = _wrap_names(missing_in_cm)
-                    print(f"  {yellow(WARN)} {len(missing_in_cm)} tool(s) not mentioned in CLAUDE.md:")
-                    for _line in _wrapped:
-                        print(f"       {dim(_line)}")
-                    print(f"  {dim('  Run: jcodemunch-mcp claude-md --generate  (or --format=append for delta only)')}")
-                    issues.append("claude_md")
+                # The README documents a supported one-line form: "Call the
+                # jcodemunch_guide tool and strictly follow its instructions."
+                # That tool returns the per-version policy at runtime, so the
+                # full canonical tool list is not expected to appear in CLAUDE.md.
+                # Treat any mention of jcodemunch_guide as valid setup.
+                if "jcodemunch_guide" in cm_content:
+                    print(f"  {green(CHECK)} CLAUDE.md uses jcodemunch_guide one-line form (version-pinned at runtime)")
                 else:
-                    print(f"  {green(CHECK)} All {len(canonical_tools)} tools mentioned in CLAUDE.md")
+                    missing_in_cm = [t for t in canonical_tools if t not in cm_content]
+                    if missing_in_cm:
+                        # Wrap into ~60-char lines for readability
+                        _wrapped = _wrap_names(missing_in_cm)
+                        print(f"  {yellow(WARN)} {len(missing_in_cm)} tool(s) not mentioned in CLAUDE.md:")
+                        for _line in _wrapped:
+                            print(f"       {dim(_line)}")
+                        print(f"  {dim('  Run: jcodemunch-mcp claude-md --generate  (or --format=append for delta only)')}")
+                        print(f"  {dim('  Or use the one-line form: add `Call the jcodemunch_guide tool and strictly follow its instructions.` to CLAUDE.md')}")
+                        issues.append("claude_md")
+                    else:
+                        print(f"  {green(CHECK)} All {len(canonical_tools)} tools mentioned in CLAUDE.md")
             except Exception as _e:
                 print(f"  {yellow(WARN)} Could not read CLAUDE.md: {_e}")
         else:
