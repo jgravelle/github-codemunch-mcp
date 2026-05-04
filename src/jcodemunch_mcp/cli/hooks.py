@@ -154,6 +154,78 @@ def run_posttooluse() -> int:
     return 0
 
 
+def run_copilot_posttooluse() -> int:
+    """GitHub Copilot ``postToolUse`` hook: auto-index files after Edit/Write.
+
+    Adapter for the Copilot CLI / cloud-agent hook payload shape, which
+    differs from Claude Code's:
+
+    Copilot stdin JSON::
+
+        {
+            "timestamp": "...",
+            "cwd": "...",
+            "toolName": "edit" | "write" | "create_file" | ...,
+            "toolArgs": "{\\"path\\": \\"/abs/path/to/file.py\\", ...}",
+            "toolResult": "..."
+        }
+
+    ``toolArgs`` arrives as a JSON-encoded **string**, not a nested object.
+    Tool names vary across Copilot tool implementations, so we extract a
+    file path heuristically: any value at the top level of toolArgs whose
+    key matches ``path``/``file_path``/``filename``/``filePath`` and points
+    at an existing file. If the file is a code file under a directory that
+    has been indexed, spawn ``jcodemunch-mcp index-file <path>`` as a
+    fire-and-forget background process. Errors are swallowed silently —
+    Copilot ignores postToolUse stdout/exit code, so a failing reindex
+    must never disrupt the agent flow.
+    """
+    try:
+        data = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        return 0
+
+    tool_args_raw = data.get("toolArgs", "")
+    if isinstance(tool_args_raw, str):
+        try:
+            tool_args = json.loads(tool_args_raw) if tool_args_raw else {}
+        except (json.JSONDecodeError, ValueError):
+            return 0
+    elif isinstance(tool_args_raw, dict):
+        tool_args = tool_args_raw
+    else:
+        return 0
+
+    file_path = ""
+    for key in ("file_path", "filePath", "path", "filename"):
+        v = tool_args.get(key)
+        if isinstance(v, str) and v:
+            file_path = v
+            break
+    if not file_path:
+        return 0
+
+    _, ext = os.path.splitext(file_path)
+    if ext.lower() not in _CODE_EXTENSIONS:
+        return 0
+
+    try:
+        kwargs: dict = dict(
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if sys.platform == "win32":
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+        subprocess.Popen(
+            ["jcodemunch-mcp", "index-file", file_path],
+            **kwargs,
+        )
+    except (OSError, FileNotFoundError):
+        pass
+
+    return 0
+
+
 def run_precompact() -> int:
     """PreCompact hook: generate session snapshot before context compaction.
 

@@ -1,0 +1,70 @@
+{
+  "name": "jcodemunch-mcp-vscode",
+  "displayName": "jCodeMunch — Auto Reindex on Save",
+  "description": "Auto-reindexes saved files via jcodemunch-mcp. Keeps the code index fresh when editing in VS Code under Copilot, Continue, Cline, or any MCP client without its own PostToolUse hook.",
+  "version": "0.1.0",
+  "publisher": "jgravelle",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jgravelle/jcodemunch-mcp",
+    "directory": "vscode-extension"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "jCodeMunch",
+      "properties": {
+        "jcodemunch.indexOnSave.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-run `jcodemunch-mcp index-file <path>` on file save."
+        },
+        "jcodemunch.indexOnSave.command": {
+          "type": "string",
+          "default": "jcodemunch-mcp",
+          "description": "Path to the jcodemunch-mcp executable (defaults to looking on PATH)."
+        },
+        "jcodemunch.indexOnSave.debounceMs": {
+          "type": "number",
+          "default": 500,
+          "description": "Per-file debounce window in milliseconds — rapid successive saves of the same file collapse into a single reindex."
+        },
+        "jcodemunch.indexOnSave.exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/dist/**",
+            "**/build/**",
+            "**/.venv/**",
+            "**/venv/**",
+            "**/__pycache__/**",
+            "**/*.min.*"
+          ],
+          "description": "Glob patterns for files to skip on save."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}

@@ -2,6 +2,44 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.81.0] — 2026-05-04 — VS Code extension, GitHub Copilot hooks, upgrade command
+
+### Added
+- **VS Code extension (`vscode-extension/`)** — new sibling project that
+  listens for `onDidSaveTextDocument` and shells out to
+  `jcodemunch-mcp index-file <path>` so the index stays fresh while you
+  edit in any MCP client running inside VS Code (Copilot Chat, Continue,
+  Cline, Roo Code, …). Per-file debounce, configurable command path,
+  and an exclude-glob list. Installs via VSIX from source today;
+  marketplace publish is queued. Closes the parallel-sessions
+  staleness gap from issue #273.
+- **`jcodemunch-mcp init --copilot-hooks`** — writes
+  `.github/hooks/hooks.json` with a `postToolUse` rule so GitHub Copilot
+  CLI / cloud-agent runs auto-reindex edited files. Idempotent: re-runs
+  detect existing rules and append-or-skip.
+- **`jcodemunch-mcp hook-copilot-posttooluse`** subcommand — adapter
+  that parses Copilot's stdin payload (toolArgs as JSON-string) and
+  spawns `index-file` for code-file edits. Mirrors the existing Claude
+  Code `hook-posttooluse` handler.
+- **`jcodemunch-mcp upgrade`** — single command that wraps
+  `pip install -U jcodemunch-mcp` + `init --hooks --yes` so users no
+  longer need to remember the two-step post-release path. `--no-pip`
+  flag for users who want only the config refresh.
+- **Server-startup version-drift probe** — on `serve` start, compares
+  the installed version against the version recorded by the last
+  `init` run. Logs a warning if they differ so stale hook templates
+  surface immediately rather than silently breaking. Stamp file at
+  `~/.code-index/last_init_version.txt`.
+
+### Tests
+- `tests/test_copilot_hook.py` — 6 cases covering the Copilot stdin
+  shape (string-encoded toolArgs, dict toolArgs, alternate path keys,
+  non-code skip, invalid JSON).
+- `tests/test_install_copilot_hooks.py` — 4 cases covering create /
+  idempotent re-run / append-to-existing / dry-run.
+
+3645 tests passing.
+
 ## [1.80.10] — 2026-05-04 — get_dead_code_v2: same-file caller detection
 
 ### Fixed

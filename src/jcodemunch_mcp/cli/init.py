@@ -637,6 +637,87 @@ def install_hooks(*, dry_run: bool = False, backup: bool = True) -> str:
     return f"  added {', '.join(added)} hooks to {path}"
 
 
+def _install_version_path() -> Path:
+    """Path to the file recording the jcodemunch-mcp version that last ran ``init``."""
+    base = Path(os.environ.get("CODE_INDEX_PATH", str(Path.home() / ".code-index")))
+    return base / "last_init_version.txt"
+
+
+def _stamp_install_version() -> None:
+    """Record the currently-installed jcodemunch-mcp version.
+
+    Used by the server-startup version probe to detect when the package
+    has been upgraded but ``init`` has not been re-run (so hooks/config
+    may be stale).
+    """
+    from .. import __version__
+    path = _install_version_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(__version__.strip(), encoding="utf-8")
+
+
+def read_install_version() -> Optional[str]:
+    """Read the version recorded by the last ``init`` run, if any."""
+    path = _install_version_path()
+    try:
+        return path.read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+
+
+def install_copilot_hooks(*, dry_run: bool = False, backup: bool = True) -> str:
+    """Write a ``.github/hooks/hooks.json`` for GitHub Copilot CLI / cloud agent.
+
+    Generates a postToolUse hook that invokes
+    ``jcodemunch-mcp hook-copilot-posttooluse`` so that file edits made
+    by Copilot trigger an automatic re-index, parallel to the Claude
+    Code PostToolUse handling.
+
+    The file is written at ``<cwd>/.github/hooks/hooks.json``. If a
+    hooks.json already exists, the postToolUse rule is appended only if
+    no rule with the same command is present (idempotent).
+    """
+    cwd = Path.cwd()
+    hooks_dir = cwd / ".github" / "hooks"
+    hooks_path = hooks_dir / "hooks.json"
+
+    rule = {
+        "type": "command",
+        "bash": "jcodemunch-mcp hook-copilot-posttooluse",
+        "powershell": "jcodemunch-mcp hook-copilot-posttooluse",
+        "timeoutSec": 30,
+        "comment": "jcodemunch-mcp: auto-reindex edited files",
+    }
+
+    if hooks_path.exists():
+        try:
+            data = json.loads(hooks_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, ValueError, OSError):
+            return f"  failed to parse existing {hooks_path}; skipping"
+        hooks = data.setdefault("hooks", {})
+        existing = hooks.setdefault("postToolUse", [])
+        for r in existing:
+            if r.get("bash", "").startswith("jcodemunch-mcp hook-copilot"):
+                return f"  Copilot hooks already present in {hooks_path}"
+        if dry_run:
+            return f"  would append jcodemunch postToolUse hook to {hooks_path}"
+        existing.append(rule)
+        data.setdefault("version", 1)
+        if backup:
+            hooks_path.with_suffix(".json.bak").write_text(
+                hooks_path.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+        hooks_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        return f"  appended Copilot postToolUse hook to {hooks_path}"
+
+    if dry_run:
+        return f"  would create {hooks_path} with jcodemunch postToolUse hook"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    payload = {"version": 1, "hooks": {"postToolUse": [rule]}}
+    hooks_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return f"  wrote {hooks_path} with jcodemunch postToolUse hook"
+
+
 def install_enforcement_hooks(*, dry_run: bool = False, backup: bool = True) -> str:
     """Merge PreToolUse/PostToolUse enforcement hooks into ~/.claude/settings.json.
 
@@ -789,6 +870,7 @@ def run_init(
     clients: Optional[list[str]] = None,
     claude_md: Optional[str] = None,
     hooks: bool = False,
+    copilot_hooks: bool = False,
     index: bool = False,
     audit: bool = False,
     dry_run: bool = False,
@@ -941,12 +1023,28 @@ def run_init(
     if do_enforce:
         msg = install_enforcement_hooks(dry_run=dry_run, backup=backup)
         print(f"  Enforcement:{msg}")
+        # touch the install-version stamp so `serve` startup can detect drift
+        try:
+            _stamp_install_version()
+        except Exception:
+            pass
         if demo and "would" in msg:
             _demo_actions.append((
                 "Install PreToolUse + PostToolUse enforcement hooks in ~/.claude/settings.json",
                 "Large code files would be routed through jCodemunch (get_file_outline + get_symbol_source) "
                 "instead of raw Read, and the index would auto-update after every Edit/Write — "
                 "eliminating staleness anxiety and enforcing token-efficient navigation",
+            ))
+
+    # ----- Step 3c: Copilot hooks (.github/hooks/hooks.json) -----
+    if copilot_hooks:
+        msg = install_copilot_hooks(dry_run=dry_run, backup=backup)
+        print(f"  Copilot hooks:{msg}")
+        if demo and "would" in msg:
+            _demo_actions.append((
+                "Write .github/hooks/hooks.json with a jcodemunch postToolUse rule",
+                "GitHub Copilot CLI / cloud-agent runs would auto-reindex edited files, "
+                "keeping jCodemunch fresh without any manual `index-file` calls",
             ))
 
     # ----- Step 4: Index -----

@@ -5271,6 +5271,12 @@ def main(argv: Optional[list[str]] = None):
         help="Install worktree lifecycle hooks into ~/.claude/settings.json",
     )
     init_parser.add_argument(
+        "--copilot-hooks",
+        action="store_true",
+        dest="copilot_hooks",
+        help="Write .github/hooks/hooks.json so GitHub Copilot CLI / cloud agent auto-reindex on edit",
+    )
+    init_parser.add_argument(
         "--index",
         action="store_true",
         help="Index the current working directory after setup",
@@ -5328,6 +5334,29 @@ def main(argv: Optional[list[str]] = None):
     subparsers.add_parser(
         "hook-posttooluse",
         help="PostToolUse hook: auto-reindex files after Edit/Write (reads stdin)",
+    )
+
+    # --- hook-copilot-posttooluse ---
+    subparsers.add_parser(
+        "hook-copilot-posttooluse",
+        help="GitHub Copilot postToolUse hook: auto-reindex files after Edit/Write (reads stdin)",
+    )
+
+    # --- upgrade ---
+    upgrade_parser = subparsers.add_parser(
+        "upgrade",
+        help="Upgrade jcodemunch-mcp via pip and refresh hooks/config",
+    )
+    upgrade_parser.add_argument(
+        "--no-pip",
+        action="store_true",
+        dest="no_pip",
+        help="Skip 'pip install -U' and only refresh hooks/config",
+    )
+    upgrade_parser.add_argument(
+        "--yes", "-y",
+        action="store_true",
+        help="Run init refresh non-interactively",
     )
 
     # --- hook-precompact ---
@@ -5474,7 +5503,7 @@ def main(argv: Optional[list[str]] = None):
     if any(arg in top_level_flags for arg in raw_argv):
         args = parser.parse_args(raw_argv)
     else:
-        known_commands = {"serve", "watch", "hook-event", "hook-pretooluse", "hook-posttooluse", "hook-precompact", "hook-taskcomplete", "hook-subagent-start", "watch-claude", "watch-all", "watch-install", "watch-uninstall", "watch-status", "config", "index", "index-file", "claude-md", "init", "install-pack", "download-model"}
+        known_commands = {"serve", "watch", "hook-event", "hook-pretooluse", "hook-posttooluse", "hook-copilot-posttooluse", "hook-precompact", "hook-taskcomplete", "hook-subagent-start", "watch-claude", "watch-all", "watch-install", "watch-uninstall", "watch-status", "config", "index", "index-file", "claude-md", "init", "install-pack", "download-model", "upgrade"}
         has_subcommand = any(arg in known_commands for arg in raw_argv if not arg.startswith("-"))
         if not has_subcommand:
             raw_argv = ["serve"] + list(raw_argv)
@@ -5501,6 +5530,7 @@ def main(argv: Optional[list[str]] = None):
             clients=args.client,
             claude_md=args.claude_md,
             hooks=args.hooks,
+            copilot_hooks=getattr(args, "copilot_hooks", False),
             index=args.index,
             audit=args.audit,
             dry_run=args.dry_run,
@@ -5536,6 +5566,14 @@ def main(argv: Optional[list[str]] = None):
     if args.command == "hook-posttooluse":
         from .cli.hooks import run_posttooluse
         sys.exit(run_posttooluse())
+
+    if args.command == "hook-copilot-posttooluse":
+        from .cli.hooks import run_copilot_posttooluse
+        sys.exit(run_copilot_posttooluse())
+
+    if args.command == "upgrade":
+        from .cli.upgrade import run_upgrade
+        sys.exit(run_upgrade(no_pip=args.no_pip, yes=args.yes))
 
     if args.command == "hook-precompact":
         from .cli.hooks import run_precompact
@@ -5694,6 +5732,23 @@ def main(argv: Optional[list[str]] = None):
         # Re-run load_config() after _setup_logging() so config warnings/errors
         # go to the configured log destination (the early call at startup ran before logging was set up)
         config_module.load_config()
+
+        # Version-drift probe: warn if `pip install -U` ran but `init` did not.
+        # Stale hook templates can point at older binaries / event names.
+        try:
+            from .cli.init import read_install_version
+            from . import __version__ as _current_version
+            _stamped = read_install_version()
+            if _stamped and _stamped != _current_version and _current_version != "unknown":
+                logger.warning(
+                    "jcodemunch-mcp upgraded %s -> %s but `init` has not been "
+                    "re-run. Hook templates and config may be stale; run "
+                    "`jcodemunch-mcp upgrade` (or `init --hooks`) to refresh.",
+                    _stamped,
+                    _current_version,
+                )
+        except Exception:
+            logger.debug("install-version probe failed", exc_info=True)
 
         # Clean up orphan indexes whose source_root no longer exists
         try:
