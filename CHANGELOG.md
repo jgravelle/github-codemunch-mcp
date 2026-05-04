@@ -2,6 +2,29 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.80.10] — 2026-05-04 — get_dead_code_v2: same-file caller detection
+
+### Fixed
+- **`get_dead_code_v2` no longer flags functions as dead when their
+  only caller lives in the same file.** Surfaced by the sverklo bench
+  on the sverklo repo (issue #25 follow-up by @nike-17): `parseDeadCode`
+  is defined at `benchmark/src/baselines/jcodemunch.ts:311` and called
+  at line 193 of the same file, but pre-1.80.10 the no-callers signal
+  only inspected files that *imported* the symbol's file — the symbol's
+  own file was never checked. Combined with `unreachable_file` (the
+  file isn't imported anywhere because it's the entry) and
+  `not_barrel_exported`, this produced confidence-1.0 false positives
+  in nested-root TS monorepos and any module where helpers are defined
+  and called locally. The AST fast path now also checks
+  `called_names_by_file[sym_file]`; the text-heuristic fallback scans
+  the symbol's own file body excluding the symbol's own line range so
+  the definition itself isn't matched.
+
+### Tests
+- `tests/test_v1_80_10_dead_code_intra_file_calls.py` — covers both
+  paths: an intra-file caller is no longer flagged dead, while a
+  genuinely-unreferenced function in the same file still is.
+
 ## [1.80.9] — 2026-05-03 — Lodash-class repos: force-include + call-graph fallback
 
 ### Fixed

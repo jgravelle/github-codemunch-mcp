@@ -359,9 +359,13 @@ def get_dead_code_v2(
             sym_name = sym.get("name", "")
             if not sym_name or not sym_file:
                 continue
-            # Check if any importing file has a symbol that calls this name
-            for importer_file in rev.get(sym_file, []):
-                if sym_name in called_names_by_file.get(importer_file, set()):
+            # Check the symbol's own file (intra-file calls) and any importing
+            # file. Same-file callers were missed pre-1.80.10, which produced
+            # false positives in nested-root TS monorepos where a function is
+            # defined and called within the same module.
+            search_files = (sym_file, *rev.get(sym_file, ()))
+            for caller_file in search_files:
+                if sym_name in called_names_by_file.get(caller_file, set()):
                     callee_has_caller.add(sym["id"])
                     break
     else:
@@ -375,6 +379,24 @@ def get_dead_code_v2(
             sym_name = sym.get("name", "")
             if not sym_name or not sym_file:
                 continue
+            # Check the symbol's own file (intra-file calls) and any importing
+            # file. The text heuristic must avoid matching the symbol's own
+            # definition line — otherwise every function trivially "calls"
+            # itself. Match the whole file body excluding the symbol's own
+            # line range.
+            sym_line = sym.get("line", 0)
+            sym_end_line = sym.get("end_line", sym_line)
+            if sym_file not in _file_cache:
+                _file_cache[sym_file] = store.get_file_content(owner, name, sym_file) or ""
+            own_content = _file_cache[sym_file]
+            if own_content and sym_line:
+                lines = own_content.splitlines()
+                start_idx = max(0, sym_line - 1)
+                end_idx = min(len(lines), sym_end_line)
+                outside = "\n".join(lines[:start_idx] + lines[end_idx:])
+                if outside and _word_match(outside, sym_name):
+                    callee_has_caller.add(sym["id"])
+                    continue
             for importer_file in rev.get(sym_file, []):
                 if importer_file not in _file_cache:
                     _file_cache[importer_file] = store.get_file_content(owner, name, importer_file) or ""
