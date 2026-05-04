@@ -25,7 +25,17 @@ Two-line summary: **save a file → that one file is re-indexed in the backgroun
 
 Output appears in the **jCodeMunch** output channel (View → Output → jCodeMunch).
 
-## Build / install from source
+## Install
+
+From the VS Code marketplace:
+
+```
+ext install jgravelle.jcodemunch-mcp-vscode
+```
+
+Or via the Extensions panel — search for "jCodeMunch".
+
+### Build from source
 
 ```bash
 cd vscode-extension
