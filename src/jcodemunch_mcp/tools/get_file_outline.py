@@ -6,7 +6,7 @@ import time
 from typing import Optional
 
 from ..storage import IndexStore, record_savings, estimate_savings, cost_avoided
-from ..parser import build_symbol_tree
+from ..parser import Symbol, build_symbol_tree
 from ._utils import resolve_repo
 
 
@@ -61,13 +61,11 @@ def _get_file_outline_single(
             },
         }
 
-    # Build symbol tree
-    from ..parser import Symbol
+    # DFS-flatten the symbol tree into a list with parent ids; class members
+    # follow their class in order.
     symbol_objects = [_dict_to_symbol(s) for s in file_symbols]
     tree = build_symbol_tree(symbol_objects)
-
-    # Convert to output format
-    symbols_output = [_node_to_dict(n) for n in tree]
+    symbols_output = _flatten_tree_with_parents(tree)
 
     elapsed = (time.perf_counter() - start) * 1000
     response_bytes = len(json.dumps(symbols_output).encode("utf-8"))
@@ -123,12 +121,15 @@ def get_file_outline(
     storage_path: Optional[str] = None,
     file_paths: Optional[list[str]] = None,
 ) -> dict:
-    """Get symbols in a file with hierarchical structure.
+    """Get all symbols in a file as a flat list with ``parent`` ids.
 
-    Supports two modes:
-    - Singular: pass ``file_path`` to get the original flat response shape.
-    - Batch: pass ``file_paths`` (list) to query multiple files at once,
-      returning a grouped ``results`` array.
+    Hierarchy is carried by ``parent``: nested symbols point at their
+    enclosing symbol's id; top-level symbols have ``parent=None``. DFS
+    ordering groups class members immediately after the class.
+
+    Modes:
+    - Singular: pass ``file_path`` for one file's outline.
+    - Batch: pass ``file_paths`` (list) to return a grouped ``results`` array.
 
     Args:
         repo: Repository identifier (owner/repo or just repo name)
@@ -169,9 +170,8 @@ def get_file_outline(
         return _get_file_outline_single(file_path, index, owner, name, store, start)
 
 
-def _dict_to_symbol(d: dict) -> "Symbol":
+def _dict_to_symbol(d: dict) -> Symbol:
     """Convert dict back to Symbol dataclass."""
-    from ..parser import Symbol
     return Symbol(
         id=d["id"],
         file=d["file"],
@@ -193,21 +193,24 @@ def _dict_to_symbol(d: dict) -> "Symbol":
     )
 
 
-def _node_to_dict(node) -> dict:
-    """Convert SymbolNode to output dict."""
-    result = {
-        "id": node.symbol.id,
-        "kind": node.symbol.kind,
-        "name": node.symbol.name,
-        "signature": node.symbol.signature,
-        "summary": node.symbol.summary,
-        "line": node.symbol.line,
-    }
-
-    if node.symbol.decorators:
-        result["decorators"] = node.symbol.decorators
-
-    if node.children:
-        result["children"] = [_node_to_dict(c) for c in node.children]
-
-    return result
+def _flatten_tree_with_parents(nodes, parent_id=None) -> list[dict]:
+    """DFS-flatten a SymbolNode tree into dicts; each carries its parent's id (None for roots)."""
+    out: list[dict] = []
+    for node in nodes:
+        sym = node.symbol
+        d = {
+            "id": sym.id,
+            "kind": sym.kind,
+            "name": sym.name,
+            "signature": sym.signature,
+            "summary": sym.summary,
+            "line": sym.line,
+            "end_line": sym.end_line,
+            "parent": parent_id,
+        }
+        if sym.decorators:
+            d["decorators"] = sym.decorators
+        out.append(d)
+        if node.children:
+            out.extend(_flatten_tree_with_parents(node.children, parent_id=sym.id))
+    return out

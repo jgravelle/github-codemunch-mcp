@@ -2,6 +2,32 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [Unreleased]
+
+### Fixed
+- **`get_file_outline` silently dropped every nested symbol** (methods,
+  constructors, fields, properties) on the MCP wire. The producer emitted a
+  nested tree (`children` arrays), but the compact `fo1` encoder schema was
+  designed for a flat list with `parent` ids and the generic encoder loop
+  iterated only top-level rows — so nested children fell on the floor. MCP
+  clients saw classes as if they had no methods, breaking the canonical
+  "outline first, then drill down" workflow. Reproduces on every language
+  (the failure lives in language-agnostic code), confirmed on C# and
+  TypeScript. Producer now DFS-flattens the tree and writes `parent` ids
+  directly, matching the encoder's existing schema intent.
+- **`signature` field was silently nulled on the wire** by `get_file_outline`.
+  The producer emitted it, but the encoder schema's `cols` list omitted it,
+  so it never made it into the compact payload. `signature` is now part of
+  the encoder schema.
+
+### Changed
+- **`get_file_outline` response shape is now flat with `parent` ids** in both
+  the in-process and over-the-wire response. The previous in-process tree
+  shape (nested `children` arrays) is removed. Direct Python callers that
+  walked `result["symbols"][i]["children"]` must rebuild the tree with a
+  `parent`-based group-by — one line. The on-wire compact format already
+  carried `parent`; this just makes the in-process shape match.
+
 ## [1.82.1] — 2026-05-08 — Handshake watchdog for stdio transport
 
 ### Added

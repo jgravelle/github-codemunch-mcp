@@ -9,7 +9,7 @@ _TABLES = [
     sd.TableSpec(
         key="symbols",
         tag="s",
-        cols=["id", "name", "kind", "line", "end_line", "parent", "summary"],
+        cols=["id", "name", "kind", "signature", "line", "end_line", "parent", "summary"],
         intern=["id", "parent"],
         types={"line": "int", "end_line": "int"},
     ),

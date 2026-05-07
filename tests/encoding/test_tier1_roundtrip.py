@@ -378,15 +378,26 @@ def test_get_file_outline_round_trip():
     resp = {
         "repo": "acme/app",
         "file": "src/models/user.py",
-        "symbol_count": 2,
+        "symbol_count": 4,
         "symbols": [
-            {"id": "s1", "name": "User", "kind": "class", "line": 1, "end_line": 20, "parent": "", "summary": ""},
-            {"id": "s2", "name": "get_user", "kind": "function", "line": 25, "end_line": 40, "parent": "", "summary": ""},
+            {"id": "s1", "name": "User", "kind": "class", "signature": "class User", "line": 1, "end_line": 20, "parent": None, "summary": ""},
+            {"id": "s2", "name": "__init__", "kind": "method", "signature": "def __init__(self)", "line": 3, "end_line": 5, "parent": "s1", "summary": ""},
+            {"id": "s3", "name": "name", "kind": "constant", "signature": "name: str", "line": 6, "end_line": 6, "parent": "s1", "summary": ""},
+            {"id": "s4", "name": "get_user", "kind": "function", "signature": "def get_user(uid: int) -> User", "line": 25, "end_line": 40, "parent": None, "summary": ""},
         ],
         "_meta": {"timing_ms": 0.3},
     }
     out = _rt("get_file_outline", resp)
-    assert len(out["symbols"]) == 2
+    assert len(out["symbols"]) == 4
+    by_id = {s["id"]: s for s in out["symbols"]}
+    # parent column carries hierarchy; nested symbols point at their class.
+    assert by_id["s2"]["parent"] == "s1"
+    assert by_id["s3"]["parent"] == "s1"
+    assert by_id["s1"]["parent"] is None
+    assert by_id["s4"]["parent"] is None
+    # signature round-trips through the encoder.
+    assert by_id["s4"]["signature"] == "def get_user(uid: int) -> User"
+    assert by_id["s2"]["signature"] == "def __init__(self)"
 
 
 def test_get_repo_outline_round_trip():
