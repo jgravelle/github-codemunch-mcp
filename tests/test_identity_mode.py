@@ -258,7 +258,8 @@ def test_config_template_exposes_git_identity_opt_in():
     template = config_module.generate_template()
 
     assert '// "identity_mode": "git",' in template
-    assert "Uncomment and set to \"git\" to opt in" in template
+    assert '"local" (default)' in template
+    assert '"git"' in template
     assert "Existing indexes keep their current identity" in template
     assert '// "git_root_identity": true,' in template
 
