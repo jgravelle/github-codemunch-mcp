@@ -1,11 +1,12 @@
 # jcodemunch-mcp — Project Brief
 
 ## Current State
-- **Version:** 1.108.6 (Local-first index identity restored as default — `resolve_index_identity()` in `storage/git_root.py` is the single source of truth for local-path → repo-ID resolution. Default is `local/<basename>-<hash>`; `identity_mode: "git"` opt-in enables git-root identity + monorepo subdir merging. Existing indexes of either kind are preserved automatically, with `IdentityModeConflict` / `IdentityModeAmbiguous` guarding silent re-keying. Plus: `check_delete_safe` now caveats `safe_to_delete` verdicts when no runtime traces have been ingested for the repo — honest-hint pattern back-ported from `check_column_drop_safe` in jdatamunch-mcp v1.8.0. PR #295 by @MariusAdrian88.)
+- **Version:** 1.108.7 (Windows hook path fix: `_hook_invocation()` now emits forward-slash paths on Windows so Claude Code's bash launcher doesn't eat the backslashes (`C:\Python314\Scripts\...EXE` → `C:Python314Scripts...EXE` and "command not found"). `_merge_hooks()` deduplication now compares jcm subcommands via a new `_extract_jcm_subcommand()` regex instead of substring matching — absolute-path and bare forms of the same hook are correctly recognised as duplicates, ending the every-init-appends-another-copy bug. 19 new regression tests in `tests/test_init_hooks_paths.py`.)
+- **v1.108.6:** Local-first index identity restored as default — `resolve_index_identity()` in `storage/git_root.py` is the single source of truth for local-path → repo-ID resolution. Default is `local/<basename>-<hash>`; `identity_mode: "git"` opt-in enables git-root identity + monorepo subdir merging. Existing indexes of either kind are preserved automatically, with `IdentityModeConflict` / `IdentityModeAmbiguous` guarding silent re-keying. Plus: `check_delete_safe` now caveats `safe_to_delete` verdicts when no runtime traces have been ingested for the repo — honest-hint pattern back-ported from `check_column_drop_safe` in jdatamunch-mcp v1.8.0. PR #295 by @MariusAdrian88.
 - **INDEX_VERSION:** 16
-- **Tests:** 4255+ passed, 10 skipped (1.108.6 — full count varies by optional-dep availability)
+- **Tests:** 4274+ passed, 10 skipped (1.108.7 — full count varies by optional-dep availability)
 - **Python:** >=3.10
-- **Tool count:** 81 (unchanged — 1.108.6 adds `identity_mode` parameter to `index_folder` but no new tools)
+- **Tool count:** 81 (unchanged — 1.108.7 fixes init-time hook path handling; no new tools)
 
 ## Key Files
 ```
