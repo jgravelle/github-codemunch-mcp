@@ -1284,6 +1284,128 @@ class TestConfigDisplayHonorsProjectOverride:
             assert ".jcodemunch.jsonc loaded" not in captured
 
 
+class TestSummarizerModelDisplay:
+    """Regression: surfaced by @slazarov on #300 (comment 4472458576).
+    `config --check` showed the OPENAI_MODEL env default even when
+    summarizer_model was configured, because the display logic only read
+    OPENAI_MODEL env var, not the config key. Mirror the runtime
+    resolution order (config summarizer_model > provider env var > default).
+    """
+
+    def _setup(self, monkeypatch, tmp, project_config: dict, env_vars: dict):
+        from src.jcodemunch_mcp.config import _GLOBAL_CONFIG, _PROJECT_CONFIGS
+        _GLOBAL_CONFIG.clear()
+        _PROJECT_CONFIGS.clear()
+
+        storage = tmp / "storage"
+        storage.mkdir()
+        (storage / "config.jsonc").write_text("{}", encoding="utf-8")
+
+        project = tmp / "project"
+        project.mkdir()
+        if project_config:
+            import json
+            (project / ".jcodemunch.jsonc").write_text(
+                json.dumps(project_config), encoding="utf-8"
+            )
+
+        monkeypatch.setenv("CODE_INDEX_PATH", str(storage))
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp))
+        monkeypatch.setattr(Path, "cwd", classmethod(lambda cls: project))
+        for k in ("ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_BASE",
+                  "MINIMAX_API_KEY", "ZHIPUAI_API_KEY", "OPENROUTER_API_KEY",
+                  "OPENAI_MODEL", "ANTHROPIC_MODEL", "GOOGLE_MODEL",
+                  "JCODEMUNCH_SUMMARIZER_PROVIDER",
+                  "JCODEMUNCH_SUMMARIZER_MODEL"):
+            monkeypatch.delenv(k, raising=False)
+        for k, v in env_vars.items():
+            monkeypatch.setenv(k, v)
+        return project
+
+    def test_summarizer_model_row_present_with_global_value(self, capsys, monkeypatch):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            self._setup(monkeypatch, tmp, project_config={}, env_vars={})
+            # Set global summarizer_model via the storage config.jsonc.
+            import json
+            (tmp / "storage" / "config.jsonc").write_text(
+                json.dumps({"summarizer_model": "Qwen3.6-Plus"}), encoding="utf-8"
+            )
+
+            from src.jcodemunch_mcp.server import _run_config
+            _run_config(check=False)
+
+            captured = capsys.readouterr().out
+            sm_lines = [l for l in captured.splitlines() if "summarizer_model" in l]
+            assert sm_lines, f"summarizer_model row missing; got: {captured}"
+            assert "Qwen3.6-Plus" in sm_lines[0], (
+                f"expected configured value on summarizer_model row, got: {sm_lines[0]}"
+            )
+            # The warning hint for #304 only fires when project-only.
+            assert "#304" not in sm_lines[0]
+
+    def test_summarizer_model_project_only_shows_runtime_warning(
+        self, capsys, monkeypatch
+    ):
+        """When summarizer_model is in project config but not global, the
+        display surfaces the runtime gap (#304) instead of pretending the
+        project value will be honored."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            self._setup(
+                monkeypatch, tmp,
+                project_config={"summarizer_model": "Qwen3.6-Plus"},
+                env_vars={},
+            )
+
+            from src.jcodemunch_mcp.server import _run_config
+            _run_config(check=False)
+
+            captured = capsys.readouterr().out
+            sm_lines = [l for l in captured.splitlines() if "summarizer_model" in l]
+            assert sm_lines, f"summarizer_model row missing; got: {captured}"
+            row = sm_lines[0]
+            assert "Qwen3.6-Plus" in row
+            assert "#304" in row, (
+                "expected #304 reference to surface runtime-gap honestly; "
+                f"got: {row}"
+            )
+
+    def test_openai_model_row_uses_configured_summarizer_model(
+        self, capsys, monkeypatch
+    ):
+        """When summarizer_model is set globally AND OpenAI provider is
+        active, the OPENAI_MODEL row reflects the config value, not the
+        env-or-default fallback. Mirrors batch_summarize.py's resolution."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            self._setup(
+                monkeypatch, tmp,
+                project_config={},
+                env_vars={"OPENAI_API_BASE": "http://localhost:11434/v1"},
+            )
+            import json
+            (tmp / "storage" / "config.jsonc").write_text(
+                json.dumps({"summarizer_model": "Qwen3.6-Plus"}), encoding="utf-8"
+            )
+
+            from src.jcodemunch_mcp.server import _run_config
+            _run_config(check=False)
+
+            captured = capsys.readouterr().out
+            openai_model_lines = [
+                l for l in captured.splitlines() if "OPENAI_MODEL" in l
+            ]
+            assert openai_model_lines, f"OPENAI_MODEL row missing; got: {captured}"
+            row = openai_model_lines[0]
+            assert "Qwen3.6-Plus" in row, (
+                f"OPENAI_MODEL should reflect summarizer_model config, got: {row}"
+            )
+            assert "qwen3-coder" not in row, (
+                f"hardcoded default should be replaced by config, got: {row}"
+            )
+
+
 class TestClaudeMdDriftCheck:
     """config --check: CLAUDE.md drift detection."""
 

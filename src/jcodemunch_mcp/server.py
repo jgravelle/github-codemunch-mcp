@@ -5827,6 +5827,26 @@ def _run_config(check: bool = False, init: bool = False, upgrade: bool = False) 
         "env" if not provider_d else "default",
     )
 
+    # summarizer_model display (surfaced by @slazarov on #300):
+    # batch_summarize.py reads this from _GLOBAL_CONFIG only (no repo= passed),
+    # so a project-level override in .jcodemunch.jsonc is silently ignored at
+    # runtime. The display has to mirror what the runtime actually sees, or
+    # we'd be lying. Show the global value here; flag a warning row if a
+    # project override exists that the runtime won't honor (#304).
+    _sm_global = (_cfg._mod.get("summarizer_model", "") or "").strip()
+    _sm_effective = (_cfg.get("summarizer_model", "") or "").strip()
+    if _sm_global:
+        row("summarizer_model", _sm_global, _detect_source("summarizer_model", ""))
+    elif _sm_effective:
+        row(
+            "summarizer_model",
+            f"{yellow(_sm_effective)} "
+            f"{dim('(project value not honored by runtime yet — see #304)')}",
+            "project",
+        )
+    else:
+        row("summarizer_model", dim("(provider default)"), "default")
+
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
     google_key = os.environ.get("GOOGLE_API_KEY", "")
     openai_base = os.environ.get("OPENAI_API_BASE", "")
@@ -5837,21 +5857,31 @@ def _run_config(check: bool = False, init: bool = False, upgrade: bool = False) 
     elif provider_name == "anthropic":
         suffix = "JCODEMUNCH_SUMMARIZER_PROVIDER=anthropic" if provider == "anthropic" else "ANTHROPIC_API_KEY set"
         print(f"  Active provider:  {green('Anthropic')}  ({suffix})")
-        model, d = env("ANTHROPIC_MODEL", "claude-haiku-*")
-        row("  ANTHROPIC_MODEL", model, "env" if not d else "default")
+        # Runtime: summarizer_model (global config) > ANTHROPIC_MODEL env > default
+        if _sm_global:
+            row("  ANTHROPIC_MODEL", _sm_global, "config")
+        else:
+            model, d = env("ANTHROPIC_MODEL", "claude-haiku-*")
+            row("  ANTHROPIC_MODEL", model, "env" if not d else "default")
     elif provider_name == "gemini":
         suffix = "JCODEMUNCH_SUMMARIZER_PROVIDER=gemini" if provider == "gemini" else "GOOGLE_API_KEY set"
         print(f"  Active provider:  {green('Google Gemini')}  ({suffix})")
-        model, d = env("GOOGLE_MODEL", "gemini-flash-*")
-        row("  GOOGLE_MODEL", model, "env" if not d else "default")
+        if _sm_global:
+            row("  GOOGLE_MODEL", _sm_global, "config")
+        else:
+            model, d = env("GOOGLE_MODEL", "gemini-flash-*")
+            row("  GOOGLE_MODEL", model, "env" if not d else "default")
     elif provider_name == "openai":
         base_label = openai_base or "https://api.openai.com/v1"
         suffix = "JCODEMUNCH_SUMMARIZER_PROVIDER=openai" if provider == "openai" else "OPENAI_API_BASE set"
         print(f"  Active provider:  {green('OpenAI-compatible')}  ({suffix})")
         row("  OPENAI_API_BASE", base_label, "env" if openai_base else "default")
-        model_default = "gpt-4o-mini" if provider == "openai" and not openai_base else "qwen3-coder"
-        model, d = env("OPENAI_MODEL", model_default)
-        row("  OPENAI_MODEL", model, "env" if not d else "default")
+        if _sm_global:
+            row("  OPENAI_MODEL", _sm_global, "config")
+        else:
+            model_default = "gpt-4o-mini" if provider == "openai" and not openai_base else "qwen3-coder"
+            model, d = env("OPENAI_MODEL", model_default)
+            row("  OPENAI_MODEL", model, "env" if not d else "default")
         v, d = env("OPENAI_TIMEOUT", "60.0")
         row("  OPENAI_TIMEOUT", v, "env" if not d else "default")
         v, d = env("OPENAI_BATCH_SIZE", "10")
@@ -5864,17 +5894,17 @@ def _run_config(check: bool = False, init: bool = False, upgrade: bool = False) 
         suffix = "JCODEMUNCH_SUMMARIZER_PROVIDER=minimax" if provider == "minimax" else "MINIMAX_API_KEY set"
         print(f"  Active provider:  {green('MiniMax')}  ({suffix})")
         row("  OPENAI_API_BASE", "https://api.minimax.io/v1", "default")
-        row("  OPENAI_MODEL", "minimax-m2.7", "default")
+        row("  OPENAI_MODEL", _sm_global or "minimax-m2.7", "config" if _sm_global else "default")
     elif provider_name == "glm":
         suffix = "JCODEMUNCH_SUMMARIZER_PROVIDER=glm" if provider == "glm" else "ZHIPUAI_API_KEY set"
         print(f"  Active provider:  {green('GLM-5')}  ({suffix})")
         row("  OPENAI_API_BASE", "https://api.z.ai/api/paas/v4/", "default")
-        row("  OPENAI_MODEL", "glm-5", "default")
+        row("  OPENAI_MODEL", _sm_global or "glm-5", "config" if _sm_global else "default")
     elif provider_name == "openrouter":
         suffix = "JCODEMUNCH_SUMMARIZER_PROVIDER=openrouter" if provider == "openrouter" else "OPENROUTER_API_KEY set"
         print(f"  Active provider:  {green('OpenRouter')}  ({suffix})")
         row("  OPENAI_API_BASE", "https://openrouter.ai/api/v1", "default")
-        row("  OPENAI_MODEL", "meta-llama/llama-3.3-70b-instruct:free", "default")
+        row("  OPENAI_MODEL", _sm_global or "meta-llama/llama-3.3-70b-instruct:free", "config" if _sm_global else "default")
     elif provider == "none":
         print(f"  Active provider:  {yellow('none')} — explicitly disabled, signature fallback active")
     else:

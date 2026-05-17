@@ -2,6 +2,43 @@
 
 All notable changes to jcodemunch-mcp are documented here.
 
+## [1.108.17] - 2026-05-17 - `config --check` reflects `summarizer_model` (#300 follow-up; #304 filed)
+
+Patch release. Surfaced by @slazarov on #300: setting
+`summarizer_model: "Qwen3.6-Plus"` in `.jcodemunch.jsonc` and running
+`config --check` printed `OPENAI_MODEL qwen3-coder (default)`. The
+display only consulted the `OPENAI_MODEL` env var and a hardcoded
+fallback; it never looked at the `summarizer_model` config key that the
+runtime summarizer actually reads.
+
+Two display fixes:
+
+1. **New `summarizer_model` row in the AI Summarizer section.** Reads
+   `_GLOBAL_CONFIG["summarizer_model"]` directly (bypassing the v1.108.15
+   project-aware shim) so the displayed value matches what the runtime
+   actually sees. Source tag is `[config]` / `[env]` / `[default]` as
+   appropriate.
+2. **Provider-specific MODEL rows now consult `summarizer_model` first.**
+   `ANTHROPIC_MODEL`, `GOOGLE_MODEL`, `OPENAI_MODEL` (for openai-compatible,
+   minimax, glm, openrouter) display the configured `summarizer_model`
+   when set, mirroring `batch_summarize.py`'s resolution order:
+   `summarizer_model` config > provider env var > hardcoded default.
+
+Honesty gate: project-level `summarizer_model` (set in
+`.jcodemunch.jsonc` only, not in global `config.jsonc`) is NOT honored
+by the runtime today — every `_config.get("summarizer_model")` call
+in `batch_summarize.py` passes `repo=None`, so project configs are
+silently dropped. The display now surfaces a yellow warning row when
+this case is detected, pointing at #304 (filed) for the runtime fix.
+Without that honesty signal, the v1.108.15 project-aware shim would
+show "Qwen3.6-Plus [project]" while the actual summarizer used the
+default — the worst kind of misleading diagnostic.
+
+3 new regression tests in `TestSummarizerModelDisplay`:
+global-value-shows-in-row, project-only-shows-runtime-warning,
+OpenAI provider row reflects configured summarizer_model. Full suite:
+4421 passing.
+
 ## [1.108.16] - 2026-05-17 - resolve_repo: provisional id bypass + `_read_origin_url` hardening (#303 follow-up)
 
 Patch release. @rknighton rebuilt the original 130-worktree fixture and
